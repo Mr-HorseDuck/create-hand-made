@@ -497,7 +497,7 @@ public final class HandMadeRecipePool {
      * 所以 Create 的机器（查的是 {@code AllRecipeTypes.XXX.getType()}）永远看不到它们；
      * 只有本方法把它们并进工具的候选列表。</p>
      *
-     * <p><b>哪些工具支持：</b>目前六个工具、四个家族：</p>
+     * <p><b>哪些工具支持：</b>目前 <b>8 个工具 id / 6 个家族</b>：</p>
      * <ul>
      *   <li>basin：{@link HandMadeTool#PRESS_HAMMER_BASIN} / {@link HandMadeTool#STIRRING_STAFF}
      *       → {@link HandMadeToolRecipe}</li>
