@@ -55,7 +55,7 @@
   "item.create_hand_made.infusion_gun.tooltip.condition5": "Short right-click elsewhere",
   "item.create_hand_made.infusion_gun.tooltip.behaviour5": "_Place_ a fluid source",
 
-  "item.create_hand_made.bellows.tooltip.summary": "A tool that applies fan effects using an _offhand medium_.",
+  "item.create_hand_made.bellows.tooltip.summary": "A tool for applying _fan effects_ with an _offhand medium_.",
   "item.create_hand_made.bellows.tooltip.condition1": "Holding a medium in offhand, hold right-click on a Depot or Belt",
   "item.create_hand_made.bellows.tooltip.behaviour1": "Applies the matching _fan processing_ to items on it",
   "item.create_hand_made.bellows.tooltip.condition2": "Holding a medium in offhand, hold right-click toward mobs",
