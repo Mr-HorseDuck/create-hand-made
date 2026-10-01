@@ -14,11 +14,14 @@ import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.recipe.FanType;
 import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
+import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadePressingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.alben.createhandmade.recipe.HandMadeToolRecipe;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
@@ -58,6 +61,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.*;
 import net.minecraft.world.level.Level;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -610,6 +614,16 @@ public class CreateHandMadeJEI implements IModPlugin {
         // 5. 移除 non-automation（与 Create 的 removeNonAutomation 逐字一致）。
         result.removeIf(AllRecipeTypes.CAN_BE_AUTOMATED.negate());
 
+        // 6. 追加 L3 独占配方（create_hand_made:bellows_recipe, fan_type=blasting）。
+        //    刻意放在最后：它只按 fan_type 归类，不参与上面那几步 L1 去重 / 自动化过滤
+        //    （独占配方本来就是"手搓"语义，不该被 _manual_only 那套规则挡住）。
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.BLASTING)) {
+            AbstractCookingRecipe proxy = asBellowsCookingProxy(h.value(), true);
+            if (proxy != null) {
+                result.add(new RecipeHolder<>(h.id(), proxy));
+            }
+        }
+
         return result;
     }
 
@@ -631,6 +645,15 @@ public class CreateHandMadeJEI implements IModPlugin {
             result.add((RecipeHolder) h);
         }
         result.removeIf(AllRecipeTypes.CAN_BE_AUTOMATED.negate());
+
+        // L3 独占配方（fan_type=smoking）；位置与理由同 blasting
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.SMOKING)) {
+            AbstractCookingRecipe proxy = asBellowsCookingProxy(h.value(), false);
+            if (proxy != null) {
+                result.add(new RecipeHolder<>(h.id(), proxy));
+            }
+        }
+
         return result;
     }
 
@@ -642,6 +665,15 @@ public class CreateHandMadeJEI implements IModPlugin {
                 result.add(new RecipeHolder<>(h.id(), r));
             }
         }
+
+        // L3 独占配方（fan_type=haunting）：包成 HauntingRecipe 后混进同一类别
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.HAUNTING)) {
+            HauntingRecipe proxy = asBellowsProcessingProxy(HauntingRecipe::new, h.id(), h.value());
+            if (proxy != null) {
+                result.add(new RecipeHolder<>(h.id(), proxy));
+            }
+        }
+
         return result;
     }
 
@@ -653,6 +685,98 @@ public class CreateHandMadeJEI implements IModPlugin {
                 result.add(new RecipeHolder<>(h.id(), r));
             }
         }
+
+        // L3 独占配方（fan_type=splashing）：同上
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.SPLASHING)) {
+            SplashingRecipe proxy = asBellowsProcessingProxy(SplashingRecipe::new, h.id(), h.value());
+            if (proxy != null) {
+                result.add(new RecipeHolder<>(h.id(), proxy));
+            }
+        }
+
         return result;
+    }
+
+    // ==================== 风箱 L3 独占配方（create_hand_made:bellows_recipe） ====================
+
+    /**
+     * 收集 {@code create_hand_made:bellows_recipe} 里 {@code fan_type} 匹配的 L3 独占配方。
+     *
+     * <p><b>为什么不走 {@link HandMadeRecipePool}：</b>池的语义是"某个 {@code HandMadeTool}
+     * 的候选集"，而风箱不在 {@code HandMadeTool} 体系里（它按 {@code fan_type} 归类，没有 tool 字段）。
+     * 所以这里直接查 {@code RecipeManager} —— 与游戏内 {@code BellowsItem.findL3BellowsRecipe}
+     * 的数据来源一致（那边是服务端用同一个 RecipeType 查的）。</p>
+     *
+     * <p>只做 {@code fan_type} 过滤；"这条配方是否匹配某个物品"由配方自己的 {@code matches}
+     * 在游戏内判定（JEI 类别只负责展示）。</p>
+     */
+    private static List<RecipeHolder<HandMadeBellowsRecipe>> collectBellowsExclusive(FanType fanType) {
+        List<RecipeHolder<HandMadeBellowsRecipe>> result = new ArrayList<>();
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return result;
+
+        for (RecipeHolder<?> holder : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
+            if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
+            if (recipe.getFanType() != fanType) continue;
+            result.add(new RecipeHolder<>(holder.id(), recipe));
+        }
+        return result;
+    }
+
+    /**
+     * 把一条 L3 风箱配方包成 {@link AbstractCookingRecipe}（仅 JEI 展示用）。
+     *
+     * <p>用 {@link SmeltingRecipe}（{@code smelting=true}）或 {@link SmokingRecipe}：
+     * 与 Create 的"鼓风熔炼 / 鼓风烟熏"底层配方来源一致（鼓风熔炼优先
+     * {@code minecraft:smelting}，见 {@code AllFanProcessingTypes.java:121-137}）。
+     * 两者的构造都是 public，只需要一个输入 + 一个产物。</p>
+     *
+     * <p><b>已知展示限制：</b>{@code AbstractCookingRecipe} 只能承载<b>一个</b>产物，
+     * 而本模组的 L3 配方最多允许 12 个产物、每个可带概率 —— 所以
+     * {@code fan_type: blasting / smoking} 的 L3 配方在 JEI 里<b>只显示第一个产物</b>
+     * （{@code fan_type: haunting / splashing} 走 {@code getRollableResults()}，
+     * 多产物与概率都会显示）。</p>
+     */
+    @Nullable
+    private static AbstractCookingRecipe asBellowsCookingProxy(HandMadeBellowsRecipe exclusive, boolean smelting) {
+        if (exclusive.getIngredients().isEmpty()) return null;
+        List<ProcessingOutput> results = exclusive.getRollableResults();
+        if (results.isEmpty()) return null;
+        ItemStack result = results.get(0).getStack();
+        if (result.isEmpty()) return null;
+
+        Ingredient ingredient = exclusive.getIngredients().get(0);
+        // experience / cookingTime 只是构造占位 —— 该类别不渲染这两个值
+        // （BellowsCookingCategory:37,52 只读输入与产物）
+        return smelting
+                ? new SmeltingRecipe("", CookingBookCategory.MISC, ingredient, result, 0f, 200)
+                : new SmokingRecipe("", CookingBookCategory.MISC, ingredient, result, 0f, 200);
+    }
+
+    /**
+     * 把一条 L3 风箱配方包成 Create 的鼓风配方（{@link HauntingRecipe} / {@link SplashingRecipe}），
+     * 仅 JEI 展示用。
+     *
+     * <p>用 Create 自己的 {@link StandardProcessingRecipe.Builder} 构造：它内部的
+     * {@code createParams()} 会 new 一个 {@link ProcessingRecipeParams} 并在 Create 包内
+     * 填好字段，所以外部包不需要碰 {@code protected} 的 params 字段
+     * （T5c 批次 4 给部署器造代理时用的也是同一套 Builder）。</p>
+     *
+     * <p>产物走 {@code withItemOutputs(...)}，因此多产物与概率都会被类别渲染出来
+     * （{@code BellowsHauntingCategory:45-56} 就是遍历 {@code getRollableResults()}
+     * 并给每个产物挂概率 tooltip）。</p>
+     */
+    @Nullable
+    private static <R extends StandardProcessingRecipe<?>> R asBellowsProcessingProxy(
+            StandardProcessingRecipe.Factory<R> factory, ResourceLocation id, HandMadeBellowsRecipe exclusive) {
+        if (exclusive.getIngredients().isEmpty()) return null;
+        List<ProcessingOutput> results = exclusive.getRollableResults();
+        if (results.isEmpty()) return null;
+
+        return new StandardProcessingRecipe.Builder<>(factory, id)
+                .withItemIngredients(exclusive.getIngredients())
+                .withItemOutputs(results.toArray(new ProcessingOutput[0]))
+                .build();
     }
 }
