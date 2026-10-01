@@ -217,6 +217,33 @@ HandMadeEvents.toolFilter(event => {
 
 数据包侧的 `tool_filter/<tool_id>.json` 同理，`disabled` 里直接写独占配方的 id 即可。
 
+### L3 与 L1 的匹配顺序（重要）
+
+工具匹配配方时，候选集的顺序是 **Create 候选（L1）在前、L3 独占配方在后**，而工具取**第一个匹配**的。
+也就是说：
+
+> **如果某个输入已经有匹配的 Create 配方，你的独占配方在手搓工具里永远不会被选中。**
+
+这是设计使然 —— 同一个输入不应该有两条都匹配的配方（那属于配方设计错误），
+优先级规则只是为了给出确定的行为。
+
+想让独占配方真正生效，作者要自己把 L1 那条让开：
+
+1. **用 L2 禁用对应的 Create 配方**：
+   ```js
+   HandMadeEvents.toolFilter(event => {
+       event.disable('press_hammer_depot', 'create:pressing/iron_ingot')
+   })
+   ```
+   （数据包方式同理：在 `tool_filter/press_hammer_depot.json` 的 `disabled` 里写 `create:pressing/iron_ingot`）
+2. **再用 L3 添加独占配方**（或直接用 Create 那条改名后的变体）。
+
+反过来，如果某个输入 Create 根本没有配方（例如给置物台喂一个苹果），L3 独占配方会直接生效，
+不需要任何额外操作。
+
+> 提示：选测试/示例配方时，最好挑一个 Create 没有对应配方的输入，
+> 这样不必依赖 L2 禁用就能看到 L3 的效果。
+
 ---
 
 ## 工具 ID 清单

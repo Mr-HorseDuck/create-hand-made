@@ -2,6 +2,7 @@ package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.network.FluidParticlesPacket;
+import com.alben.createhandmade.recipe.HandMadeFillingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -11,6 +12,7 @@ import com.simibubi.create.content.fluids.transfer.GenericItemFilling;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
 import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
+import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.fluid.FluidHelper;
@@ -56,6 +58,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
@@ -570,10 +573,11 @@ public class InfusionGunItem extends Item {
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
 
-            // 1. FillingRecipe
-            RecipeHolder<FillingRecipe> recipe = findFillingRecipe(level, stack, contents.fluid());
+            // 1. FillingRecipe（Create 的 + L3 独占的，见 findFillingRecipe）
+            RecipeHolder<? extends StandardProcessingRecipe<?>> recipe =
+                    findFillingRecipe(level, stack, contents.fluid());
             if (recipe != null) {
-                int required = recipe.value().getRequiredFluid().amount();
+                int required = requiredFluidOf(recipe.value()).amount();
                 if (contents.fluid().getAmount() < required) return TransportedResult.doNothing();
 
                 List<ItemStack> results = recipe.value().rollResults(level.random);
@@ -736,7 +740,8 @@ public class InfusionGunItem extends Item {
     // ================== 配方查找 ==================
 
     @Nullable
-    private static RecipeHolder<FillingRecipe> findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
+    private static RecipeHolder<? extends StandardProcessingRecipe<?>> findFillingRecipe(
+            Level level, ItemStack target, FluidStack fluid) {
         SingleRecipeInput input = new SingleRecipeInput(target);
 
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
@@ -749,6 +754,15 @@ public class InfusionGunItem extends Item {
         // 候选集改由统一配方池提供；匹配与流体判定留在本类。
         // 这里没有 CAN_BE_AUTOMATED 过滤 —— 改造前就没有，不新增。
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.INFUSION_GUN, level)) {
+            // L3 独占配方（注液家族）：只认归属灌注枪的那些。
+            // 流体判定与 Create 分支一样留在工具侧（matches 只管物品）。
+            if (holder.value() instanceof HandMadeFillingRecipe exclusive) {
+                if (exclusive.getTool() != HandMadeTool.INFUSION_GUN) continue;
+                if (!exclusive.matches(input, level)) continue;
+                if (!exclusive.getRequiredFluid().test(fluid)) continue;
+                return new RecipeHolder<>(holder.id(), exclusive);
+            }
+
             if (!(holder.value() instanceof FillingRecipe fr)) continue;
             if (!fr.matches(input, level)) continue;
             if (!fr.getRequiredFluid().test(fluid)) continue;
@@ -756,6 +770,26 @@ public class InfusionGunItem extends Item {
         }
 
         return null;
+    }
+
+    /**
+     * 取「注液类」配方要求的流体。
+     *
+     * <p>Create 的 {@link FillingRecipe} 与本模组的 {@link HandMadeFillingRecipe} 都继承
+     * {@code StandardProcessingRecipe}，但那个公共父类型上<b>没有</b> {@code getRequiredFluid()}
+     * （Create 只把它放在 FillingRecipe 上），所以这里把两边的取法收拢到一处，
+     * 调用点就不必各写一次 instanceof。</p>
+     *
+     * @throws IllegalStateException 传入的不是注液类配方（正常流程到不了这里）
+     */
+    private static SizedFluidIngredient requiredFluidOf(StandardProcessingRecipe<?> recipe) {
+        if (recipe instanceof FillingRecipe filling) {
+            return filling.getRequiredFluid();
+        }
+        if (recipe instanceof HandMadeFillingRecipe exclusive) {
+            return exclusive.getRequiredFluid();
+        }
+        throw new IllegalStateException("Not a filling recipe: " + recipe);
     }
 
     // ================== 数据组件 ==================

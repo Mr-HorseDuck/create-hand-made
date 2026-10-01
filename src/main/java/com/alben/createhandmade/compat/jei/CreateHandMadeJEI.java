@@ -394,7 +394,8 @@ public class CreateHandMadeJEI implements IModPlugin {
 
     /** 灌注枪 · 注液（FILLING），再追加 SpoutCategory 的转换配方。 */
     private List<RecipeHolder<FillingRecipe>> collectInfusionGunRecipes() {
-        List<RecipeHolder<FillingRecipe>> result = collectFromPool(HandMadeTool.INFUSION_GUN, FillingRecipe.class);
+        List<RecipeHolder<FillingRecipe>> result =
+                collectFromPoolWithProxy(HandMadeTool.INFUSION_GUN, FillingRecipe.class, FillingRecipe::new);
 
         if (ingredientManager != null) {
             SpoutCategory.consumeRecipes(result::add, ingredientManager);

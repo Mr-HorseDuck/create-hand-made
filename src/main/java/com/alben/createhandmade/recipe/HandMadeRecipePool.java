@@ -505,9 +505,10 @@ public final class HandMadeRecipePool {
      *       → {@link HandMadeCrushingRecipe}</li>
      *   <li>冲压：{@link HandMadeTool#PRESS_HAMMER_DEPOT} → {@link HandMadePressingRecipe}</li>
      *   <li>切削：{@link HandMadeTool#HAND_SAW} → {@link HandMadeCuttingRecipe}</li>
+     *   <li>注液：{@link HandMadeTool#INFUSION_GUN} → {@link HandMadeFillingRecipe}</li>
      * </ul>
      * <p><b>这份清单必须与 {@code HandMadeToolRecipeSerializer.familyOf} 的键集保持一致。</b>
-     * 其余工具（自动摆放 / 自动无序合成 / 自动酿造 / 指杆 / 灌注枪）还没有自己的独占配方类。</p>
+     * 其余工具（自动摆放 / 自动无序合成 / 自动酿造 / 指杆）还没有自己的独占配方类。</p>
      *
      * <p><b>归属匹配规则：</b>独占配方按 {@code tool} 字段归属，通常只给写下它的那个工具读；
      * 例外是 {@link HandMadeTool#CRUSHER_MORTAR} —— 它连 Create 的 MILLING 配方都能读
@@ -541,7 +542,8 @@ public final class HandMadeRecipePool {
                 || tool == HandMadeTool.MORTAR
                 || tool == HandMadeTool.CRUSHER_MORTAR
                 || tool == HandMadeTool.PRESS_HAMMER_DEPOT
-                || tool == HandMadeTool.HAND_SAW;
+                || tool == HandMadeTool.HAND_SAW
+                || tool == HandMadeTool.INFUSION_GUN;
     }
 
     /** 某条独占配方（归属 {@code owner}）是否应该进入 {@code tool} 的候选集。 */

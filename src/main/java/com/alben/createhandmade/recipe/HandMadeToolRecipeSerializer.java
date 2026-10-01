@@ -65,7 +65,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
         BASIN,
         CRUSHING,
         PRESSING,
-        CUTTING
+        CUTTING,
+        FILLING
     }
 
     private static final StandardProcessingRecipe.Serializer<HandMadeToolRecipe> BASIN_DELEGATE =
@@ -80,6 +81,9 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
     private static final StandardProcessingRecipe.Serializer<HandMadeCuttingRecipe> CUTTING_DELEGATE =
             new StandardProcessingRecipe.Serializer<>(HandMadeCuttingRecipe::new);
 
+    private static final StandardProcessingRecipe.Serializer<HandMadeFillingRecipe> FILLING_DELEGATE =
+            new StandardProcessingRecipe.Serializer<>(HandMadeFillingRecipe::new);
+
     /**
      * {@code tool} → 家族；返回 null 表示该工具还不支持独占配方。
      *
@@ -93,6 +97,7 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
             case MORTAR, CRUSHER_MORTAR -> Family.CRUSHING;
             case PRESS_HAMMER_DEPOT -> Family.PRESSING;
             case HAND_SAW -> Family.CUTTING;
+            case INFUSION_GUN -> Family.FILLING;
             default -> null;
         };
     }
@@ -145,6 +150,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                     case CRUSHING -> decodeWith(CRUSHING_DELEGATE, ops, normalized, tool);
                     case PRESSING -> decodeWith(PRESSING_DELEGATE, ops, normalized, tool);
                     case CUTTING -> decodeWith(CUTTING_DELEGATE, ops, normalized, tool);
+                    case FILLING -> decodeWith(FILLING_DELEGATE, ops, normalized, tool)
+                            .flatMap(recipe -> requireFluidInput(recipe, tool));
                 };
             }
 
@@ -156,6 +163,7 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                     case HandMadeCrushingRecipe crushing -> CRUSHING_DELEGATE.codec().encode(crushing, ops, prefix);
                     case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.codec().encode(pressing, ops, prefix);
                     case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.codec().encode(cutting, ops, prefix);
+                    case HandMadeFillingRecipe filling -> FILLING_DELEGATE.codec().encode(filling, ops, prefix);
                     case HandMadeToolRecipe basin -> BASIN_DELEGATE.codec().encode(basin, ops, prefix);
                     default -> prefix;
                 };
@@ -166,6 +174,27 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                 return builder;
             }
         };
+    }
+
+    /**
+     * 注液家族的独占配方必须带流体输入，否则在加载期拒绝。
+     *
+     * <p><b>为什么需要这一步：</b>Create 的 {@code ProcessingRecipe.validate()} 只检查各项
+     * <b>上限</b>（输入/输出/流体输入/流体输出是否超量）与"是否允许时长/加热"，
+     * <b>不检查下限</b> —— 所以一条没有流体输入的 {@code create_hand_made:tool_recipe}
+     * 能正常加载，然后在灌注枪运行时由 {@code getRequiredFluid()} 抛
+     * {@link IllegalStateException}（工具侧在传送带/置物台回调里，等于运行期炸掉）。</p>
+     *
+     * <p>与其在工具侧加防御分支静默跳过，不如在加载期直接拒绝并给出清晰原因 ——
+     * 这与 L3 的一贯做法一致（坏配方加载时就报错，而不是运行时静默失效）。</p>
+     */
+    private static DataResult<StandardProcessingRecipe<RecipeInput>> requireFluidInput(
+            StandardProcessingRecipe<RecipeInput> recipe, HandMadeTool tool) {
+        if (!recipe.getFluidIngredients().isEmpty()) {
+            return DataResult.success(recipe);
+        }
+        return DataResult.error(() -> "Exclusive recipe for tool '" + tool.name().toLowerCase(Locale.ROOT)
+                + "' must declare at least one fluid ingredient (ingredients entry with \"type\" + \"fluid\")");
     }
 
     /**
@@ -225,6 +254,7 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                         case HandMadeCrushingRecipe crushing -> CRUSHING_DELEGATE.streamCodec().encode(buf, crushing);
                         case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.streamCodec().encode(buf, pressing);
                         case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.streamCodec().encode(buf, cutting);
+                        case HandMadeFillingRecipe filling -> FILLING_DELEGATE.streamCodec().encode(buf, filling);
                         case HandMadeToolRecipe basin -> BASIN_DELEGATE.streamCodec().encode(buf, basin);
                         default -> { }
                     }
@@ -238,6 +268,7 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                         case CRUSHING -> CRUSHING_DELEGATE.streamCodec().decode(buf);
                         case PRESSING -> PRESSING_DELEGATE.streamCodec().decode(buf);
                         case CUTTING -> CUTTING_DELEGATE.streamCodec().decode(buf);
+                        case FILLING -> FILLING_DELEGATE.streamCodec().decode(buf);
                     };
                     ((HandMadeToolRecipeLike) recipe).setTool(tool);
                     return recipe;
