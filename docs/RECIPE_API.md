@@ -1,5 +1,7 @@
 # Create: Hand Made 配方 API
 
+> **配套文档**：[工具速查表](TOOL_REFERENCE.md)
+
 面向魔改包作者。本文只讲「怎么改手搓工具能读到的配方」，不涉及工具本身的合成表。
 
 模组 id：`create_hand_made`
