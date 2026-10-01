@@ -2,6 +2,10 @@ package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.network.BellowsBlastPacket;
+import com.alben.createhandmade.recipe.FanType;
+import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.simibubi.create.api.registry.CreateBuiltInRegistries;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
 import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
@@ -11,7 +15,9 @@ import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.damageTypes.CreateDamageSources;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
+import com.simibubi.create.foundation.recipe.RecipeApplier;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -30,6 +36,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -396,6 +404,59 @@ public class BellowsItem extends Item {
 
     // ================= 加工 =================
 
+    /**
+     * 把 Create 的鼓风类型映射成本模组配方层的 {@link FanType}。
+     *
+     * <p><b>为什么放在这里（而不是 {@code BellowsMediaRegistry} 或 {@code FanType} 里）：</b></p>
+     * <ul>
+     *   <li>放在 {@link FanType} 会让 {@code recipe} 包 import Create 的风扇实现类
+     *       （{@code AllFanProcessingTypes}），而批次 1 的 {@code FanType} 注释明确说了
+     *       "刻意不引用 Create 的类型对象" —— 这条边界要守住；</li>
+     *   <li>放在 {@link BellowsMediaRegistry} 更"对称"（它已经拥有"介质 → Create 类型"的正向映射），
+     *       但目前只有本类这一个调用点，而批次 1 的 {@code FanType} 注释已经写明
+     *       "与 Create 类型的映射放在使用方（BellowsItem）"。等将来 JEI / L2 也需要反查时
+     *       再把它挪进 registry 包即可。</li>
+     * </ul>
+     *
+     * @return 对应的 {@link FanType}；未知类型（理论上不会发生）返回 null
+     */
+    @Nullable
+    private static FanType toFanType(FanProcessingType createType) {
+        if (createType == AllFanProcessingTypes.BLASTING) return FanType.BLASTING;
+        if (createType == AllFanProcessingTypes.SMOKING) return FanType.SMOKING;
+        if (createType == AllFanProcessingTypes.HAUNTING) return FanType.HAUNTING;
+        if (createType == AllFanProcessingTypes.SPLASHING) return FanType.SPLASHING;
+        return null;
+    }
+
+    /**
+     * 查一条能加工 {@code item} 的 L3 独占配方（{@code create_hand_made:bellows_recipe}）。
+     *
+     * <p><b>刻意不走 {@link com.alben.createhandmade.recipe.HandMadeRecipePool}：</b>
+     * 池的语义是"某个 {@code HandMadeTool} 的候选集"，而风箱不在 {@code HandMadeTool} 体系里
+     * （它没有 tool 字段，按 {@code fan_type} 归类）。这里直接查 RecipeManager，
+     * 只做两件判定：{@code fan_type} 相同、{@code matches} 通过。</p>
+     *
+     * <p>遍历用 {@code RecipeHolder<?>} + {@code instanceof} 模式匹配（与手锯 / 灌注枪的查法一致）：
+     * {@code HandMadeRecipeTypes.getType()} 的泛型参数无法从上下文推断，
+     * 直接强转 {@code RecipeType<HandMadeBellowsRecipe>} 会被编译器判为不兼容类型。</p>
+     *
+     * <p>顺序取第一条命中的 —— 与 L1 路径"取第一个能加工的"语义一致。</p>
+     */
+    @Nullable
+    private static RecipeHolder<HandMadeBellowsRecipe> findL3BellowsRecipe(Level level, ItemStack item,
+                                                                          FanType fanType) {
+        SingleRecipeInput input = new SingleRecipeInput(item);
+        for (RecipeHolder<?> holder : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
+            if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
+            if (recipe.getFanType() != fanType) continue;
+            if (!recipe.matches(input, level)) continue;
+            return new RecipeHolder<>(holder.id(), recipe);
+        }
+        return null;
+    }
+
     private static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
@@ -410,11 +471,33 @@ public class BellowsItem extends Item {
 
             ItemStack single = stack.copyWithCount(1);
 
-            if (!type.canProcess(single, level)) return TransportedResult.doNothing();
+            // ★ L3 优先：独占配方（create_hand_made:bellows_recipe）只替换"物品加工"这一步。
+            //   命中条件 = 副手介质解析出的鼓风类型（fanType）与配方的 fan_type 相同。
+            //   未命中（含"没拿介质"：此时 type 为 null，本方法根本不会被调用）时，
+            //   原样回落到 Create 的鼓风逻辑（L1）—— 即 type.canProcess / type.process。
+            //
+            //   介质不消耗：与 L1 一致，本方法从不减少副手物品；
+            //   加工成功只扣风箱自身 1 点耐久（见 releaseUsing 末尾）。
+            List<ItemStack> results = null;
+            FanType fanType = toFanType(type);
+            if (fanType != null) {
+                RecipeHolder<HandMadeBellowsRecipe> l3 = findL3BellowsRecipe(level, single, fanType);
+                if (l3 != null) {
+                    // 与 L1 的 haunting / splashing 一样带 returnProcessingRemainder=true
+                    // （Create 的 blasting / smoking 传 false，那两族的 L1 配方是 vanilla cooking recipe，
+                    //  本模组的 L3 一律是 ProcessingRecipe，按后者口径统一）。
+                    results = RecipeApplier.applyRecipeOn(level, single, l3.value(), true);
+                }
+            }
 
-            List<ItemStack> results = type.process(single, level);
+            // L1 回落：真正的"能不能加工"仍由 Create 的 FanProcessingType 决定
+            if (results == null) {
+                if (!type.canProcess(single, level)) return TransportedResult.doNothing();
 
-            if (results == null) return TransportedResult.doNothing();
+                results = type.process(single, level);
+
+                if (results == null) return TransportedResult.doNothing();
+            }
 
             success[0] = true;
             ItemStack left = stack.copy();
@@ -475,13 +558,18 @@ public class BellowsItem extends Item {
         }
     }
 
-    /** 把 FanProcessingType 反查成 ID 字符串 */
+    /**
+     * 把 FanProcessingType 反查成 ID 字符串（供客户端还原类型用）。
+     *
+     * <p>直接查 Create 的 {@code FAN_PROCESSING_TYPE} 注册表（写法与 Create 自己的
+     * {@code FanProcessing.java:98} 一致）—— 这样将来注册新类型时客户端同步自动可用，
+     * 不需要再维护一张硬编码表。既有 4 种类型查到的是同一批 id
+     * （{@code create:blasting} / {@code create:smoking} / {@code create:haunting} /
+     * {@code create:splashing}），所以现有粒子与音效行为不变。</p>
+     */
     private static String getTypeId(@Nullable FanProcessingType type) {
         if (type == null) return "";
-        if (type == AllFanProcessingTypes.BLASTING) return "create:blasting";
-        if (type == AllFanProcessingTypes.HAUNTING) return "create:haunting";
-        if (type == AllFanProcessingTypes.SMOKING) return "create:smoking";
-        if (type == AllFanProcessingTypes.SPLASHING) return "create:splashing";
-        return "";
+        ResourceLocation key = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.getKey(type);
+        return key != null ? key.toString() : "";
     }
 }
