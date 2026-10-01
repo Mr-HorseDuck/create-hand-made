@@ -1,0 +1,29 @@
+{
+  "keys": [
+    {
+      "name": "fan_type",
+      "type": "string"
+    },
+    {
+      "name": "ingredients",
+      "role": "input",
+      "type": {
+        "type": "list",
+        "component": "ingredient"
+      }
+    },
+    {
+      "name": "results",
+      "role": "output",
+      "type": {
+        "type": "list",
+        "component": "item_stack"
+      }
+    }
+  ],
+  "constructors": [
+    {
+      "keys": ["fan_type", "results", "ingredients"]
+    }
+  ]
+}

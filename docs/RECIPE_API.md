@@ -28,19 +28,19 @@ JEI 的分类显示的是同一份候选集，所以上面三层的结果在 JEI
 
 工具默认读取的 `RecipeType` 由 `HandMadeTool` 枚举与 `HandMadeRecipePool` 里对应的收集方法决定：
 
-| tool_id | 工具 | 读取的 RecipeType |
-| --- | --- | --- |
-| `press_hammer_basin` | 冲压锤 · 工作盆 | `create:compacting` |
-| `press_hammer_depot` | 冲压锤 · 置物台 / 传送带 | `create:pressing` |
-| `press_hammer_auto_square` | 冲压锤 · 工作盆（4/9 合 1 自动摆放） | `minecraft:crafting`（可压缩的工作台配方） |
-| `mortar` | 研钵 | `create:milling` |
-| `crusher_mortar` | 碾钵 | `create:crushing`，匹配不到再兜底 `create:milling` |
-| `hand_saw` | 手锯 | `create:cutting` |
-| `stirring_staff` | 搅拌杖 · 工作盆 | `create:mixing` |
-| `stirring_staff_auto_shapeless` | 搅拌杖 · 自动无序合成 | `minecraft:crafting`（无序、多原料、非 shaped、不可压缩） |
-| `stirring_staff_auto_brewing` | 搅拌杖 · 自动酿造 | 运行时由 `PotionMixingRecipes` 生成，不是数据包配方 |
-| `pointer` | 指杆 | `create:deploying`，再兜底 `create:item_application` |
-| `infusion_gun` | 灌注枪 | `create:filling` |
+| tool_id | 工具                        | 读取的 RecipeType |
+| --- |-----------------------------| --- |
+| `press_hammer_basin` | 冲压锤 · 工作盆             | `create:compacting` |
+| `press_hammer_depot` | 冲压锤 · 置物台 / 传送带    | `create:pressing` |
+| `press_hammer_auto_square` | 冲压锤 · 工作盆（4/9 合 1） | `minecraft:crafting`（可压缩的工作台配方） |
+| `mortar` | 研钵                        | `create:milling` |
+| `crusher_mortar` | 碾钵                        | `create:crushing`，匹配不到再兜底 `create:milling` |
+| `hand_saw` | 手锯                        | `create:cutting` |
+| `stirring_staff` | 搅拌杖 · 工作盆             | `create:mixing` |
+| `stirring_staff_auto_shapeless` | 搅拌杖 · 自动无序合成       | `minecraft:crafting`（无序、多原料、非 shaped、不可压缩） |
+| `stirring_staff_auto_brewing` | 搅拌杖 · 自动酿造           | 运行时由 `PotionMixingRecipes` 生成，不是数据包配方 |
+| `pointer` | 指杆                        | `create:deploying`，再兜底 `create:item_application` |
+| `infusion_gun` | 灌注枪                      | `create:filling` |
 
 风箱（`BellowsItem`）不在上表内：它走 Create 的 `FanProcessingType` / `AllFanProcessingTypes`（鼓风熔炼 / 烟熏 / 缠魂 / 洗涤），本来就是一个聚合入口，不受本模组配方 API 管辖。
 
@@ -246,6 +246,112 @@ HandMadeEvents.toolFilter(event => {
 
 > 提示：选测试/示例配方时，最好挑一个 Create 没有对应配方的输入，
 > 这样不必依赖 L2 禁用就能看到 L3 的效果。
+
+---
+
+## 风箱独占配方（`create_hand_made:bellows_recipe`）
+
+风箱（Bellows）**不走** `tool_recipe`，而是自己的 RecipeType：
+
+```
+create_hand_made:bellows_recipe
+```
+
+两个原因：风箱不属于 `HandMadeTool` 体系（没有 tool_id），字段集也不同（`fan_type` 必填、禁止流体）。
+Create 的鼓风机查的是 `create:blasting` / `create:smoking` / `create:haunting` / `create:splashing`，
+永远看不到这个类型 —— 与 L3 一样是"手搓独占"。
+
+> **状态：T6 批次 1 只做了配方层。** 配方能被加载、能被 `/reload` 重新读取，
+> 但**风箱运行时还读不到它们**（接线在 T6 批次 2）。批次 2 之前，下面的配方不影响游戏行为。
+
+### 字段
+
+| 字段 | 必填 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| `type` | ✅ | 字符串 | 固定 `create_hand_made:bellows_recipe` |
+| `fan_type` | ✅ | 字符串 | `blasting` / `smoking` / `haunting` / `splashing` 之一 |
+| `ingredients` | ✅ | 数组 | **恰好 1 个物品**（`{ "item": ... }` 或 `{ "tag": ... }`）；**不支持流体** |
+| `results` | ✅ | 数组 | 1–12 个物品：`{ "id": ..., "count": ..., "chance": ... }`（`count` 缺省 1、`chance` 缺省 1.0） |
+
+**限制（写错会在**加载期**被拒，日志里是 `Parsing error loading recipe <id>` + 原因）：**
+
+- ❌ `processing_time` —— 风箱是**瞬发**的（松手一次结算，没有 tick 累计）。
+  报错：`Recipe specified a duration. Durations have no impact on this type of recipe.`
+- ❌ `heat_requirement` —— 风箱没有热源概念。
+  报错：`Recipe specified a heat condition. Heat conditions have no impact on this type of recipe.`
+- ❌ 流体原料 —— 风箱的"介质"是**副手物品**，由 `bellows_media` / 触媒标签决定，不在配方里。
+  报错：`Recipe has more fluid inputs (1) than supported (0).`
+- ❌ 多于 1 个物品原料。报错：`Recipe has more item inputs (2) than supported (1).`
+- ⚠️ **独占配方目前不受 L2 过滤管辖**（风箱的加工路径不经过配方池）。是否接通由 T6 批次 2 决定。
+
+### `fan_type` 的 4 个取值
+
+| `fan_type` | 含义 | 需要的副手介质（触媒） | 对应的 Create 鼓风类型 |
+| --- | --- | --- | --- |
+| `blasting` | 鼓风熔炼 | 岩浆类（岩浆桶、岩浆块…） | `create:blasting` |
+| `smoking` | 鼓风烟熏 | 营火类 | `create:smoking` |
+| `haunting` | 鼓风缠魂 | 灵魂营火类 | `create:haunting` |
+| `splashing` | 鼓风洗涤 | 水类 | `create:splashing` |
+
+> 介质清单不是写死的：它与风箱的介质表（`bellows_media` 数据包 + Create 的触媒标签自动发现）一致，
+> 与现有 4 个风箱 JEI 类别里显示的介质相同。
+
+### 数据包方式
+
+目录：`data/<你的命名空间>/recipe/<任意文件名>.json`
+
+最简形式：
+
+```json
+{
+  "type": "create_hand_made:bellows_recipe",
+  "fan_type": "blasting",
+  "ingredients": [
+    { "item": "minecraft:iron_ingot" }
+  ],
+  "results": [
+    { "id": "minecraft:gold_ingot", "count": 1 }
+  ]
+}
+```
+
+带概率的多产物（`chance` 是**每个产物各自独立**掷的，与 Create 的其它处理配方一致）：
+
+```json
+{
+  "type": "create_hand_made:bellows_recipe",
+  "fan_type": "haunting",
+  "ingredients": [
+    { "tag": "minecraft:sand" }
+  ],
+  "results": [
+    { "id": "minecraft:clay_ball", "count": 1 },
+    { "id": "minecraft:gold_nugget", "count": 1, "chance": 0.25 }
+  ]
+}
+```
+
+### KubeJS 方式
+
+模组自带 schema（`data/create_hand_made/kubejs/recipe_schema/bellows_recipe.json`）：
+
+```js
+ServerEvents.recipes(event => {
+    // 位置参数顺序：(fan_type, results, ingredients)
+    event.recipes.create_hand_made.bellows_recipe(
+        'blasting',
+        ['1x minecraft:gold_ingot'],
+        ['minecraft:iron_ingot']
+    )
+})
+```
+
+- 与 `tool_recipe` 一致：`ingredients` 写纯 id（`'minecraft:iron_ingot'`）或 tag（`'#minecraft:sand'`），
+  **不能**写 `'2x ...'`；`results` 支持 `'Nx item'` 简写。
+- ⚠️ **KubeJS 目前写不了产物概率**：KubeJS 的 `item_stack` 组件产出的 JSON 里没有 `chance`
+  （实测：`{ id: 'minecraft:gold_nugget', count: 1, chance: 0.25 }` 进去，配方里读回来的 `chance` 仍是 `1.0`）。
+  要概率请用上面的**数据包 JSON**。（后续可以给本模组的 KubeJS 插件注册一个带 `chance` 的组件来补上；
+  届时 `tool_recipe` 也能一起受益。）
 
 ---
 

@@ -15,6 +15,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.Locale;
+import java.util.function.Supplier;
 
 /**
  * 本模组自己的 {@link RecipeType} / {@link RecipeSerializer} 注册表（L3 独占层的地基）。
@@ -54,7 +55,17 @@ public enum HandMadeRecipeTypes implements IRecipeTypeInfo {
      * <p>目前只有一个 type；将来若需要按家族拆（basin / milling / pressing…），
      * 在这里加常量即可，每个常量自动获得自己的 type + serializer。</p>
      */
-    TOOL_RECIPE;
+    TOOL_RECIPE(HandMadeToolRecipeSerializer::new),
+
+    /**
+     * 风箱独占配方（{@code fan_type} + 单品输入）。
+     *
+     * <p><b>为什么不并进 {@link #TOOL_RECIPE}：</b>风箱不属于 {@code HandMadeTool} 体系
+     * （{@code HandMadeTool.java:13-15} 明确写了它不在枚举里、也不为它建 Pool 条目），
+     * 字段集也不同（{@code fan_type} 必填、禁止流体）。语义上它是<b>另一个</b> L3 类型，
+     * 所以拿一个独立的常量 + 独立的 serializer（见 {@link HandMadeBellowsRecipeSerializer} 的类注释）。</p>
+     */
+    BELLOWS_RECIPE(HandMadeBellowsRecipeSerializer::new);
 
     /** 延迟注册器。必须是嵌套类，见类注释里的初始化顺序说明。 */
     private static final class Registers {
@@ -69,12 +80,13 @@ public enum HandMadeRecipeTypes implements IRecipeTypeInfo {
     private final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<?>> serializer;
     private final DeferredHolder<RecipeType<?>, RecipeType<?>> type;
 
-    HandMadeRecipeTypes() {
+    HandMadeRecipeTypes(Supplier<RecipeSerializer<?>> serializerFactory) {
         var name = name().toLowerCase(Locale.ROOT);
         this.id = ResourceLocation.fromNamespaceAndPath(CreateHandMade.MODID, name);
 
-        // 复用 Create 泛型 serializer 的薄包装：多读/写一个 tool 字段（见 HandMadeToolRecipeSerializer）
-        this.serializer = Registers.SERIALIZERS.register(name, HandMadeToolRecipeSerializer::new);
+        // 复用 Create 泛型 serializer 的薄包装：每个常量自己决定用哪个 serializer
+        // （TOOL_RECIPE → HandMadeToolRecipeSerializer，BELLOWS_RECIPE → HandMadeBellowsRecipeSerializer）
+        this.serializer = Registers.SERIALIZERS.register(name, serializerFactory);
 
         // 与 Create 同款写法（AllRecipeTypes.java:116 用的也是 RecipeType.simple(id)）
         this.type = Registers.TYPES.register(name, () -> RecipeType.simple(id));
