@@ -1,6 +1,7 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.ModDataComponents;
+import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
@@ -241,6 +242,16 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         // CRUSHING 与 MILLING 这两段各自的顺序由配方池保证。
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.CRUSHER_MORTAR, level)) {
             Recipe<?> recipe = holder.value();
+
+            // L3 独占配方（碾磨家族）：碾钵接受自己写下的，也接受研钵写下的
+            // （L1 语义就是"先粉碎、后研磨"，它连 Create 的 MILLING 都能读）
+            if (recipe instanceof HandMadeCrushingRecipe exclusive) {
+                HandMadeTool owner = exclusive.getTool();
+                if (owner != HandMadeTool.CRUSHER_MORTAR && owner != HandMadeTool.MORTAR) continue;
+                if (!exclusive.matches(recipeInput, level)) continue;
+                return holder;
+            }
+
             boolean matched = (recipe instanceof CrushingRecipe crushing && crushing.matches(recipeInput, level))
                     || (recipe instanceof MillingRecipe milling && milling.matches(recipeInput, level));
             if (matched) {

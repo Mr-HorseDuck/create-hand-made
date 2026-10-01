@@ -9,7 +9,11 @@
       "role": "input",
       "type": {
         "type": "list",
-        "component": "ingredient"
+        "component": {
+          "type": "either",
+          "left": "ingredient",
+          "right": "flat_sized_fluid_ingredient"
+        }
       }
     },
     {

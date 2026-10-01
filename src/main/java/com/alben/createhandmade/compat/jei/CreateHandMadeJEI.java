@@ -14,6 +14,7 @@ import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllBlocks;
@@ -350,9 +351,36 @@ public class CreateHandMadeJEI implements IModPlugin {
         return result;
     }
 
-    /** 研钵 · 研磨（MILLING）。 */
+    /**
+     * 研钵 · 研磨（MILLING）。
+     *
+     * <p>候选集来自配方池，池里除了 Create 的 {@link MillingRecipe}，还可能有 L3 独占配方
+     * {@link HandMadeCrushingRecipe}（碾磨家族，它是 {@code AbstractCrushingRecipe} 的子类，
+     * <b>不是</b> {@code MillingRecipe} 的子类）。本类别的类型参数是 {@code MillingRecipe}，
+     * 若直接走 {@code collectFromPool}，它的 {@code clazz.isInstance(...)} 会把独占配方丢掉，
+     * 所以这里对独占配方做一次<b>显示代理</b>：用同一份 {@code ProcessingRecipeParams}
+     * 造一个 {@code MillingRecipe} 供渲染。</p>
+     *
+     * <p>代理对象只服务于 JEI 展示（{@code MillingRecipe} 的构造是 public，
+     * {@code ProcessingRecipe.getParams()} 也是 public），不会注册进配方管理器，
+     * 也不参与游戏内匹配。</p>
+     */
     private static List<RecipeHolder<MillingRecipe>> collectMillingRecipes() {
-        return collectFromPool(HandMadeTool.MORTAR, MillingRecipe.class);
+        List<RecipeHolder<MillingRecipe>> result = new ArrayList<>();
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return result;
+
+        for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.MORTAR, level)) {
+            if (holder.value() instanceof MillingRecipe milling) {
+                result.add(new RecipeHolder<>(holder.id(), milling));
+                continue;
+            }
+            if (holder.value() instanceof HandMadeCrushingRecipe exclusive
+                    && exclusive.getTool() == HandMadeTool.MORTAR) {
+                result.add(new RecipeHolder<>(holder.id(), new MillingRecipe(exclusive.getParams())));
+            }
+        }
+        return result;
     }
 
     /**

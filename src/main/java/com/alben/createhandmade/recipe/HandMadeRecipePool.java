@@ -18,6 +18,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -496,29 +497,56 @@ public final class HandMadeRecipePool {
      * 所以 Create 的机器（查的是 {@code AllRecipeTypes.XXX.getType()}）永远看不到它们；
      * 只有本方法把它们并进工具的候选列表。</p>
      *
-     * <p><b>为什么只有 basin 家族：</b>独占配方类 {@link HandMadeToolRecipe} 必须把
-     * {@code getType()} 换成我们的 type，而 Create 只有 {@code BasinRecipe} 提供了
-     * 接受 {@code IRecipeTypeInfo} 的 protected 构造；Milling / Pressing / Cutting /
-     * Filling / ItemApplication 的构造把 type 写死成 {@code AllRecipeTypes.XXX}，
-     * 无法子类化出自定义 type。所以这里先只接入
-     * {@link HandMadeTool#PRESS_HAMMER_BASIN} 与 {@link HandMadeTool#STIRRING_STAFF}
-     * —— 这两个工具对工作盆用的是 {@code BasinRecipe.match/apply}（不做 instanceof），
-     * 因此工具侧零改动即可消费独占配方。</p>
+     * <p><b>哪些工具支持：</b>目前是 basin 家族（{@link HandMadeTool#PRESS_HAMMER_BASIN} /
+     * {@link HandMadeTool#STIRRING_STAFF}，配方类 {@link HandMadeToolRecipe}）与
+     * 碾磨家族（{@link HandMadeTool#MORTAR} / {@link HandMadeTool#CRUSHER_MORTAR}，
+     * 配方类 {@link HandMadeCrushingRecipe}）。
+     * <b>这份清单必须与 {@code HandMadeToolRecipeSerializer.familyOf} 的键集保持一致。</b>
+     * 其余工具还没有自己的独占配方类。</p>
+     *
+     * <p><b>归属匹配规则：</b>独占配方按 {@code tool} 字段归属，通常只给写下它的那个工具读；
+     * 例外是 {@link HandMadeTool#CRUSHER_MORTAR} —— 它连 Create 的 MILLING 配方都能读
+     * （L1 语义就是"先粉碎、后研磨"），所以也接受
+     * {@link HandMadeTool#MORTAR} 写下的独占配方。</p>
      *
      * @param tool  目标工具
      * @param level 当前世界（非 null）
      * @param out   收集结果直接追加到这里
      */
     private static void collectExclusiveRecipes(HandMadeTool tool, Level level, List<RecipeHolder<?>> out) {
-        if (tool != HandMadeTool.PRESS_HAMMER_BASIN && tool != HandMadeTool.STIRRING_STAFF) {
+        if (!supportsExclusiveRecipes(tool)) {
             return;
         }
 
         for (RecipeHolder<?> holder : recipesOfType(level, HandMadeRecipeTypes.TOOL_RECIPE.getType())) {
-            if (holder.value() instanceof HandMadeToolRecipe recipe && recipe.getTool() == tool) {
-                out.add(holder);
+            if (!(holder.value() instanceof HandMadeToolRecipeLike exclusive)) {
+                continue;
             }
+            if (!acceptsExclusiveRecipe(tool, exclusive.getTool())) {
+                continue;
+            }
+            out.add(holder);
         }
+    }
+
+    /** 该工具是否有自己的 L3 独占配方类（与 serializer 的分派表同步）。 */
+    private static boolean supportsExclusiveRecipes(HandMadeTool tool) {
+        return tool == HandMadeTool.PRESS_HAMMER_BASIN
+                || tool == HandMadeTool.STIRRING_STAFF
+                || tool == HandMadeTool.MORTAR
+                || tool == HandMadeTool.CRUSHER_MORTAR;
+    }
+
+    /** 某条独占配方（归属 {@code owner}）是否应该进入 {@code tool} 的候选集。 */
+    private static boolean acceptsExclusiveRecipe(HandMadeTool tool, @Nullable HandMadeTool owner) {
+        if (owner == null) {
+            return false;
+        }
+        if (owner == tool) {
+            return true;
+        }
+        // 碾钵 = 研钵的升级版：L1 层它就能读 Create 的 MILLING，L3 层同理
+        return tool == HandMadeTool.CRUSHER_MORTAR && owner == HandMadeTool.MORTAR;
     }
 
     /**

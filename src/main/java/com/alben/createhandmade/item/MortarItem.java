@@ -1,9 +1,11 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.ModDataComponents;
+import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.item.CustomUseEffectsItem;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import net.createmod.catnip.data.TriState;
@@ -110,8 +112,10 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
         SingleRecipeInput recipeInput = new SingleRecipeInput(contents.stack());
         RecipeHolder<?> recipe = findMillingRecipe(level, recipeInput);
-        if (recipe != null && recipe.value() instanceof MillingRecipe millingRecipe) {
-            List<ItemStack> results = millingRecipe.rollResults(level.random);
+        // 候选集由配方池保证：Create 的 MillingRecipe 与 L3 独占配方（HandMadeCrushingRecipe）
+        // 都是 ProcessingRecipe，rollResults 对两者通用，所以这里用共同父类消费。
+        if (recipe != null && recipe.value() instanceof ProcessingRecipe<?, ?> processing) {
+            List<ItemStack> results = processing.rollResults(level.random);
             for (ItemStack result : results) {
                 if (!result.isEmpty()) {
                     player.getInventory().placeItemBackInInventory(result);
@@ -212,11 +216,17 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
      */
     @Nullable
     private static RecipeHolder<?> findMillingRecipe(Level level, SingleRecipeInput recipeInput) {
-        // 用 instanceof 模式匹配取出确切的 MillingRecipe 再调 matches：
+        // 用 instanceof 模式匹配取出确切的配方类型再调 matches：
         // holder.value() 的静态类型是 Recipe<?>，其 matches 的参数是通配符捕获，
         // 无法直接接受 SingleRecipeInput。instanceof 能拿到确切类型，
         // 因此既不需要 unchecked 强转，也不会在将来类型变化时静默出错。
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.MORTAR, level)) {
+            // L3 独占配方（碾磨家族）：只认归属研钵的那些（碾钵写下的不归研钵）
+            if (holder.value() instanceof HandMadeCrushingRecipe exclusive) {
+                if (exclusive.getTool() != HandMadeTool.MORTAR) continue;
+                if (!exclusive.matches(recipeInput, level)) continue;
+                return holder;
+            }
             if (!(holder.value() instanceof MillingRecipe millingRecipe)) continue;
             if (!millingRecipe.matches(recipeInput, level)) continue;
             return holder;

@@ -153,15 +153,13 @@ Create 的机器查询的是 `create:compacting` / `create:mixing` 等自己的�
 | --- | --- | --- | --- |
 | `type` | ✅ | 字符串 | 固定 `create_hand_made:tool_recipe` |
 | `tool` | ✅ | 字符串 | 归属工具，**只接受 `press_hammer_basin` 或 `stirring_staff`** |
-| `ingredients` | ✅ | 数组 | 原料，物品形式：`{ "item": ... }` 或 `{ "tag": ... }` |
+| `ingredients` | ✅ | 数组 | 原料，物品 `{ "item": ... }` / `{ "tag": ... }`，或流体 `{ "type": "neoforge:single", "amount": ..., "fluid": ... }` |
 | `results` | ✅ | 数组 | 产物，物品 `{ "id": ..., "count": ... }` 或流体 `{ "id": ..., "amount": ... }` |
 | `processing_time` | ❌ | 整数 | 处理耗时（tick），默认 `0` |
 | `heat_requirement` | ❌ | 字符串 | `none`（默认）/ `heated` / `superheated` |
 
 **限制：**
 
-- `ingredients` **只支持物品原料，不支持流体**。原因见「常见问题」。
-- `results` 支持流体产物（因为 Create 的产物 codec 就是 `FluidStack` / `ProcessingOutput` 二选一）。
 - `tool` 写错工具 id，或写了不支持的工具：配方在加载时被拒绝，日志里会出现一条 `Parsing error loading recipe <你的配方 id>` 并附上原因（`Unknown tool id: ...` / `Tool '...' does not support exclusive recipes yet.`）。
 - 该类型没有任何内置配方 —— 是否使用 L3 完全由整合包决定。
 
@@ -186,11 +184,11 @@ ServerEvents.recipes(event => {
         ['minecraft:iron_ingot', 'minecraft:iron_ingot', 'minecraft:iron_ingot']
     ).processingTime(120).superheated()
 
-    // 流体产物也可以（流体原料不行，见常见问题）
+    // 流体原料 + 物品原料混用：1 金锭 + 100 mB 水 → 1 钻石
     event.recipes.create_hand_made.tool_recipe(
         'stirring_staff',
-        [Fluid.of('minecraft:water', 100), '1x minecraft:diamond'],
-        ['minecraft:gold_ingot']
+        ['1x minecraft:diamond'],
+        [Fluid.of('minecraft:water', 100), 'minecraft:gold_ingot']
     )
 })
 ```
@@ -198,7 +196,9 @@ ServerEvents.recipes(event => {
 写法要点：
 
 - 位置参数顺序是 `(tool, results, ingredients)`。
-- `ingredients` 用 `ingredient` 组件：写**纯 id**（`'minecraft:iron_ingot'`）或 **tag**（`'#create:pulpifiable'`），**不能**写 `'2x ...'` 计数简写；要两份就重复写两个元素（和 Create 自己的配方文件一致）。
+- `ingredients` 用 `either` 组件（`ingredient` / `flat_sized_fluid_ingredient` 二选一）：
+  - 物品写**纯 id**（`'minecraft:iron_ingot'`）或 **tag**（`'#create:pulpifiable'`），**不能**写 `'2x ...'` 计数简写；要两份就重复写两个元素（和 Create 自己的配方文件一致）。
+  - 流体写 `Fluid.of('minecraft:water', 100)`，可以和物品混在同一个数组里。
 - `results` 用 `item_stack` / `fluid_stack` 组件：可以写 `'2x minecraft:gold_ingot'` 计数简写。
 - 链式函数：`.heated()`、`.superheated()`、`.processingTime(n)`，也可以直接写 `heat_requirement` 键。
 
@@ -253,7 +253,9 @@ HandMadeEvents.toolFilter(event => {
 
 ### 流体原料怎么写？
 
-**只能写成数据包 JSON，KubeJS 目前写不出来。** 数据包写法：
+**数据包与 KubeJS 都可以。** 两种写法最终等价（脚本写出来的东西由模组自己归一化成下面的形状）。
+
+数据包写法（KubeJS 也可以直接这样写，只是更啰嗦）：
 
 ```json
 {
@@ -269,17 +271,21 @@ HandMadeEvents.toolFilter(event => {
 }
 ```
 
-注意流体原料必须是 `{"type": "neoforge:single", "amount": ..., "fluid": ...}` 这个形状（顶层 `type` 是 Create 要求的）。
+KubeJS 写法：
 
-为什么 KubeJS 不行：KubeJS 的流体原料组件（`flat_sized_fluid_ingredient` / `nested_sized_fluid_ingredient`）写出的是 NeoForge 的格式（`{"fluid": ..., "amount": ...}`，**没有顶层 `type`**），Create 的 codec 不接受。用它们"创建成功"的配方落到数据包里会解析失败并被丢弃。为了让作者能立刻发现问题，本模组的 schema 里 `ingredients` 只声明了物品，流体原料会在脚本侧直接报错，而不是悄悄产出一条坏配方。
-
-附带现象：数据包里带流体原料的独占配方，在 KubeJS 日志里会出现一条
-
+```js
+event.recipes.create_hand_made.tool_recipe(
+    'stirring_staff',
+    ['1x minecraft:diamond'],
+    [Fluid.of('minecraft:water', 100), 'minecraft:gold_ingot']
+)
 ```
-Failed to parse recipe '<id>'! Falling back to vanilla
-```
 
-这是**正常的**（KubeJS 无法把它解析成自己的 schema 对象，于是原样交给原版处理），**配方本身仍然正常生效**，也不会被 KubeJS 改写。
+数据包里流体原料必须是 `{"type": "neoforge:single", "amount": ..., "fluid": ...}` 这个形状（顶层 `type` 是 Create 要求的）；
+KubeJS 的 `flat_sized_fluid_ingredient` 组件写出的是 NeoForge 的
+`{"fluid": ..., "amount": ...}`（**没有顶层 `type`**），模组的 serializer 会在解析前自动补上
+`"type": "neoforge:single"`，所以两种写法都能用。用 tag 选流体则在数据包里写
+`{"type": "neoforge:tag", "amount": 250, "tag": "c:milk"}`。
 
 ### `disabled_by_mod` 会不会误伤独占配方？
 

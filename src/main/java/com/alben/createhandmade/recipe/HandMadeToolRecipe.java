@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * 而 {@code tool} 不在 {@code ProcessingRecipeParams} 里，所以只能在
  * decode 之后由 {@link HandMadeToolRecipeSerializer} 手动 {@code setTool(...)}。</p>
  */
-public class HandMadeToolRecipe extends BasinRecipe {
+public class HandMadeToolRecipe extends BasinRecipe implements HandMadeToolRecipeLike {
 
     /** 这条独占配方归属哪个工具；由 {@link HandMadeToolRecipeSerializer} 在 decode 后写入。 */
     @Nullable
