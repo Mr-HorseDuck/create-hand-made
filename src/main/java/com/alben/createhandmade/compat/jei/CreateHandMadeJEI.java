@@ -14,6 +14,7 @@ import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadePressingRecipe;
@@ -31,6 +32,7 @@ import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.compat.jei.category.SpoutCategory;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
+import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.AllFanProcessingTypes;
 import com.simibubi.create.content.kinetics.fan.processing.HauntingRecipe;
@@ -39,6 +41,7 @@ import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingOutput;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
 import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
 import mezz.jei.api.IModPlugin;
@@ -468,9 +471,54 @@ public class CreateHandMadeJEI implements IModPlugin {
         return (List) HandMadeRecipePool.getBaseRecipes(HandMadeTool.STIRRING_STAFF_AUTO_BREWING, level);
     }
 
-    /** 指杆 · 应用（DEPLOYING + ITEM_APPLICATION，前者在前）。 */
+    /**
+     * 指杆 · 应用（DEPLOYING + ITEM_APPLICATION，前者在前）。
+     *
+     * <p>候选集来自配方池，池里除了 Create 的 {@link ItemApplicationRecipe} 家族，还可能有
+     * L3 独占配方 {@link HandMadeApplicationRecipe}。本类别的类型参数是
+     * {@link ItemApplicationRecipe}，而独占配方不是它的子类，所以要造<b>显示代理</b>。</p>
+     *
+     * <p><b>为什么不能走 {@link #collectFromPoolWithProxy}：</b>那个 helper 的代理工厂签名是
+     * {@code ProcessingRecipeParams -> T}，但 Create 的 {@link DeployerApplicationRecipe}
+     * 要求的是 {@code ItemApplicationRecipeParams}
+     * （{@code DeployerApplicationRecipe.java:27-29} → {@code ItemApplicationRecipe.java:23}）——
+     * 直接传普通 params 会 ClassCastException；而且代理还需要配方 id 与原料/产物本身，
+     * 不只是 params。所以这里改用 Create 公开的 {@code ItemApplicationRecipe.Builder}
+     * （它内部创建正确的 params 类型，并支持 {@code toolNotConsumed()}）。</p>
+     *
+     * <p>代理只用于 JEI 展示，不会注册进配方管理器，也不参与游戏内匹配。</p>
+     */
     private static List<RecipeHolder<ItemApplicationRecipe>> collectPointerRecipes() {
-        return collectFromPool(HandMadeTool.POINTER, ItemApplicationRecipe.class);
+        List<RecipeHolder<ItemApplicationRecipe>> result = new ArrayList<>();
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return result;
+
+        for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.POINTER, level)) {
+            Object value = holder.value();
+
+            if (value instanceof ItemApplicationRecipe application) {
+                result.add(new RecipeHolder<>(holder.id(), application));
+                continue;
+            }
+
+            if (value instanceof HandMadeApplicationRecipe exclusive
+                    && exclusive.getTool() == HandMadeTool.POINTER) {
+                result.add(new RecipeHolder<>(holder.id(), asDeployerProxy(holder.id(), exclusive)));
+            }
+        }
+        return result;
+    }
+
+    /** 用 Create 的 builder 把一条 L3 独占配方包成 {@link DeployerApplicationRecipe}（仅展示用）。 */
+    private static DeployerApplicationRecipe asDeployerProxy(ResourceLocation id, HandMadeApplicationRecipe exclusive) {
+        ItemApplicationRecipe.Builder<DeployerApplicationRecipe> builder =
+                new ItemApplicationRecipe.Builder<>(DeployerApplicationRecipe::new, id)
+                        .withItemIngredients(exclusive.getIngredients())
+                        .withItemOutputs(exclusive.getRollableResults().toArray(new ProcessingOutput[0]));
+        if (exclusive.shouldKeepHeldItem()) {
+            builder.toolNotConsumed();
+        }
+        return builder.build();
     }
 
     /**

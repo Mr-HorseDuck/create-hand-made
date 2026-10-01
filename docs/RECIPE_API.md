@@ -116,13 +116,16 @@ Create 的机器查询的是 `create:compacting` / `create:mixing` 等自己的�
 
 ### 覆盖范围（重要）
 
-| | 工具 |
+| | recipe id（= 工具 id） |
 | --- | --- |
-| ✅ 支持 | `press_hammer_basin`、`stirring_staff` |
-| ❌ 暂不支持 | `press_hammer_depot`、`mortar`、`crusher_mortar`、`hand_saw`、`pointer`、`infusion_gun`（涉及 `create:pressing` / `create:milling` / `create:crushing` / `create:cutting` / `create:deploying` / `create:item_application` / `create:filling`） |
+| ✅ 支持 | `press_hammer_basin`、`press_hammer_depot`、`stirring_staff`、`mortar`、`crusher_mortar`、`hand_saw`、`infusion_gun`、`pointer` —— 共 **8 个 id / 8 个工具** |
 | ❌ 不涉及 | 风箱 4 类；`press_hammer_auto_square`、`stirring_staff_auto_shapeless`（这两类源自 `minecraft:crafting`）；`stirring_staff_auto_brewing`（运行时生成） |
 
-原因：独占配方的配方类必须让 `getType()` 返回自定义类型，而 Create 只给 `BasinRecipe` 留了接受自定义类型的 `protected` 构造（`BasinRecipe(IRecipeTypeInfo, ProcessingRecipeParams)`）；其余家族的配方类把 `RecipeType` 硬编码在自己的 `AllRecipeTypes` 里，**要支持它们必须先改工具侧代码**。
+原因：
+
+- **支持的那 8 个工具**各有一个继承 Create 对应配方类的 L3 配方类，并用接受自定义 `IRecipeTypeInfo` 的构造把自己挂到 `create_hand_made:tool_recipe` 上：`HandMadeToolRecipe extends BasinRecipe`、`HandMadeCrushingRecipe extends AbstractCrushingRecipe`、`HandMadePressingRecipe` / `HandMadeCuttingRecipe` / `HandMadeFillingRecipe` / `HandMadeApplicationRecipe extends StandardProcessingRecipe`。Create 的 `BasinRecipe` 只把该构造留成 `protected`（子类可用），其余家族在 `StandardProcessingRecipe` / `AbstractCrushingRecipe` 上是 `public`；配方类型由本模组自己的 `IRecipeTypeInfo` 提供，所以 `getType()` 返回的是 `create_hand_made:tool_recipe`。
+- **风箱（`bellows_*` 4 类）不涉及**：它走 Create 的 `FanProcessingType` / `AllFanProcessingTypes`（鼓风熔炼 / 烟熏 / 缠魂 / 洗涤），**不读 `RecipeManager`** —— 没有任何可以追加配方的入口，L3 对它无从下手（也不在 `HandMadeTool` 枚举里）。
+- **3 个 auto 类别不涉及**：`press_hammer_auto_square` 与 `stirring_staff_auto_shapeless` 是从 `minecraft:crafting` 派生的展示类别（原料来自普通工作台配方），`stirring_staff_auto_brewing` 由代码在运行时生成 —— 三者都不是数据包里的处理配方，所以没有"独占配方"可言。
 
 ### 数据包方式
 
@@ -152,7 +155,7 @@ Create 的机器查询的是 `create:compacting` / `create:mixing` 等自己的�
 | 字段 | 必填 | 类型 | 说明 |
 | --- | --- | --- | --- |
 | `type` | ✅ | 字符串 | 固定 `create_hand_made:tool_recipe` |
-| `tool` | ✅ | 字符串 | 归属工具，**只接受 `press_hammer_basin` 或 `stirring_staff`** |
+| `tool` | ✅ | 字符串 | 归属工具，8 个支持 L3 的 id 之一（见上面的「覆盖范围」与「工具 ID 清单」） |
 | `ingredients` | ✅ | 数组 | 原料，物品 `{ "item": ... }` / `{ "tag": ... }`，或流体 `{ "type": "neoforge:single", "amount": ..., "fluid": ... }` |
 | `results` | ✅ | 数组 | 产物，物品 `{ "id": ..., "count": ... }` 或流体 `{ "id": ..., "amount": ... }` |
 | `processing_time` | ❌ | 整数 | 处理耗时（tick），默认 `0` |
@@ -254,15 +257,17 @@ HandMadeEvents.toolFilter(event => {
 | --- | --- | --- |
 | `press_hammer_basin` | 冲压锤 · 工作盆（压缩） | ✅ |
 | `press_hammer_auto_square` | 冲压锤 · 工作盆（自动摆放） | ❌ |
-| `press_hammer_depot` | 冲压锤 · 置物台 / 传送带 | ❌ |
-| `mortar` | 研钵 · 研磨 | ❌ |
-| `crusher_mortar` | 碾钵 · 粉碎 + 研磨 | ❌ |
-| `hand_saw` | 手锯 · 切削 | ❌ |
+| `press_hammer_depot` | 冲压锤 · 置物台 / 传送带 | ✅ |
+| `mortar` | 研钵 · 研磨 | ✅ |
+| `crusher_mortar` | 碾钵 · 粉碎 + 研磨 | ✅ |
+| `hand_saw` | 手锯 · 切削 | ✅ |
 | `stirring_staff` | 搅拌杖 · 混合 | ✅ |
 | `stirring_staff_auto_shapeless` | 搅拌杖 · 自动无序合成 | ❌ |
 | `stirring_staff_auto_brewing` | 搅拌杖 · 自动酿造 | ❌ |
-| `pointer` | 指杆 · 应用 | ❌ |
-| `infusion_gun` | 灌注枪 · 注液 | ❌ |
+| `pointer` | 指杆 · 应用 | ✅ |
+| `infusion_gun` | 灌注枪 · 注液 | ✅ |
+
+> 风箱（鼓风熔炼 / 烟熏 / 缠魂 / 洗涤）不在本表内 —— 它不走配方 API，见上面的「覆盖范围」。
 
 ---
 
@@ -273,7 +278,7 @@ HandMadeEvents.toolFilter(event => {
 按顺序检查：
 
 1. **`tool` 字段**是不是合法 id（上面的清单）。写错会在日志里看到 `Unknown tool id: '<你写的>'`。
-2. **工具是否在覆盖范围内** —— 目前只有 `press_hammer_basin` 与 `stirring_staff` 支持独占配方，其它工具写了会被拒绝，日志里是 `Tool '<id>' does not support exclusive recipes yet.`。
+2. **工具是否在覆盖范围内** —— 只有上面「覆盖范围」里那 8 个 id 支持独占配方（`press_hammer_basin`、`press_hammer_depot`、`stirring_staff`、`mortar`、`crusher_mortar`、`hand_saw`、`infusion_gun`、`pointer`），其它 id（含风箱与 3 个 auto 类别）写了会被拒绝，日志里是 `Tool '<id>' does not support exclusive recipes yet.`。
 3. **是否被 L2 过滤掉了** —— 检查 `tool_filter/<tool_id>.json` 的 `disabled` / `disabled_by_mod`，以及 KubeJS 脚本里的 `toolFilter` 回调。`disabled_by_mod` 里如果写了你自己放独占配方的命名空间，会把它一起禁掉。
 4. **日志里有没有 `Parsing error loading recipe <id>`** —— 字段缺漏（比如没写 `tool`）会在加载时被拒绝：`Missing required field 'tool' for create_hand_made:tool_recipe`。
 5. **配方是否真的在数据包里** —— 目录必须是 `data/<ns>/recipe/`，文件名随意。

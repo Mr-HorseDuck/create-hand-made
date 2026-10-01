@@ -3,6 +3,7 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
+import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -310,6 +311,16 @@ public class PointerItem extends Item {
         //   匹配与 automation 过滤留在本类。ItemApplicationRecipe 继承自
         //   ProcessingRecipe<RecipeWrapper, ...>，其 matches 参数正是 RecipeWrapper，无需转换。
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.POINTER, level)) {
+            // L3 独占配方（应用家族）：只认归属指杆的那些。
+            // 它与 Create 的 ItemApplicationRecipe 一样是 2 槽语义（槽 0 目标、槽 1 手持），
+            // 但配方类不同，所以要单独判一次。
+            if (holder.value() instanceof HandMadeApplicationRecipe exclusive) {
+                if (exclusive.getTool() != HandMadeTool.POINTER) continue;
+                if (!exclusive.matches(wrapper, level)) continue;
+                if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(holder)) continue;
+                return holder;
+            }
+
             if (!(holder.value() instanceof ItemApplicationRecipe itemApplication)) continue;
             if (!itemApplication.matches(wrapper, level)) continue;
             // ★ automation 过滤保留在调用方：配方池与 JEI 都不过滤这些"仅手动"配方。
@@ -323,6 +334,10 @@ public class PointerItem extends Item {
     // ================= 辅助 =================
 
     private static void consumeTool(Player player, ItemStack tool, RecipeHolder<?> recipe) {
+        // L3 独占配方（应用家族）与 Create 的 ItemApplicationRecipe 都可能有"手持物品不消耗"
+        if (recipe.value() instanceof HandMadeApplicationRecipe handmade && handmade.shouldKeepHeldItem()) {
+            return;
+        }
         if (recipe.value() instanceof ItemApplicationRecipe ia && ia.shouldKeepHeldItem()) {
             return;
         }

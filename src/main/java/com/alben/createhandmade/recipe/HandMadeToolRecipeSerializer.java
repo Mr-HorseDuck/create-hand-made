@@ -53,6 +53,16 @@ import java.util.stream.Stream;
 public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardProcessingRecipe<RecipeInput>> {
 
     private static final String TOOL_FIELD = "tool";
+
+    /**
+     * 可选的 {@code keep_held_item}：手持物品是否不消耗（Create 的 {@code toolNotConsumed}）。
+     *
+     * <p>只有 APPLICATION 家族（指杆）会读它 —— Create 把它放在
+     * {@code ItemApplicationRecipeParams} 里，字段与访问器都是 {@code protected}
+     * （{@code ItemApplicationRecipeParams.java:32-36}），外部包读不到，所以由本类自己读。
+     * 其它家族写了这个键既不会被读也不会报错（与所有未知键一样被忽略）。</p>
+     */
+    private static final String KEEP_HELD_ITEM_FIELD = "keep_held_item";
     private static final String INGREDIENTS_FIELD = "ingredients";
     private static final String TYPE_FIELD = "type";
     private static final String FLUID_FIELD = "fluid";
@@ -66,7 +76,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
         CRUSHING,
         PRESSING,
         CUTTING,
-        FILLING
+        FILLING,
+        APPLICATION
     }
 
     private static final StandardProcessingRecipe.Serializer<HandMadeToolRecipe> BASIN_DELEGATE =
@@ -84,6 +95,9 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
     private static final StandardProcessingRecipe.Serializer<HandMadeFillingRecipe> FILLING_DELEGATE =
             new StandardProcessingRecipe.Serializer<>(HandMadeFillingRecipe::new);
 
+    private static final StandardProcessingRecipe.Serializer<HandMadeApplicationRecipe> APPLICATION_DELEGATE =
+            new StandardProcessingRecipe.Serializer<>(HandMadeApplicationRecipe::new);
+
     /**
      * {@code tool} → 家族；返回 null 表示该工具还不支持独占配方。
      *
@@ -98,6 +112,7 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
             case PRESS_HAMMER_DEPOT -> Family.PRESSING;
             case HAND_SAW -> Family.CUTTING;
             case INFUSION_GUN -> Family.FILLING;
+            case POINTER -> Family.APPLICATION;
             default -> null;
         };
     }
@@ -152,6 +167,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                     case CUTTING -> decodeWith(CUTTING_DELEGATE, ops, normalized, tool);
                     case FILLING -> decodeWith(FILLING_DELEGATE, ops, normalized, tool)
                             .flatMap(recipe -> requireFluidInput(recipe, tool));
+                    case APPLICATION -> decodeWith(APPLICATION_DELEGATE, ops, normalized, tool)
+                            .flatMap(recipe -> applyKeepHeldItem(ops, normalized, recipe));
                 };
             }
 
@@ -164,12 +181,17 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                     case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.codec().encode(pressing, ops, prefix);
                     case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.codec().encode(cutting, ops, prefix);
                     case HandMadeFillingRecipe filling -> FILLING_DELEGATE.codec().encode(filling, ops, prefix);
+                    case HandMadeApplicationRecipe application -> APPLICATION_DELEGATE.codec().encode(application, ops, prefix);
                     case HandMadeToolRecipe basin -> BASIN_DELEGATE.codec().encode(basin, ops, prefix);
                     default -> prefix;
                 };
 
                 if (recipe instanceof HandMadeToolRecipeLike like && like.getTool() != null) {
                     builder.add(TOOL_FIELD, ops.createString(like.getTool().name().toLowerCase(Locale.ROOT)));
+                }
+                // keep_held_item 只在为 true 时写出（缺省即 false，往返仍然一致）
+                if (recipe instanceof HandMadeApplicationRecipe application && application.shouldKeepHeldItem()) {
+                    builder.add(KEEP_HELD_ITEM_FIELD, ops.createBoolean(true));
                 }
                 return builder;
             }
@@ -195,6 +217,33 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
         }
         return DataResult.error(() -> "Exclusive recipe for tool '" + tool.name().toLowerCase(Locale.ROOT)
                 + "' must declare at least one fluid ingredient (ingredients entry with \"type\" + \"fluid\")");
+    }
+
+    /**
+     * 读可选的 {@code keep_held_item}（缺省 false）并写进配方对象。
+     *
+     * <p><b>只有 APPLICATION 家族会走这一步</b>：这个键的语义来自 Create 的
+     * {@code ItemApplicationRecipeParams}（字段与访问器都是 {@code protected}，外部包读不到），
+     * 所以由 serializer 自己从 JSON 读。其它家族即使写了这个键，也跟所有未知键一样被忽略 ——
+     * 既不读也不报错（DFU 的标准行为，与本模组其它额外键一致）。</p>
+     *
+     * <p>解析失败（写了非布尔值）会返回带原因的 {@code DataResult.error}，
+     * 由数据包加载器报给作者。</p>
+     */
+    private static <T> DataResult<StandardProcessingRecipe<RecipeInput>> applyKeepHeldItem(
+            DynamicOps<T> ops, MapLike<T> input, StandardProcessingRecipe<RecipeInput> recipe) {
+        T value = input.get(KEEP_HELD_ITEM_FIELD);
+        if (value == null) {
+            return DataResult.success(recipe);
+        }
+
+        DataResult<Boolean> parsed = Codec.BOOL.parse(ops, value);
+        if (parsed.error().isPresent()) {
+            return DataResult.error(() -> "Invalid '" + KEEP_HELD_ITEM_FIELD + "' field: expected a boolean");
+        }
+
+        ((HandMadeApplicationRecipe) recipe).setKeepHeldItem(parsed.getOrThrow());
+        return DataResult.success(recipe);
     }
 
     /**
@@ -255,8 +304,14 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                         case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.streamCodec().encode(buf, pressing);
                         case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.streamCodec().encode(buf, cutting);
                         case HandMadeFillingRecipe filling -> FILLING_DELEGATE.streamCodec().encode(buf, filling);
+                        case HandMadeApplicationRecipe application -> APPLICATION_DELEGATE.streamCodec().encode(buf, application);
                         case HandMadeToolRecipe basin -> BASIN_DELEGATE.streamCodec().encode(buf, basin);
                         default -> { }
+                    }
+
+                    // keep_held_item 只有应用家族有；写在载荷之后，读的一侧对称处理
+                    if (recipe instanceof HandMadeApplicationRecipe application) {
+                        buf.writeBoolean(application.shouldKeepHeldItem());
                     }
                 },
                 buf -> {
@@ -269,8 +324,13 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                         case PRESSING -> PRESSING_DELEGATE.streamCodec().decode(buf);
                         case CUTTING -> CUTTING_DELEGATE.streamCodec().decode(buf);
                         case FILLING -> FILLING_DELEGATE.streamCodec().decode(buf);
+                        case APPLICATION -> APPLICATION_DELEGATE.streamCodec().decode(buf);
                     };
                     ((HandMadeToolRecipeLike) recipe).setTool(tool);
+                    // 与 encode 对称：应用家族额外带一个 keep_held_item
+                    if (recipe instanceof HandMadeApplicationRecipe application) {
+                        application.setKeepHeldItem(buf.readBoolean());
+                    }
                     return recipe;
                 }
         );
