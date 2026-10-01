@@ -15,8 +15,12 @@ import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
+import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
+import com.alben.createhandmade.recipe.HandMadePressingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
+import com.alben.createhandmade.recipe.HandMadeToolRecipe;
+import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.AllRecipeTypes;
@@ -35,6 +39,8 @@ import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
+import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
@@ -51,6 +57,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 @JeiPlugin
 public class CreateHandMadeJEI implements IModPlugin {
@@ -314,14 +321,59 @@ public class CreateHandMadeJEI implements IModPlugin {
         return result;
     }
 
+    /**
+     * 从配方池收集某个工具类别的配方，并把 <b>L3 独占配方</b>代理成类别所需的 Create 配方类型。
+     *
+     * <p>L3 独占配方按家族使用不同的配方类（basin {@link HandMadeToolRecipe} / 碾磨
+     * {@link HandMadeCrushingRecipe} / 冲压 {@link HandMadePressingRecipe} / 切削
+     * {@link HandMadeCuttingRecipe}），它们都不是对应 JEI 类别所用的那个具体 Create 类，
+     * 所以 {@link #collectFromPool} 的 {@code clazz.isInstance(...)} 会把独占配方丢掉。
+     * 本方法在类型不匹配时用同一份 {@link ProcessingRecipeParams} 造一个<b>显示代理</b>
+     * 供渲染（代理不会注册进配方管理器，也不参与游戏内匹配）。</p>
+     *
+     * <p>只有归属工具正好等于本类别工具的独占配方会被代理；配方池本身也按归属过滤，
+     * 这里再判一次是为了让本方法不依赖池的实现细节。</p>
+     *
+     * <p>例外：碾钵类别用的是 {@link AbstractCrushingRecipe}（碾磨家族类的父类），
+     * 独占配方天然通过 {@code clazz.isInstance(...)}，因此继续用 {@link #collectFromPool}，
+     * 不需要代理。</p>
+     *
+     * @param tool         工具 + 配方类型组合
+     * @param clazz        本类别需要的配方类型
+     * @param proxyFactory 用 params 造代理对象的工厂（例如 {@code MillingRecipe::new}）
+     */
+    private static <T extends Recipe<?>> List<RecipeHolder<T>> collectFromPoolWithProxy(
+            HandMadeTool tool, Class<T> clazz, Function<ProcessingRecipeParams, T> proxyFactory) {
+        List<RecipeHolder<T>> result = new ArrayList<>();
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return result;
+
+        for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(tool, level)) {
+            Object value = holder.value();
+
+            // isInstance + cast 是类型安全的，不需要 unchecked 强转。
+            if (clazz.isInstance(value)) {
+                result.add(new RecipeHolder<>(holder.id(), clazz.cast(value)));
+                continue;
+            }
+
+            if (value instanceof HandMadeToolRecipeLike exclusive
+                    && exclusive.getTool() == tool
+                    && value instanceof StandardProcessingRecipe<?> processing) {
+                result.add(new RecipeHolder<>(holder.id(), proxyFactory.apply(processing.getParams())));
+            }
+        }
+        return result;
+    }
+
     /** 手锯 · 切削（CUTTING）。 */
     private static List<RecipeHolder<CuttingRecipe>> collectHandSawRecipes() {
-        return collectFromPool(HandMadeTool.HAND_SAW, CuttingRecipe.class);
+        return collectFromPoolWithProxy(HandMadeTool.HAND_SAW, CuttingRecipe.class, CuttingRecipe::new);
     }
 
     /** 冲压锤 · 置物台（PRESSING）。 */
     private static List<RecipeHolder<PressingRecipe>> collectPressingRecipes() {
-        return collectFromPool(HandMadeTool.PRESS_HAMMER_DEPOT, PressingRecipe.class);
+        return collectFromPoolWithProxy(HandMadeTool.PRESS_HAMMER_DEPOT, PressingRecipe.class, PressingRecipe::new);
     }
 
     /** 冲压锤 · 工作盆 · 打包（COMPACTING）。 */
@@ -366,21 +418,7 @@ public class CreateHandMadeJEI implements IModPlugin {
      * 也不参与游戏内匹配。</p>
      */
     private static List<RecipeHolder<MillingRecipe>> collectMillingRecipes() {
-        List<RecipeHolder<MillingRecipe>> result = new ArrayList<>();
-        Level level = Minecraft.getInstance().level;
-        if (level == null) return result;
-
-        for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.MORTAR, level)) {
-            if (holder.value() instanceof MillingRecipe milling) {
-                result.add(new RecipeHolder<>(holder.id(), milling));
-                continue;
-            }
-            if (holder.value() instanceof HandMadeCrushingRecipe exclusive
-                    && exclusive.getTool() == HandMadeTool.MORTAR) {
-                result.add(new RecipeHolder<>(holder.id(), new MillingRecipe(exclusive.getParams())));
-            }
-        }
-        return result;
+        return collectFromPoolWithProxy(HandMadeTool.MORTAR, MillingRecipe.class, MillingRecipe::new);
     }
 
     /**

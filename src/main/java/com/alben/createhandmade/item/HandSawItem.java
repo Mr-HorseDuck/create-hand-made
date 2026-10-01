@@ -2,6 +2,7 @@ package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.Config;
 import com.alben.createhandmade.ModDataComponents;
+import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -355,7 +356,11 @@ public class HandSawItem extends Item {
         Recipe<?> recipe = recipes.get(index).value();
 
         List<ItemStack> results = new ArrayList<>();
-        if (recipe instanceof CuttingRecipe cr) {
+        // L3 独占配方（切削家族）与 Create 的 CuttingRecipe 一样支持多产物 / 概率产物，
+        // 所以必须走 rollResults；只有都不是时才退回"取第一个产物"的兜底分支。
+        if (recipe instanceof HandMadeCuttingRecipe exclusive) {
+            results = exclusive.rollResults(level.random);
+        } else if (recipe instanceof CuttingRecipe cr) {
             results = cr.rollResults(level.random);
         } else {
             results.add(recipe.getResultItem(level.registryAccess()).copy());
@@ -399,11 +404,20 @@ public class HandSawItem extends Item {
         // 无法直接接受 RecipeWrapper，而 instanceof 模式匹配能拿到确切类型，
         // 既不需要 unchecked 强转，也不会在将来类型变化时静默出错。
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.HAND_SAW, level)) {
+            // ★ automation 过滤保留在调用方：配方池与 JEI 都不过滤这些"仅手动"配方，
+            //   只有游戏内的手锯需要排除它们，行为与改造前一致。L3 独占配方同样受它管辖。
+            if (AllRecipeTypes.shouldIgnoreInAutomation(holder)) continue;
+
+            // L3 独占配方（切削家族）：只认归属手锯的那些
+            if (holder.value() instanceof HandMadeCuttingRecipe exclusive) {
+                if (exclusive.getTool() != HandMadeTool.HAND_SAW) continue;
+                if (!exclusive.matches(wrapper, level)) continue;
+                result.add(holder);
+                continue;
+            }
+
             if (!(holder.value() instanceof CuttingRecipe cuttingRecipe)) continue;
             if (!cuttingRecipe.matches(wrapper, level)) continue;
-            // ★ automation 过滤保留在调用方：配方池与 JEI 都不过滤这些"仅手动"配方，
-            //   只有游戏内的手锯需要排除它们，行为与改造前一致。
-            if (AllRecipeTypes.shouldIgnoreInAutomation(holder)) continue;
             result.add(holder);
         }
 

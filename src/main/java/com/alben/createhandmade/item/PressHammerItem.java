@@ -2,6 +2,7 @@ package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
+import com.alben.createhandmade.recipe.HandMadePressingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -344,10 +345,19 @@ public class PressHammerItem extends Item {
         // 静态类型是 Recipe<?>，其 matches 参数是通配符捕获，无法直接接受 SingleRecipeInput。
         SingleRecipeInput recipeInput = new SingleRecipeInput(stack);
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.PRESS_HAMMER_DEPOT, level)) {
+            // ★ automation 过滤保留在调用方：配方池与 JEI 都不过滤这些"仅手动"配方。
+            //   L3 独占配方与 Create 配方走同一套规则，所以过滤对两者都生效。
+            if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(holder)) continue;
+
+            // L3 独占配方（冲压家族）：只认归属置物台的那些
+            if (holder.value() instanceof HandMadePressingRecipe exclusive) {
+                if (exclusive.getTool() != HandMadeTool.PRESS_HAMMER_DEPOT) continue;
+                if (!exclusive.matches(recipeInput, level)) continue;
+                return holder;
+            }
+
             if (!(holder.value() instanceof PressingRecipe pressing)) continue;
             if (!pressing.matches(recipeInput, level)) continue;
-            // ★ automation 过滤保留在调用方：配方池与 JEI 都不过滤这些"仅手动"配方。
-            if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(holder)) continue;
             return holder;
         }
         return null;

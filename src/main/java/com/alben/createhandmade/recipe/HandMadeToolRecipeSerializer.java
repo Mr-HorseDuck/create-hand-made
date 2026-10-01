@@ -63,7 +63,9 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
     /** 独占配方的家族：决定用哪个配方类 / 哪个 delegate。 */
     private enum Family {
         BASIN,
-        CRUSHING
+        CRUSHING,
+        PRESSING,
+        CUTTING
     }
 
     private static final StandardProcessingRecipe.Serializer<HandMadeToolRecipe> BASIN_DELEGATE =
@@ -71,6 +73,12 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
 
     private static final StandardProcessingRecipe.Serializer<HandMadeCrushingRecipe> CRUSHING_DELEGATE =
             new StandardProcessingRecipe.Serializer<>(HandMadeCrushingRecipe::new);
+
+    private static final StandardProcessingRecipe.Serializer<HandMadePressingRecipe> PRESSING_DELEGATE =
+            new StandardProcessingRecipe.Serializer<>(HandMadePressingRecipe::new);
+
+    private static final StandardProcessingRecipe.Serializer<HandMadeCuttingRecipe> CUTTING_DELEGATE =
+            new StandardProcessingRecipe.Serializer<>(HandMadeCuttingRecipe::new);
 
     /**
      * {@code tool} → 家族；返回 null 表示该工具还不支持独占配方。
@@ -83,6 +91,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
         return switch (tool) {
             case PRESS_HAMMER_BASIN, STIRRING_STAFF -> Family.BASIN;
             case MORTAR, CRUSHER_MORTAR -> Family.CRUSHING;
+            case PRESS_HAMMER_DEPOT -> Family.PRESSING;
+            case HAND_SAW -> Family.CUTTING;
             default -> null;
         };
     }
@@ -133,6 +143,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                 return switch (family) {
                     case BASIN -> decodeWith(BASIN_DELEGATE, ops, normalized, tool);
                     case CRUSHING -> decodeWith(CRUSHING_DELEGATE, ops, normalized, tool);
+                    case PRESSING -> decodeWith(PRESSING_DELEGATE, ops, normalized, tool);
+                    case CUTTING -> decodeWith(CUTTING_DELEGATE, ops, normalized, tool);
                 };
             }
 
@@ -142,6 +154,8 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
                 // 用配方对象的实际类型反查家族（它一定是某个 delegate 造出来的）
                 RecordBuilder<T> builder = switch (recipe) {
                     case HandMadeCrushingRecipe crushing -> CRUSHING_DELEGATE.codec().encode(crushing, ops, prefix);
+                    case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.codec().encode(pressing, ops, prefix);
+                    case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.codec().encode(cutting, ops, prefix);
                     case HandMadeToolRecipe basin -> BASIN_DELEGATE.codec().encode(basin, ops, prefix);
                     default -> prefix;
                 };
@@ -209,15 +223,22 @@ public class HandMadeToolRecipeSerializer implements RecipeSerializer<StandardPr
 
                     switch (recipe) {
                         case HandMadeCrushingRecipe crushing -> CRUSHING_DELEGATE.streamCodec().encode(buf, crushing);
+                        case HandMadePressingRecipe pressing -> PRESSING_DELEGATE.streamCodec().encode(buf, pressing);
+                        case HandMadeCuttingRecipe cutting -> CUTTING_DELEGATE.streamCodec().encode(buf, cutting);
                         case HandMadeToolRecipe basin -> BASIN_DELEGATE.streamCodec().encode(buf, basin);
                         default -> { }
                     }
                 },
                 buf -> {
                     HandMadeTool tool = buf.readEnum(HandMadeTool.class);
-                    StandardProcessingRecipe<RecipeInput> recipe = familyOf(tool) == Family.CRUSHING
-                            ? CRUSHING_DELEGATE.streamCodec().decode(buf)
-                            : BASIN_DELEGATE.streamCodec().decode(buf);
+                    Family family = familyOf(tool);
+                    // family 为 null 不会发生（只有受支持的 tool 才会被同步过来），这里只是防御
+                    StandardProcessingRecipe<RecipeInput> recipe = switch (family == null ? Family.BASIN : family) {
+                        case BASIN -> BASIN_DELEGATE.streamCodec().decode(buf);
+                        case CRUSHING -> CRUSHING_DELEGATE.streamCodec().decode(buf);
+                        case PRESSING -> PRESSING_DELEGATE.streamCodec().decode(buf);
+                        case CUTTING -> CUTTING_DELEGATE.streamCodec().decode(buf);
+                    };
                     ((HandMadeToolRecipeLike) recipe).setTool(tool);
                     return recipe;
                 }

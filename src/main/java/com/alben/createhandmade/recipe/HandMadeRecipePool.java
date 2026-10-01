@@ -497,12 +497,17 @@ public final class HandMadeRecipePool {
      * 所以 Create 的机器（查的是 {@code AllRecipeTypes.XXX.getType()}）永远看不到它们；
      * 只有本方法把它们并进工具的候选列表。</p>
      *
-     * <p><b>哪些工具支持：</b>目前是 basin 家族（{@link HandMadeTool#PRESS_HAMMER_BASIN} /
-     * {@link HandMadeTool#STIRRING_STAFF}，配方类 {@link HandMadeToolRecipe}）与
-     * 碾磨家族（{@link HandMadeTool#MORTAR} / {@link HandMadeTool#CRUSHER_MORTAR}，
-     * 配方类 {@link HandMadeCrushingRecipe}）。
-     * <b>这份清单必须与 {@code HandMadeToolRecipeSerializer.familyOf} 的键集保持一致。</b>
-     * 其余工具还没有自己的独占配方类。</p>
+     * <p><b>哪些工具支持：</b>目前六个工具、四个家族：</p>
+     * <ul>
+     *   <li>basin：{@link HandMadeTool#PRESS_HAMMER_BASIN} / {@link HandMadeTool#STIRRING_STAFF}
+     *       → {@link HandMadeToolRecipe}</li>
+     *   <li>碾磨：{@link HandMadeTool#MORTAR} / {@link HandMadeTool#CRUSHER_MORTAR}
+     *       → {@link HandMadeCrushingRecipe}</li>
+     *   <li>冲压：{@link HandMadeTool#PRESS_HAMMER_DEPOT} → {@link HandMadePressingRecipe}</li>
+     *   <li>切削：{@link HandMadeTool#HAND_SAW} → {@link HandMadeCuttingRecipe}</li>
+     * </ul>
+     * <p><b>这份清单必须与 {@code HandMadeToolRecipeSerializer.familyOf} 的键集保持一致。</b>
+     * 其余工具（自动摆放 / 自动无序合成 / 自动酿造 / 指杆 / 灌注枪）还没有自己的独占配方类。</p>
      *
      * <p><b>归属匹配规则：</b>独占配方按 {@code tool} 字段归属，通常只给写下它的那个工具读；
      * 例外是 {@link HandMadeTool#CRUSHER_MORTAR} —— 它连 Create 的 MILLING 配方都能读
@@ -534,7 +539,9 @@ public final class HandMadeRecipePool {
         return tool == HandMadeTool.PRESS_HAMMER_BASIN
                 || tool == HandMadeTool.STIRRING_STAFF
                 || tool == HandMadeTool.MORTAR
-                || tool == HandMadeTool.CRUSHER_MORTAR;
+                || tool == HandMadeTool.CRUSHER_MORTAR
+                || tool == HandMadeTool.PRESS_HAMMER_DEPOT
+                || tool == HandMadeTool.HAND_SAW;
     }
 
     /** 某条独占配方（归属 {@code owner}）是否应该进入 {@code tool} 的候选集。 */
