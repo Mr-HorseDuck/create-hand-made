@@ -310,14 +310,18 @@ public class InfusionGunItem extends Item {
         int usedTicks = getUseDuration(stack, entity) - timeLeft;
         if (usedTicks >= LONG_PRESS_THRESHOLD) return;   // 长按已由 onUseTick 处理
 
-        // ★ 目标守卫：判断这个位置是否允许放流体源
-        //   - 目标是流体源方块 → 不放（否则会在源旁边又生成一个新源，等于"吸了又放"）
+        // ★ 目标守卫：这里只保留「点击的不是容器」。
         //   - 目标是容器（有 IFluidHandler）→ 不放（否则可能洒到容器旁边）
-        //   - 其余（空气、石头等）→ 潜行与不潜行都允许，但优先级低于注入 / 存容器
-        boolean isFluidSourcePos = isFluidSource(level, info.pos());
+        //   - 其余（空气、石头、流体等）→ 潜行与不潜行都放，但优先级低于注入 / 存容器
+        //
+        //   ★ bug 修复：「点击位置不能是流体源」这条旧判据已删除。
+        //     它作用在**点击位置** info.pos() 上，而真正的放置目标是
+        //     clickedPos.relative(face)，两者相差一格。结果是只要准星落在流体源上，
+        //     canPlaceFluid 就恒为 false —— 玩家对着已有的流体方块右键永远放不出流体。
+        //     水桶式的「目标能不能被顶掉」判断改在真正的目标位置上做（canReplaceWithSource）。
         boolean isContainer = level.getCapability(
                 Capabilities.FluidHandler.BLOCK, info.pos(), null) != null;
-        boolean canPlaceFluid = !isFluidSourcePos && !isContainer;
+        boolean canPlaceFluid = !isContainer;
 
         // ★ 短按：按优先级尝试。注入物品 + 存容器是一组，注入优先。
         if (player.isShiftKeyDown()) {
@@ -493,8 +497,31 @@ public class InfusionGunItem extends Item {
     // ================== 放置流体方块 ==================
 
     /**
-     * 把枪内 1000mB 流体放到点击面的相邻位置。
-     * 严格判定：枪内 ≥1000mB、目标位置可替换、流体有方块形式。
+     * 本次"放流体源"落在哪一格。
+     *
+     * <ul>
+     *   <li>点击位置<b>本身就是流体</b>（不论同种 / 异种）→ <b>原地覆盖它</b>，
+     *       而不是放到它上面/旁边那一格。</li>
+     *   <li>其余（空气、石头等）→ 点击面的相邻格，即水桶的 {@code blockpos1}
+     *       （{@code BucketItem.java:55,78}）。</li>
+     * </ul>
+     *
+     * <p>射线是 {@code ClipContext.Fluid.SOURCE_ONLY}（见 {@link #use}），所以
+     * "点击位置本身就是流体"实际上必然是流体<b>源</b>，不会是流动流体。</p>
+     *
+     * <p>同种流体源被"原地覆盖"时写进去的还是同一个 {@link BlockState}，世界不会有任何
+     * 变化 —— 这与原版水桶把水倒进水里一样属于"白放"：仍算放成功、照扣流体、照播音效
+     * （判定见 {@link #tryPlaceFluidBlock}）。</p>
+     */
+    private static BlockPos placementTarget(Level level, BlockPos clickedPos, Direction face) {
+        if (!level.getFluidState(clickedPos).isEmpty()) return clickedPos;
+        return clickedPos.relative(face);
+    }
+
+    /**
+     * 把枪内 1000mB 流体放到目标格（目标格的选取见 {@link #placementTarget}）。
+     * 严格判定：枪内 ≥1000mB、目标格可被顶掉（见 {@link #canReplaceWithSource}）、流体有方块形式；
+     * "算不算放成功"完全照抄原版水桶（见方法内注释）。
      */
     private static boolean tryPlaceFluidBlock(Level level, BlockPos clickedPos, Direction face,
                                               Player player, ItemStack gun) {
@@ -502,9 +529,9 @@ public class InfusionGunItem extends Item {
         if (contents.isEmpty()) return false;
         if (contents.amount() < FLUID_BLOCK_AMOUNT) return false;
 
-        BlockPos targetPos = clickedPos.relative(face);
+        BlockPos targetPos = placementTarget(level, clickedPos, face);
         BlockState targetState = level.getBlockState(targetPos);
-        if (!targetState.canBeReplaced()) return false;
+        if (!canReplaceWithSource(targetState)) return false;
 
         Fluid fluid = contents.fluid().getFluid();
         if (fluid == Fluids.EMPTY) return false;
@@ -513,13 +540,46 @@ public class InfusionGunItem extends Item {
         BlockState fluidBlockState = fluid.defaultFluidState().createLegacyBlock();
         if (fluidBlockState.isAir()) return false;
 
-        level.setBlock(targetPos, fluidBlockState, 11);
+        // ★ "算不算放成功"与原版水桶逐字对齐（{@code BucketItem.java:172-177}）：
+        //      if (!level.setBlock(pos, ...) && !blockstate.getFluidState().isSource()) return false;
+        //   - setBlock 真的改了世界（空气→水、流动→源、异种源被顶掉）→ 成功，扣流体；
+        //   - 没改世界、但原来那格本就是流体源（同种源上"白放"）→ 仍算成功，照扣流体 + 音效；
+        //   - 没改世界且原来不是源（例如超出建筑高度）→ 不算成功，不扣流体。
+        boolean changed = level.setBlock(targetPos, fluidBlockState, 11);
+        if (!changed && !targetState.getFluidState().isSource()) return false;
+
         level.playSound(null, targetPos, FluidHelper.getEmptySound(contents.fluid()),
                 SoundSource.PLAYERS, 1.0f, 1.0f + level.random.nextFloat() * 0.2f);
 
         setContents(gun, contents.withDrain(FLUID_BLOCK_AMOUNT));
         damageGun(gun, player);
         return true;
+    }
+
+    /**
+     * 水桶式的「这个格子能不能被本枪的流体顶掉」判据 —— 有意收拢成这一处定义，
+     * {@link #tryPlaceFluidBlock} 与 {@link #canInteractAt} 共用。
+     *
+     * <p>对照 1.21.1 的 {@code BucketItem.emptyContents}：那边只要求
+     * {@code blockstate.isAir() || blockstate.canBeReplaced(fluid)}
+     * （{@code BucketItem.java:119-134}），<b>不排除流体源</b>。这里用无参
+     * {@link BlockState#canBeReplaced()} 表达同一件事：</p>
+     *
+     * <ul>
+     *   <li>空气、花草等可替换方块 → 可放（保持"对着空气能放"的现有行为）；</li>
+     *   <li>流体 —— <b>流动的和源都算</b> → 可顶。水/岩浆方块注册了 {@code replaceable}
+     *       （{@code Blocks.java:345}、{@code Blocks.java:360}），所以
+     *       {@code canBeReplaced()} 对流体方块恒为 true；顶掉异种源后由 NeoForge
+     *       的流体交互决定产物（岩浆源 + 水 = 黑曜石、流动岩浆 + 水 = 圆石，
+     *       {@code FluidInteractionRegistry.java:72-76}）；</li>
+     *   <li>石头、台阶、火把等不可替换方块 → 拒绝。</li>
+     * </ul>
+     *
+     * <p>这里不做任何"同种流体源就拒绝"的预判：目标格是同种流体的源时放置仍算成功
+     * （原版水桶的"白放"），只是世界不会变化 —— 判定见 {@link #tryPlaceFluidBlock}。</p>
+     */
+    private static boolean canReplaceWithSource(BlockState state) {
+        return state.canBeReplaced();
     }
 
     /**
@@ -698,11 +758,14 @@ public class InfusionGunItem extends Item {
             return true;
         }
 
-        // 放流体方块：枪内 ≥1000mB 且相邻位置有可放置的空位
+        // 放流体方块：枪内 ≥1000mB 且目标格可被顶掉
+        // （判据与 tryPlaceFluidBlock 共用 canReplaceWithSource；真正的目标格选取在
+        //   placementTarget 里做。这里不必单独判"点击位置本身是流体"那种情形 ——
+        //   流体源在函数开头就已 return true，而射线是 SOURCE_ONLY，点到的流体只可能是源）
         if (!contents.isEmpty() && contents.amount() >= FLUID_BLOCK_AMOUNT) {
             for (Direction dir : Direction.values()) {
                 BlockPos target = pos.relative(dir);
-                if (level.getBlockState(target).canBeReplaced()) {
+                if (canReplaceWithSource(level.getBlockState(target))) {
                     return true;
                 }
             }
