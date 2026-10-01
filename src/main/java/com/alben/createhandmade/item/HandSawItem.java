@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.Config;
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
@@ -144,6 +145,10 @@ public class HandSawItem extends Item {
         BlockPos pos = event.getPos();
 
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
+            // ★ 配置开关：关闭时完全不进入「待砍」状态 —— 不记录候选、不播锯木音效，
+            //   潜行左键原木等同普通挖掘。与 fellTreeFromBroken 里的判定保持一致。
+            if (!Config.INSTANCE.enableTreeFelling.get()) return;
+
             if (!player.isShiftKeyDown()) return;
 
             BlockState state = level.getBlockState(pos);
@@ -408,6 +413,10 @@ public class HandSawItem extends Item {
     // ================= 整树砍伐 =================
     private static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
                                            BlockPos pos, BlockState brokenState) {
+        // ★ 配置开关：关闭时只破坏当前方块（原版行为）。
+        //   放在任何整树扫描之前早退，零开销；不影响切削配方 / 剥皮 / 刮铜 / 去蜡。
+        if (!Config.INSTANCE.enableTreeFelling.get()) return;
+
         if (!(level instanceof ServerLevel)) return;
         if (!SawBlockEntity.isSawable(brokenState)) return;
 

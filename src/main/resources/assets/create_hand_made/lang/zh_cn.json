@@ -1,8 +1,8 @@
 {
   "itemGroup.create_hand_made": "机械动力：手搓学",
   "create_hand_made.configuration.title": "机械动力：手搓学 配置",
-  "create_hand_made.configuration.section.create_hand_made.common.toml": "机械动力：手搓学 配置",
-  "create_hand_made.configuration.section.create_hand_made.common.toml.title": "机械动力：手搓学 配置",
+  "create_hand_made.configuration.section.create.hand.made.common.toml": "机械动力：手搓学 配置",
+  "create_hand_made.configuration.section.create.hand.made.common.toml.title": "机械动力：手搓学 配置",
 
   "item.create_hand_made.press_hammer": "冲压锤",
   "item.create_hand_made.mortar": "研钵",
@@ -82,6 +82,6 @@
   "jei.create_hand_made.bellows_blasting": "风箱熔炼",
   "jei.create_hand_made.bellows_smoking": "风箱烟熏",
   "jei.create_hand_made.bellows_haunting": "风箱缠魂",
-  "jei.create_hand_made.bellows_splashing": "风箱洗涤"
-
+  "jei.create_hand_made.bellows_splashing": "风箱洗涤",
+  "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树"
 }

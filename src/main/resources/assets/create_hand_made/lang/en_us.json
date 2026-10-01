@@ -1,8 +1,8 @@
 {
   "itemGroup.create_hand_made": "Create: Hand Made",
   "create_hand_made.configuration.title": "Create: Hand Made Configs",
-  "create_hand_made.configuration.section.create_hand_made.common.toml": "Create: Hand Made Configs",
-  "create_hand_made.configuration.section.create_hand_made.common.toml.title": "Create: Hand Made Configs",
+  "create_hand_made.configuration.section.create.hand.made.common.toml": "Create: Hand Made Configs",
+  "create_hand_made.configuration.section.create.hand.made.common.toml.title": "Create: Hand Made Configs",
 
   "item.create_hand_made.press_hammer": "Press Hammer",
   "item.create_hand_made.mortar": "Mortar",
@@ -81,5 +81,6 @@
   "jei.create_hand_made.bellows_blasting": "Bellows Blasting",
   "jei.create_hand_made.bellows_smoking": "Bellows Smoking",
   "jei.create_hand_made.bellows_haunting": "Bellows Haunting",
-  "jei.create_hand_made.bellows_splashing": "Bellows Splashing"
+  "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
+  "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling"
 }
