@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "create_hand_made:mortar" },
+    { "item": "minecraft:diamond" }
+  ],
+  "result": {
+    "id": "create_hand_made:crusher_mortar",
+    "count": 1
+  }
+}
