@@ -23,17 +23,32 @@
 | 依赖 | 版本 |
 |---|---|
 | Minecraft | 1.20.1 |
-| Forge | 47.2.0+ |
+| Forge | 47.3.0+ |
 | Create | 6.0.8+ |
 | JEI(可选) | 15.2.0+ |
 
 
 ## 安装
 
-1. 安装 Forge 47.2.0+
+1. 安装 Forge 47.3.0+
 2. 安装 Create 6.0.8+ 及其依赖（Ponder、Flywheel）
 3. 把本模组 jar 放进 `mods/` 文件夹
 4. 启动游戏
+
+## 面向整合包作者
+
+本模组提供三层配方 API，让你修改手搓工具能做什么，**不影响 Create 机器**：
+
+- **L2 · 过滤层** —— 单独禁用某工具的某条 Create 配方
+- **L3 · 独占层** —— 添加只有手搓工具能读的配方
+
+| 文档 | 内容 |
+|---|---|
+| [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 完整写法、数据包 + KubeJS 示例、字段矩阵 |
+| [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
+
+支持**数据包**
+**目前1.20.1移植版不支持KubeJS**
 
 ## 构建（开发者）
 
