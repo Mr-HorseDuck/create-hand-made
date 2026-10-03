@@ -1,6 +1,0 @@
-{
-  "type": "create:blasting",
-  "ingredients": [
-    { "item": "minecraft:lava_bucket" }
-  ]
-}
