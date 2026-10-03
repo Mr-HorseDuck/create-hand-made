@@ -1,9 +1,20 @@
 # Create: Hand Made
-
+**中文** · [English](README_EN.md)
 > 用双手完成机械动力的加工流程
+
+
+
+[![MIT License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
+![Minecraft Version](https://img.shields.io/badge/Minecraft%20版本-1.21.1%7C1.20.1-success)
+![Mod Loader Forge](https://img.shields.io/badge/Loader-Forge%7cNeoForge-red)
+![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?logo=curseforge&label=CurseForge%20%E4%B8%8B%E8%BD%BD%E9%87%8F&color=orange)
 
 为 [Create](https://www.curseforge.com/minecraft/mc-mods/create) 添加一系列手工工具，
 让玩家可以在没有机械的情况下完成部分加工流程。
+
+以下为neoforge1.21.1版本介绍，[点击跳转到forge1.20.1分支](https://github.com/Mr-HorseDuck/create-hand-made/tree/1.20.1)。
+
+
 
 ## 工具列表
 
@@ -20,14 +31,14 @@
 
 ## 依赖
 
-| 依赖 | 版本 | 类型 |
-|---|---|---|
-| Minecraft | 1.21.1 | 必需 |
-| NeoForge | 21.1.250+ | 必需 |
-| Create | 6.0.10+ | 必需 |
-| JEI | 19.0.0+ | 可选 |
-| KubeJS | 2101.7.0+ | 可选（配方脚本） |
-| Sable | 2.0.5+ | 可选 |
+| 依赖 | 版本 | 类型              |
+|---|---|-------------------|
+| Minecraft | 1.21.1 | 必需              |
+| NeoForge | 21.1.250+ | 必需              |
+| Create | 6.0.10+ | 必需              |
+| JEI | 19.0.0+ | 可选              |
+| KubeJS | 2101.7.0+ | 可选（配方脚本）  |
+| Sable | 2.0.5+ | 可选 （渲染适配） |
 
 ## 安装
 
@@ -49,6 +60,11 @@
 | [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
 
 支持**数据包**和 **KubeJS** 两种方式。
+
+## 未来展望
+
+- 可能兼容车万女仆
+
 
 ## 构建（开发者）
 
