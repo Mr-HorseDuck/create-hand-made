@@ -2,7 +2,12 @@
 
 > 用双手完成机械动力的加工流程
 
-![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?style=flat-square&logo=curseforge)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
+![Minecraft Version](https://img.shields.io/badge/Minecraft%20版本-1.21.1%7C1.20.1-success)
+![Mod Loader Forge](https://img.shields.io/badge/Loader-Forge%7cNeoForge-red)
+
+
+![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?logo=curseforge&label=CurseForge%20%E4%B8%8B%E8%BD%BD%E9%87%8F&color=orange)
 
 为 [Create](https://www.curseforge.com/minecraft/mc-mods/create) 添加一系列手工工具，
 让玩家可以在没有机械的情况下完成部分加工流程。
