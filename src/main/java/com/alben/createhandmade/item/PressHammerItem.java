@@ -73,7 +73,7 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class PressHammerItem extends Item {
 
-    private static final int CHARGE_TICKS = 20;
+    private static final int CHARGE_TICKS = 15;
     private static final Object COMPACTING_RECIPE_KEY = new Object();
     private static final int CHARGE_WINDOW_TICKS = 20;
 

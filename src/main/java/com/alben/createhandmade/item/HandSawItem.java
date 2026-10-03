@@ -75,8 +75,8 @@ public class HandSawItem extends Item {
 
     private static final int FELL_SOUND_INTERVAL = 4;
 
-    /** ★ 1.20.1：用 NBT key 替代 DataComponentType */
-    private static final String NBT_RECIPE_INDEX = "HandSawRecipeIndex";
+    /** ★ 1.20.1：用 NBT key 替代 DataComponentType（HUD 渲染器需要访问） */
+    public static final String NBT_RECIPE_INDEX = "HandSawRecipeIndex";
 
     private static final Set<UUID> CUTTING_PLAYERS = new HashSet<>();
     private static final Map<UUID, BlockPos> FELL_PENDING = new HashMap<>();
@@ -162,7 +162,6 @@ public class HandSawItem extends Item {
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
             if (!player.isShiftKeyDown()) return;
 
-            // ★ 配置关闭时不记录候选目标
             if (!Config.INSTANCE.enableTreeFelling.get()) return;
 
             BlockState state = level.getBlockState(pos);
@@ -395,9 +394,9 @@ public class HandSawItem extends Item {
                 SoundSource.PLAYERS, 0.7f, 1.2f);
     }
 
-    // ================= 三层配方查询 =================
+    // ================= 三层配方查询（HUD 渲染器需要访问，改为 public） =================
 
-    private static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
+    public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
         if (input.isEmpty()) return List.of();
 
         // ★ L3：优先查独占配方
