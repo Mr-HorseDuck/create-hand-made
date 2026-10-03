@@ -2,6 +2,8 @@
 
 > 用双手完成机械动力的加工流程
 
+![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?style=flat-square&logo=curseforge)
+
 为 [Create](https://www.curseforge.com/minecraft/mc-mods/create) 添加一系列手工工具，
 让玩家可以在没有机械的情况下完成部分加工流程。
 
@@ -26,6 +28,7 @@
 | Forge | 47.3.0+ | 必须 |
 | Create | 6.0.8+ | 必须 |
 | JEI | 15.2.0+ | 可选 |
+| KubeKS | 2001.6.5+ | 可选 |
 
 
 ## 安装
@@ -48,7 +51,7 @@
 | [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
 
 支持**数据包**
-**目前1.20.1移植版不支持KubeJS**
+**KubeJS**
 
 ## 未来展望 顺序越后优先级越低 肯定不是大饼（
 - 支持女仆使用工具加工
