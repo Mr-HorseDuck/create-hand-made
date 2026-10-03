@@ -5,9 +5,9 @@
 [![MIT License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
 ![Minecraft Version](https://img.shields.io/badge/Minecraft%20版本-1.21.1%7C1.20.1-success)
 ![Mod Loader Forge](https://img.shields.io/badge/Loader-Forge%7cNeoForge-red)
-
-
 ![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?logo=curseforge&label=CurseForge%20%E4%B8%8B%E8%BD%BD%E9%87%8F&color=orange)
+
+以下为forge1.20.1版本介绍，[点击跳转到neoforge1.21.1分支](https://github.com/Mr-HorseDuck/create-hand-made/tree/main)。
 
 为 [Create](https://www.curseforge.com/minecraft/mc-mods/create) 添加一系列手工工具，
 让玩家可以在没有机械的情况下完成部分加工流程。
@@ -33,7 +33,7 @@
 | Forge | 47.3.0+ | 必须 |
 | Create | 6.0.8+ | 必须 |
 | JEI | 15.2.0+ | 可选 |
-| KubeKS | 2001.6.5+ | 可选 |
+| KubeJS | 2001.6.5+ | 可选 |
 
 
 ## 安装
@@ -58,7 +58,7 @@
 支持**数据包**
 **KubeJS**
 
-## 未来展望 顺序越后优先级越低 肯定不是大饼（
+## 未来展望 顺序越后优先级越低
 - 支持女仆使用工具加工（可能会单独写一个模组）
 - 支持瓦基的物理结构（跟1.21.1支持Sable类似）
 
