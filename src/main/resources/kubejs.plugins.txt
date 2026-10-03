@@ -1,0 +1,1 @@
+com.alben.createhandmade.kubejs.HandMadeKubeJSPlugin
