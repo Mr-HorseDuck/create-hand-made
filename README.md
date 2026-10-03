@@ -1,7 +1,5 @@
 # Create: Hand Made（1.20.1）
 
-<img alt="mod_logo.png" src="mod_logo.png"/>
-
 > 用双手完成机械动力的加工流程
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
@@ -27,6 +25,9 @@
 | **风箱** | 用副手介质施加鼓风加工（熔炼 / 烟熏 / 缠魂 / 洗涤） |
 | **手锯** | 切削、砍树、剥皮、刮铜 |
 
+## 功能列表
+- 女仆现可支持使用灌注枪,手锯,冲压锤(未完善)
+
 ## 依赖
 
 | 依赖 | 版本 | 类型 |
@@ -36,6 +37,8 @@
 | Create | 6.0.8+ | 必须 |
 | JEI | 15.2.0+ | 可选 |
 | KubeJS | 2001.6.5+ | 可选 |
+| TLM | 5.4.2+ | 可选 |
+
 
 
 ## 安装
