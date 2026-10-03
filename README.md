@@ -1,5 +1,7 @@
 # Create: Hand Made（1.20.1）
 
+<img alt="mod_logo.png" src="mod_logo.png"/>
+
 > 用双手完成机械动力的加工流程
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
