@@ -358,8 +358,12 @@ public class HandSawItem extends Item {
 
     // ================= 切削执行 =================
 
-    private static void executeCut(Level level, Player player, ItemStack saw) {
-        ItemStack off = player.getOffhandItem();
+    /**
+     * ★ 女仆兼容：改为 public static，Player → LivingEntity
+     *   内部按 instanceof Player 区分背包与耐久处理
+     */
+    public static void executeCut(Level level, LivingEntity entity, ItemStack saw) {
+        ItemStack off = entity.getOffhandItem();
         if (off.isEmpty()) return;
 
         List<Recipe<?>> recipes = getCuttingRecipes(level, off);
@@ -381,16 +385,27 @@ public class HandSawItem extends Item {
 
         for (ItemStack result : results) {
             if (result.isEmpty()) continue;
-            if (!player.getInventory().add(result.copy())) {
-                player.drop(result.copy(), false);
+
+            if (entity instanceof Player player) {
+                if (!player.getInventory().add(result.copy())) {
+                    player.drop(result.copy(), false);
+                }
+            } else {
+              // 女仆等非玩家实体：直接掉落到地上
+             entity.spawnAtLocation(result.copy());
             }
         }
 
-        EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
-                ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
-        saw.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
+        // 耐久
+        if (entity instanceof Player player) {
+            EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
+                    ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
+            saw.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
+        } else {
+            saw.hurtAndBreak(1, entity, e -> {});
+        }
 
-        level.playSound(null, player.blockPosition(), SoundEvents.WOOD_BREAK,
+        level.playSound(null, entity.blockPosition(), SoundEvents.WOOD_BREAK,
                 SoundSource.PLAYERS, 0.7f, 1.2f);
     }
 

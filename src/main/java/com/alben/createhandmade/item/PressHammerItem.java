@@ -332,8 +332,10 @@ public class PressHammerItem extends Item {
      *   L3 独占配方（遍历所有 L3 配方，用 BasinRecipe.match 匹配）
      *   L1 原有 Create 配方（COMPACTING + 可压缩 crafting）
      *   L2 数据包过滤（在 L1 循环里逐个过滤）
+     *
+     * ★ 女仆兼容：改为 public static，让 TLM 行为类可以直接调用
      */
-    private static boolean tryPressBasin(Level level, BlockPos pos) {
+    public static boolean tryPressBasin(Level level, BlockPos pos) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
         if (basin.isEmpty()) return false;
 
@@ -437,7 +439,10 @@ public class PressHammerItem extends Item {
         return filtered.isEmpty() ? null : filtered.get(0);
     }
 
-    private static boolean tryPressTransported(Level level, BlockPos pos) {
+    /**
+     * ★ 女仆兼容：改为 public static，让 TLM 行为类可以直接调用
+     */
+    public static boolean tryPressTransported(Level level, BlockPos pos) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;

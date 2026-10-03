@@ -151,8 +151,9 @@ public class InfusionGunItem extends Item {
         return false;
     }
 
+    /** ★ 女仆兼容：改为 public static */
     @Nullable
-    private static IFluidHandler getFluidHandler(Level level, BlockPos pos) {
+    public static IFluidHandler getFluidHandler(Level level, BlockPos pos) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) return null;
         LazyOptional<IFluidHandler> opt = be.getCapability(ForgeCapabilities.FLUID_HANDLER, null);
@@ -343,14 +344,15 @@ public class InfusionGunItem extends Item {
 
     // ================= 累计抽取 =================
 
-    private static void tryExtractTick(Level level, BlockPos pos, Player player, ItemStack gun, int rate) {
+    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
+    public static void tryExtractTick(Level level, BlockPos pos, LivingEntity entity, ItemStack gun, int rate) {
         IFluidHandler handler = getFluidHandler(level, pos);
         if (handler == null) return;
 
         InfusionGunContents contents = getContents(gun);
         if (contents.remaining() <= 0) return;
 
-        int pending = Math.min(PENDING_EXTRACT.getOrDefault(player.getUUID(), 0) + rate, 10000);
+        int pending = Math.min(PENDING_EXTRACT.getOrDefault(entity.getUUID(), 0) + rate, 10000);
 
         FluidStack source = FluidStack.EMPTY;
         for (int i = 0; i < handler.getTanks(); i++) {
@@ -364,7 +366,7 @@ public class InfusionGunItem extends Item {
         }
 
         if (source.isEmpty()) {
-            PENDING_EXTRACT.remove(player.getUUID());
+            PENDING_EXTRACT.remove(entity.getUUID());
             return;
         }
 
@@ -374,16 +376,16 @@ public class InfusionGunItem extends Item {
         FluidStack toDrain = new FluidStack(source.getFluid(), want, source.getTag());
         FluidStack actual = handler.drain(toDrain, IFluidHandler.FluidAction.EXECUTE);
         if (actual.isEmpty()) {
-            PENDING_EXTRACT.put(player.getUUID(), pending);
+            PENDING_EXTRACT.put(entity.getUUID(), pending);
             return;
         }
 
-        PENDING_EXTRACT.put(player.getUUID(), Math.max(0, pending - actual.getAmount()));
+        PENDING_EXTRACT.put(entity.getUUID(), Math.max(0, pending - actual.getAmount()));
         setContents(gun, contents.withFill(actual));
 
-        if (!EXTRACT_DAMAGED.getOrDefault(player.getUUID(), false)) {
-            damageGun(gun, player);
-            EXTRACT_DAMAGED.put(player.getUUID(), true);
+        if (!EXTRACT_DAMAGED.getOrDefault(entity.getUUID(), false)) {
+            damageGun(gun, entity);
+            EXTRACT_DAMAGED.put(entity.getUUID(), true);
         }
 
         if (level.getGameTime() % 10 == 0) {
@@ -394,7 +396,8 @@ public class InfusionGunItem extends Item {
 
     // ================= 注入物品 =================
 
-    private static boolean tryInjectItems(Level level, BlockPos pos, Player player, ItemStack gun) {
+    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
+    public static boolean tryInjectItems(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -446,7 +449,7 @@ public class InfusionGunItem extends Item {
         });
 
         if (success[0]) {
-            damageGun(gun, player);
+            damageGun(gun, entity);
             level.playSound(null, pos, FluidHelper.getEmptySound(contents.fluid()),
                     SoundSource.PLAYERS, 0.8f, 1.0f + level.random.nextFloat() * 0.2f);
         }
@@ -484,7 +487,8 @@ public class InfusionGunItem extends Item {
 
     // ================= 存入流体 =================
 
-    private static boolean tryStoreFluid(Level level, BlockPos pos, Player player, ItemStack gun) {
+    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
+    public static boolean tryStoreFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
         IFluidHandler handler = getFluidHandler(level, pos);
         if (handler == null) return false;
 
@@ -496,7 +500,7 @@ public class InfusionGunItem extends Item {
         if (actual <= 0) return false;
 
         setContents(gun, contents.withDrain(actual));
-        damageGun(gun, player);
+        damageGun(gun, entity);
 
         level.playSound(null, pos, FluidHelper.getEmptySound(fluid),
                 SoundSource.PLAYERS, 1f, 1.0f + level.random.nextFloat() * 0.2f);
@@ -506,10 +510,16 @@ public class InfusionGunItem extends Item {
 
     // ================= 耐久 =================
 
-    private static void damageGun(ItemStack gun, Player player) {
-        EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
-                ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
-        gun.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
+    /** ★ 女仆兼容：改为 public static，Player → LivingEntity，内部判断 */
+    public static void damageGun(ItemStack gun, LivingEntity entity) {
+        if (entity instanceof Player player) {
+            EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
+                    ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
+            gun.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
+        } else {
+            // 女仆：直接扣耐久，不广播手臂动画
+            gun.hurtAndBreak(1, entity, e -> {});
+        }
     }
 
     // ================= 判定 =================
