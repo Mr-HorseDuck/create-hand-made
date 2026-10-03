@@ -23,7 +23,7 @@ public class HandSawHudRenderer {
 
     /** 原版槽位贴图（18×18，含 1px 边框） */
     private static final ResourceLocation SLOT_SPRITE =
-            new ResourceLocation("minecraft", "textures/gui/container/slot.png");
+        new ResourceLocation(CreateHandMade.MODID, "textures/gui/slot.png");
 
     private static final int SLOT_SIZE = 18;
     private static final int SLOT_GAP = 4;
