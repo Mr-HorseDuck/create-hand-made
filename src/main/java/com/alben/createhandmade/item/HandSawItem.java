@@ -350,21 +350,37 @@ public class HandSawItem extends Item {
         List<Recipe<?>> recipes = getCuttingRecipes(level, off);
         if (recipes.isEmpty()) return false;
 
-        int index = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
-        if (index < 0 || index >= recipes.size()) index = 0;
-
-        Recipe<?> recipe = recipes.get(index);
-
+        // ★ 选出要执行的配方
+        Recipe<?> recipe = null;
         List<ItemStack> results = new ArrayList<>();
-        if (recipe instanceof CuttingRecipe cr) {
-            results = cr.rollResults();
-        } else {
-            results.add(recipe.getResultItem(level.registryAccess()).copy());
-        }
 
-        // ★ 过滤产物
-        if (!resultsPassFilter(level, results, filter)) {
-            return false;
+        if (filter != null) {
+            // 有过滤器：遍历所有配方，找产物通过过滤的第一个
+            for (Recipe<?> candidate : recipes) {
+                List<ItemStack> candidateResults = new ArrayList<>();
+                if (candidate instanceof CuttingRecipe cr) {
+                    candidateResults = cr.rollResults();
+                } else {
+                    candidateResults.add(candidate.getResultItem(level.registryAccess()).copy());
+                }
+                if (resultsPassFilter(level, candidateResults, filter)) {
+                    recipe = candidate;
+                    results = candidateResults;
+                    break;
+                }
+            }
+            if (recipe == null) return false;
+        } else {
+            // 无过滤器：用当前选中索引
+            int index = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
+            if (index < 0 || index >= recipes.size()) index = 0;
+            recipe = recipes.get(index);
+
+            if (recipe instanceof CuttingRecipe cr) {
+                results = cr.rollResults();
+            } else {
+                results.add(recipe.getResultItem(level.registryAccess()).copy());
+            }
         }
 
         off.shrink(1);
