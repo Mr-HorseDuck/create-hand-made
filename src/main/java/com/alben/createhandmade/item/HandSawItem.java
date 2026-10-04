@@ -7,6 +7,7 @@ import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.kinetics.saw.SawBlockEntity;
 import com.simibubi.create.content.kinetics.saw.TreeCutter;
+import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import net.minecraft.ChatFormatting;
@@ -72,10 +73,8 @@ public class HandSawItem extends Item {
     private static final int CUT_MOVE_TICKS = 10;
     private static final int CUT_VIBRATE_TICKS = 20;
     private static final int CUT_DURATION = CUT_MOVE_TICKS + CUT_VIBRATE_TICKS;
-
     private static final int FELL_SOUND_INTERVAL = 4;
 
-    /** ★ 1.20.1：用 NBT key 替代 DataComponentType（HUD 渲染器需要访问） */
     public static final String NBT_RECIPE_INDEX = "HandSawRecipeIndex";
 
     private static final Set<UUID> CUTTING_PLAYERS = new HashSet<>();
@@ -90,15 +89,11 @@ public class HandSawItem extends Item {
         return 15;
     }
 
-    // ================= 斧头动作支持（剥离/刮蜡/除锈） =================
-
     @Override
     public boolean canPerformAction(ItemStack stack, ToolAction toolAction) {
         return ToolActions.DEFAULT_AXE_ACTIONS.contains(toolAction)
                 || super.canPerformAction(stack, toolAction);
     }
-
-    // ================= 斧头挖掘能力 =================
 
     @Override
     public float getDestroySpeed(ItemStack stack, BlockState state) {
@@ -116,8 +111,6 @@ public class HandSawItem extends Item {
     public void initializeClient(Consumer<IClientItemExtensions> consumer) {
         consumer.accept(SimpleCustomRenderer.create(this, new HandSawItemRenderer()));
     }
-
-    // ================= 使用动画 =================
 
     @Override
     public UseAnim getUseAnimation(ItemStack stack) {
@@ -147,8 +140,6 @@ public class HandSawItem extends Item {
         }
     }
 
-    // ================= 左键 START：潜行 + 可锯方块 → 记录候选目标 =================
-
     @SubscribeEvent
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
         Player player = event.getEntity();
@@ -161,7 +152,6 @@ public class HandSawItem extends Item {
 
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
             if (!player.isShiftKeyDown()) return;
-
             if (!Config.INSTANCE.enableTreeFelling.get()) return;
 
             BlockState state = level.getBlockState(pos);
@@ -172,8 +162,6 @@ public class HandSawItem extends Item {
             FELL_PENDING.remove(player.getUUID());
         }
     }
-
-    // ================= 服务端 tick：砍树循环音效 =================
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -209,14 +197,11 @@ public class HandSawItem extends Item {
         }
     }
 
-    // ================= 方块真正被挖碎时：判定并触发整树砍伐 =================
-
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
         if (!(player.getMainHandItem().getItem() instanceof HandSawItem)) return;
         if (!player.isShiftKeyDown()) return;
-
         if (!Config.INSTANCE.enableTreeFelling.get()) return;
 
         Level level = player.level();
@@ -238,8 +223,6 @@ public class HandSawItem extends Item {
         serverLevel.getServer().execute(() ->
                 fellTreeFromBroken(serverLevel, player, saw, immutablePos, stateSnapshot));
     }
-
-    // ================= 右键 =================
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
@@ -292,8 +275,6 @@ public class HandSawItem extends Item {
         return handleAxeAction(context);
     }
 
-    // ================= 切削 tick：服务端广播音效 + 粒子 =================
-
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
@@ -334,8 +315,6 @@ public class HandSawItem extends Item {
         }
     }
 
-    // ================= finishUsingItem：切削完成 =================
-
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
@@ -344,11 +323,10 @@ public class HandSawItem extends Item {
         if (!wasCutting) return stack;
         if (level.isClientSide) return stack;
 
-        executeCut(level, player, stack);
+        // ★ 玩家手动触发时不用过滤器
+        executeCut(level, player, stack, null);
         return stack;
     }
-
-    // ================= releaseUsing：切削取消 =================
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
@@ -359,15 +337,18 @@ public class HandSawItem extends Item {
     // ================= 切削执行 =================
 
     /**
-     * ★ 女仆兼容：改为 public static，Player → LivingEntity
-     *   内部按 instanceof Player 区分背包与耐久处理
+     * ★ 女仆兼容：
+     *   - public static，供 TLM 行为类调用
+     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
+     *   - 返回 boolean 表示是否成功切削
      */
-    public static void executeCut(Level level, LivingEntity entity, ItemStack saw) {
+    public static boolean executeCut(Level level, LivingEntity entity, ItemStack saw,
+                                     @Nullable FilterItemStack filter) {
         ItemStack off = entity.getOffhandItem();
-        if (off.isEmpty()) return;
+        if (off.isEmpty()) return false;
 
         List<Recipe<?>> recipes = getCuttingRecipes(level, off);
-        if (recipes.isEmpty()) return;
+        if (recipes.isEmpty()) return false;
 
         int index = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
         if (index < 0 || index >= recipes.size()) index = 0;
@@ -381,6 +362,11 @@ public class HandSawItem extends Item {
             results.add(recipe.getResultItem(level.registryAccess()).copy());
         }
 
+        // ★ 过滤产物
+        if (!resultsPassFilter(level, results, filter)) {
+            return false;
+        }
+
         off.shrink(1);
 
         for (ItemStack result : results) {
@@ -391,12 +377,10 @@ public class HandSawItem extends Item {
                     player.drop(result.copy(), false);
                 }
             } else {
-              // 女仆等非玩家实体：直接掉落到地上
-             entity.spawnAtLocation(result.copy());
+                entity.spawnAtLocation(result.copy());
             }
         }
 
-        // 耐久
         if (entity instanceof Player player) {
             EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
                     ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
@@ -407,19 +391,30 @@ public class HandSawItem extends Item {
 
         level.playSound(null, entity.blockPosition(), SoundEvents.WOOD_BREAK,
                 SoundSource.PLAYERS, 0.7f, 1.2f);
+
+        return true;
     }
 
-    // ================= 三层配方查询（HUD 渲染器需要访问，改为 public） =================
+    // ================= 过滤器辅助 =================
+
+    private static boolean resultsPassFilter(Level level, List<ItemStack> results,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+        for (ItemStack s : results) {
+            if (!s.isEmpty() && filter.test(level, s)) return true;
+        }
+        return false;
+    }
+
+    // ================= 三层配方查询 =================
 
     public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
         if (input.isEmpty()) return List.of();
 
-        // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
                 ToolType.HAND_SAW, level, input);
         if (!custom.isEmpty()) return custom;
 
-        // ★ L1：原有逻辑
         List<Recipe<?>> result = new ArrayList<>();
 
         Optional<CuttingRecipe> assembly = SequencedAssemblyRecipe.getRecipe(
@@ -441,16 +436,15 @@ public class HandSawItem extends Item {
             }
         }
 
-        // ★ L2：应用过滤
         return HandMadeRecipePool.applyFilter(ToolType.HAND_SAW, level, result);
     }
 
     // ================= 整树砍伐 =================
+
     private static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
                                            BlockPos pos, BlockState brokenState) {
         if (!(level instanceof ServerLevel)) return;
         if (!SawBlockEntity.isSawable(brokenState)) return;
-
         if (pos.distSqr(player.blockPosition()) > 64L * 64L) return;
 
         TreeCutter.Tree tree = TreeCutter.findTree(level, pos, brokenState);

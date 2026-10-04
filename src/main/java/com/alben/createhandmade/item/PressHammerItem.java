@@ -13,6 +13,7 @@ import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.simibubi.create.content.kinetics.crafter.MechanicalCraftingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
+import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import com.simibubi.create.content.processing.basin.BasinBlock;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
@@ -77,7 +78,6 @@ public class PressHammerItem extends Item {
     private static final Object COMPACTING_RECIPE_KEY = new Object();
     private static final int CHARGE_WINDOW_TICKS = 20;
 
-    /** ★ 蓄力暴击伤害倍率 */
     private static final float CHARGED_CRIT_MULTIPLIER = 1.5F;
 
     private static final Map<UUID, Long> CHARGE_SWING = new HashMap<>();
@@ -150,7 +150,6 @@ public class PressHammerItem extends Item {
         CHARGE_SWING.put(player.getUUID(), gameTime);
         player.swing(player.getUsedItemHand(), true);
 
-        // 生物
         double entityReach = player.getAttributeValue(ForgeMod.ENTITY_REACH.get());
         Vec3 eye = player.getEyePosition(1);
         Vec3 look = player.getViewVector(1);
@@ -166,7 +165,6 @@ public class PressHammerItem extends Item {
             return;
         }
 
-        // 方块
         double blockReach = player.getAttributeValue(ForgeMod.BLOCK_REACH.get());
         Vec3 end = eye.add(look.scale(blockReach));
         BlockHitResult hit = level.clip(new ClipContext(eye, end,
@@ -176,17 +174,16 @@ public class PressHammerItem extends Item {
             BlockPos pos = hit.getBlockPos();
             List<ItemStack> particleItems = findTargetItems(level, pos);
 
-            boolean success = tryPressBasin(level, pos)
-                    || tryPressTransported(level, pos);
+            // ★ 玩家手动触发时不用过滤器
+            tryPressBasin(level, pos, null);
+            tryPressTransported(level, pos, null);
 
             if (!particleItems.isEmpty()) {
                 broadcastParticles(level, pos, particleItems);
             }
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(level, pos, 1f, 0.8f);
 
-            if (success) {
-                stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
-            }
+            stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         } else {
             Vec3 soundPos = eye.add(look.scale(1.0));
             level.playSound(null, BlockPos.containing(soundPos),
@@ -206,8 +203,6 @@ public class PressHammerItem extends Item {
                 reach * reach);
     }
 
-    // ================= 普通攻击扣耐久 =================
-
     @SubscribeEvent
     public static void onAttackEntity(AttackEntityEvent event) {
         Player player = event.getEntity();
@@ -224,8 +219,6 @@ public class PressHammerItem extends Item {
     public static void onBreakBlock(BlockEvent.BreakEvent event) {
         // 保留原逻辑，TOOL 组件自动扣耐久
     }
-
-    // ================= 蓄力暴击（1.20.1 版：用 LivingHurtEvent） =================
 
     @SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent event) {
@@ -260,8 +253,6 @@ public class PressHammerItem extends Item {
                 && !player.isFallFlying();
     }
 
-    // ================= 蓄力额外击退 =================
-
     @SubscribeEvent
     public static void onKnockback(LivingKnockBackEvent event) {
         LivingEntity target = event.getEntity();
@@ -277,8 +268,6 @@ public class PressHammerItem extends Item {
         event.setStrength(event.getStrength() + 2.0F);
         CHARGE_TARGET.remove(target.getUUID());
     }
-
-    // ================= 探测目标物品 =================
 
     private static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
         List<ItemStack> result = new ArrayList<>();
@@ -309,8 +298,6 @@ public class PressHammerItem extends Item {
         return result;
     }
 
-    // ================= 广播粒子 =================
-
     private static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
         if (!(level instanceof ServerLevel serverLevel)) return;
         if (stacks.isEmpty()) return;
@@ -325,28 +312,67 @@ public class PressHammerItem extends Item {
         }
     }
 
+    // ================= 过滤器辅助 =================
+
+    /**
+     * 检查配方产物是否通过过滤器。
+     * filter 为 null 时直接返回 true（不过滤）。
+     */
+    private static boolean resultsPassFilter(Level level, Recipe<?> recipe,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+
+        // 优先用 BasinRecipe 的 rollResults 获取真实产物
+        if (recipe instanceof BasinRecipe br) {
+            try {
+                List<ItemStack> results = br.rollResults();
+                for (ItemStack s : results) {
+                    if (!s.isEmpty() && filter.test(level, s)) return true;
+                }
+                return false;
+            } catch (Exception ignored) {
+                // 退回到 getResultItem
+            }
+        }
+
+        ItemStack result = recipe.getResultItem(level.registryAccess());
+        return !result.isEmpty() && filter.test(level, result);
+    }
+
+    /**
+     * 检查一组 ItemStack 是否通过过滤器。
+     */
+    private static boolean resultsPassFilter(Level level, List<ItemStack> results,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+        for (ItemStack s : results) {
+            if (!s.isEmpty() && filter.test(level, s)) return true;
+        }
+        return false;
+    }
+
     // ================= 工作盆（三层配方） =================
 
     /**
-     * ★ 三层模型：
-     *   L3 独占配方（遍历所有 L3 配方，用 BasinRecipe.match 匹配）
-     *   L1 原有 Create 配方（COMPACTING + 可压缩 crafting）
-     *   L2 数据包过滤（在 L1 循环里逐个过滤）
-     *
-     * ★ 女仆兼容：改为 public static，让 TLM 行为类可以直接调用
+     * ★ 女仆兼容：
+     *   - public static，供 TLM 行为类调用
+     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
      */
-    public static boolean tryPressBasin(Level level, BlockPos pos) {
+    public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
         if (basin.isEmpty()) return false;
 
         // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getAllCustomRecipes(ToolType.PRESS_HAMMER);
         for (Recipe<?> r : custom) {
-            if (BasinRecipe.match(basin, r)) {
-                if (BasinRecipe.apply(basin, r)) {
-                    basin.notifyChangeOfContents();
-                    return true;
-                }
+            if (!BasinRecipe.match(basin, r)) continue;
+
+            // ★ 过滤产物
+            if (!resultsPassFilter(level, r, filter)) continue;
+
+            if (BasinRecipe.apply(basin, r)) {
+                basin.notifyChangeOfContents();
+                return true;
             }
         }
 
@@ -360,6 +386,9 @@ public class PressHammerItem extends Item {
                 List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                         ToolType.PRESS_HAMMER, level, List.of(recipe));
                 if (filtered.isEmpty()) continue;
+
+                // ★ 过滤产物
+                if (!resultsPassFilter(level, recipe, filter)) continue;
 
                 if (BasinRecipe.apply(basin, recipe)) {
                     basin.notifyChangeOfContents();
@@ -391,19 +420,10 @@ public class PressHammerItem extends Item {
 
     // ================= 置物台 / 传送带（三层配方） =================
 
-    /**
-     * ★ 三层模型：
-     *   L3 独占配方（命中 → 直接返回）
-     *   L1 原有 PRESSING 配方
-     *   L2 数据包过滤
-     *
-     * 返回类型改为 Recipe<?>，调用方用 instanceof 判断
-     */
     @Nullable
     private static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
         if (stack.isEmpty()) return null;
 
-        // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
                 ToolType.PRESS_HAMMER, level, stack);
         for (Recipe<?> r : custom) {
@@ -412,7 +432,6 @@ public class PressHammerItem extends Item {
             }
         }
 
-        // ★ L1：原有逻辑
         Recipe<?> result = null;
 
         Optional<PressingRecipe> sequenced =
@@ -433,16 +452,18 @@ public class PressHammerItem extends Item {
 
         if (result == null) return null;
 
-        // ★ L2：应用过滤
         List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                 ToolType.PRESS_HAMMER, level, List.of(result));
         return filtered.isEmpty() ? null : filtered.get(0);
     }
 
     /**
-     * ★ 女仆兼容：改为 public static，让 TLM 行为类可以直接调用
+     * ★ 女仆兼容：
+     *   - public static，供 TLM 行为类调用
+     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
      */
-    public static boolean tryPressTransported(Level level, BlockPos pos) {
+    public static boolean tryPressTransported(Level level, BlockPos pos,
+                                              @Nullable FilterItemStack filter) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -454,12 +475,16 @@ public class PressHammerItem extends Item {
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
 
-            // ★ 三层配方查询
             Recipe<?> recipe = findPressingRecipe(level, stack);
             if (recipe == null) return TransportedResult.doNothing();
 
             List<ItemStack> results = RecipeApplier.applyRecipeOn(
                     level, stack.copyWithCount(1), recipe, true);
+
+            // ★ 过滤产物
+            if (!resultsPassFilter(level, results, filter)) {
+                return TransportedResult.doNothing();
+            }
 
             success[0] = true;
 

@@ -10,6 +10,7 @@ import com.simibubi.create.content.fluids.transfer.GenericItemFilling;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
 import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
+import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.fluid.FluidHelper;
@@ -73,17 +74,11 @@ import java.util.function.Consumer;
 public class InfusionGunItem extends Item {
 
     private static final int LONG_PRESS_THRESHOLD = 4;
-    /** 快抽：不潜行时每 tick 抽取量（mB） */
     private static final int EXTRACT_RATE = 50;
-    /** 慢抽：潜行时单次抽取量（mB） */
     private static final int SLOW_EXTRACT_RATE = 25;
-    /** 慢抽：潜行时抽取间隔（tick） */
     private static final int SLOW_EXTRACT_INTERVAL = 8;
-    /** 水桶式吸取：蓄力所需 tick */
     private static final int FLUID_BLOCK_PICKUP_TICKS = 40;
-    /** 水桶式：单次交换量（mB） */
     private static final int FLUID_BLOCK_AMOUNT = 1000;
-    /** 音效响度 */
     private static final float FILL_SOUND_VOLUME = 0.7f;
 
     private static final Map<UUID, PressInfo> PRESSING = new HashMap<>();
@@ -124,10 +119,8 @@ public class InfusionGunItem extends Item {
 
     private static boolean canInteractAt(Level level, BlockPos pos, Direction face,
                                           Player player, ItemStack gun) {
-        // 流体源 → 水桶式收集
         if (isFluidSource(level, pos)) return true;
 
-        // 容器 → 抽取/注入/存储
         IFluidHandler fluidHandler = getFluidHandler(level, pos);
         if (fluidHandler != null) {
             InfusionGunContents contents = getContents(gun);
@@ -137,13 +130,11 @@ public class InfusionGunItem extends Item {
             }
         }
 
-        // 注入物品
         InfusionGunContents contents = getContents(gun);
         if (!contents.isEmpty() && canInjectItemsAt(level, pos, contents)) {
             return true;
         }
 
-        // 潜行 + 有流体 → 水桶式放置
         if (player.isShiftKeyDown() && !contents.isEmpty()) {
             if (canReplaceWithSource(level.getBlockState(pos.relative(face)))) return true;
         }
@@ -151,7 +142,6 @@ public class InfusionGunItem extends Item {
         return false;
     }
 
-    /** ★ 女仆兼容：改为 public static */
     @Nullable
     public static IFluidHandler getFluidHandler(Level level, BlockPos pos) {
         BlockEntity be = level.getBlockEntity(pos);
@@ -174,7 +164,6 @@ public class InfusionGunItem extends Item {
         BlockPos pos = hit.getBlockPos();
         Direction face = hit.getDirection();
 
-        // ★ 水桶式收集：点击流体源
         if (isFluidSource(level, pos)) {
             if (!level.isClientSide) {
                 PRESSING.put(player.getUUID(),
@@ -184,7 +173,6 @@ public class InfusionGunItem extends Item {
             return InteractionResultHolder.consume(gun);
         }
 
-        // ★ 水桶式放置：潜行 + 有流体
         InfusionGunContents contents = getContents(gun);
         if (player.isShiftKeyDown() && !contents.isEmpty()
                 && canReplaceWithSource(level.getBlockState(pos.relative(face)))) {
@@ -196,7 +184,6 @@ public class InfusionGunItem extends Item {
             return InteractionResultHolder.consume(gun);
         }
 
-        // ★ 容器交互
         if (!canInteractAt(level, pos, face, player, gun)) {
             return InteractionResultHolder.pass(gun);
         }
@@ -233,7 +220,6 @@ public class InfusionGunItem extends Item {
         if (usedTicks < 3) return;
 
         if (info.mode() == PressInfo.InteractionMode.CONTAINER) {
-            // 容器模式：抽取
             boolean sneaking = player.isShiftKeyDown();
             if (sneaking) {
                 if (usedTicks % SLOW_EXTRACT_INTERVAL != 0) return;
@@ -242,7 +228,6 @@ public class InfusionGunItem extends Item {
                 tryExtractTick(level, info.pos(), player, stack, EXTRACT_RATE);
             }
         } else {
-            // 流体方块模式：蓄力收集
             if (!isFluidSource(level, info.pos())) return;
             if (usedTicks >= FLUID_BLOCK_PICKUP_TICKS
                     && !PICKUP_TRIGGERED.contains(player.getUUID())) {
@@ -268,19 +253,18 @@ public class InfusionGunItem extends Item {
         int usedTicks = getUseDuration(stack) - timeLeft;
         if (usedTicks >= LONG_PRESS_THRESHOLD) return;
 
-        // ★ 水桶式放置：流体方块模式 + 非流体源 + 短按
         if (info.mode() == PressInfo.InteractionMode.FLUID_BLOCK
                 && !isFluidSource(level, info.pos())) {
             if (tryPlaceFluidBlock(level, info.pos(), info.face(), player, stack)) return;
         }
 
-        // 容器模式：注入物品 → 存入流体
-        if (!tryInjectItems(level, info.pos(), player, stack)) {
+        // ★ 玩家手动触发时不用过滤器
+        if (!tryInjectItems(level, info.pos(), player, stack, null)) {
             tryStoreFluid(level, info.pos(), player, stack);
         }
     }
 
-    // ================= 水桶式：放置流体方块 =================
+    // ================= 水桶式 =================
 
     private static boolean tryPlaceFluidBlock(Level level, BlockPos pos, Direction face,
                                               Player player, ItemStack gun) {
@@ -305,8 +289,6 @@ public class InfusionGunItem extends Item {
 
         return true;
     }
-
-    // ================= 水桶式：吸取流体方块 =================
 
     private static boolean tryPickupFluidBlock(Level level, BlockPos pos, Player player, ItemStack gun) {
         FluidStack source = getFluidFromSource(level, pos);
@@ -342,9 +324,19 @@ public class InfusionGunItem extends Item {
         return state.getBlock() == Blocks.WATER || state.getBlock() == Blocks.LAVA;
     }
 
+    // ================= 过滤器辅助 =================
+
+    private static boolean resultsPassFilter(Level level, List<ItemStack> results,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+        for (ItemStack s : results) {
+            if (!s.isEmpty() && filter.test(level, s)) return true;
+        }
+        return false;
+    }
+
     // ================= 累计抽取 =================
 
-    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
     public static void tryExtractTick(Level level, BlockPos pos, LivingEntity entity, ItemStack gun, int rate) {
         IFluidHandler handler = getFluidHandler(level, pos);
         if (handler == null) return;
@@ -396,8 +388,13 @@ public class InfusionGunItem extends Item {
 
     // ================= 注入物品 =================
 
-    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
-    public static boolean tryInjectItems(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
+    /**
+     * ★ 女仆兼容：
+     *   - public static，供 TLM 行为类调用
+     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
+     */
+    public static boolean tryInjectItems(Level level, BlockPos pos, LivingEntity entity,
+                                         ItemStack gun, @Nullable FilterItemStack filter) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -420,6 +417,9 @@ public class InfusionGunItem extends Item {
 
                 List<ItemStack> results = recipe.rollResults();
 
+                // ★ 过滤产物
+                if (!resultsPassFilter(level, results, filter)) return TransportedResult.doNothing();
+
                 success[0] = true;
                 setContents(gun, contents.withDrain(required));
                 broadcastFluidParticles(level, pos, contents.fluid());
@@ -436,12 +436,16 @@ public class InfusionGunItem extends Item {
                         level, required, stack.copy(), contents.fluid().copy());
                 if (simulatedResult.isEmpty()) return TransportedResult.doNothing();
 
+                List<ItemStack> results = new ArrayList<>();
+                results.add(simulatedResult);
+
+                // ★ 过滤产物
+                if (!resultsPassFilter(level, results, filter)) return TransportedResult.doNothing();
+
                 success[0] = true;
                 setContents(gun, contents.withDrain(required));
                 broadcastFluidParticles(level, pos, contents.fluid());
 
-                List<ItemStack> results = new ArrayList<>();
-                results.add(simulatedResult);
                 return finishInject(item, stack, results);
             }
 
@@ -487,7 +491,6 @@ public class InfusionGunItem extends Item {
 
     // ================= 存入流体 =================
 
-    /** ★ 女仆兼容：改为 public static，Player → LivingEntity */
     public static boolean tryStoreFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
         IFluidHandler handler = getFluidHandler(level, pos);
         if (handler == null) return false;
@@ -510,14 +513,12 @@ public class InfusionGunItem extends Item {
 
     // ================= 耐久 =================
 
-    /** ★ 女仆兼容：改为 public static，Player → LivingEntity，内部判断 */
     public static void damageGun(ItemStack gun, LivingEntity entity) {
         if (entity instanceof Player player) {
             EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
                     ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
             gun.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
         } else {
-            // 女仆：直接扣耐久，不广播手臂动画
             gun.hurtAndBreak(1, entity, e -> {});
         }
     }

@@ -42,6 +42,9 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
@@ -49,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+@Mod.EventBusSubscriber
 public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     private static final Object MIXING_RECIPE_KEY = new Object();
@@ -62,6 +66,24 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     @Override
     public int getEnchantmentValue(ItemStack stack) {
         return 15;
+    }
+
+    // ================= 攻击扣耐久 =================
+
+    @SubscribeEvent
+    public static void onAttackEntity(AttackEntityEvent event) {
+        Player player = event.getEntity();
+        if (player.level().isClientSide) return;
+
+        ItemStack mainHand = player.getMainHandItem();
+        if (mainHand.getItem() instanceof StirringStaffItem) {
+            mainHand.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
+            return;
+        }
+        ItemStack offHand = player.getOffhandItem();
+        if (offHand.getItem() instanceof StirringStaffItem) {
+            offHand.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.OFFHAND));
+        }
     }
 
     // ================= 右键 =================
