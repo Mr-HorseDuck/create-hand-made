@@ -1,10 +1,12 @@
 package com.alben.createhandmade.compat.tlm.behavior;
 
+import com.alben.createhandmade.Config;
 import com.alben.createhandmade.item.InfusionGunContents;
 import com.alben.createhandmade.item.InfusionGunItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
+import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import net.minecraft.core.BlockPos;
@@ -17,9 +19,8 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 
 public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
 
-    private static final double SEARCH_RADIUS = 8.0;
-
     private Behavior.Status status = Behavior.Status.STOPPED;
+    private int cooldown = 0;
 
     @Override
     public Behavior.Status getStatus() {
@@ -33,7 +34,20 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
 
     @Override
     public boolean tryStart(ServerLevel level, EntityMaid maid, long gameTime) {
+        if (cooldown > 0) {
+            cooldown--;
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
         ItemStack tool = maid.getMainHandItem();
+
+        if (!(tool.getItem() instanceof InfusionGunItem)
+                && Config.INSTANCE.maidAutoSwitchTool.get()) {
+            MaidToolHelper.tryEquipFromInventory(maid, InfusionGunItem.class);
+            tool = maid.getMainHandItem();
+        }
+
         if (!(tool.getItem() instanceof InfusionGunItem)) {
             status = Behavior.Status.STOPPED;
             return false;
@@ -51,7 +65,10 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        boolean success = InfusionGunItem.tryInjectItems(level, target, maid, tool);
+        // ★ 从女仆背包查找过滤器
+        FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+
+        boolean success = InfusionGunItem.tryInjectItems(level, target, maid, tool, filter);
 
         if (!success) {
             IFluidHandler handler = InfusionGunItem.getFluidHandler(level, target);
@@ -60,8 +77,13 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
             }
         }
 
-        status = success ? Behavior.Status.RUNNING : Behavior.Status.STOPPED;
-        return success;
+        if (success) {
+            cooldown = Config.INSTANCE.maidInfusionGunCooldown.get();
+            status = Behavior.Status.RUNNING;
+            return true;
+        }
+        status = Behavior.Status.STOPPED;
+        return false;
     }
 
     @Override
@@ -76,7 +98,7 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
 
     private BlockPos findNearbyTarget(ServerLevel level, EntityMaid maid) {
         BlockPos maidPos = maid.blockPosition();
-        int r = (int) SEARCH_RADIUS;
+        int r = (int) Config.INSTANCE.maidSearchRadius.get().doubleValue();
 
         for (BlockPos pos : BlockPos.betweenClosed(
                 maidPos.offset(-r, -r, -r), maidPos.offset(r, r, r))) {

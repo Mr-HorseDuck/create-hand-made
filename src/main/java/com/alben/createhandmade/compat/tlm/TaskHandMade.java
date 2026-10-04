@@ -6,6 +6,7 @@ import com.alben.createhandmade.compat.tlm.behavior.MaidUsePressHammerBehavior;
 import com.alben.createhandmade.item.ModItems;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.google.common.collect.Lists;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -15,10 +16,6 @@ import net.minecraft.world.item.ItemStack;
 import javax.annotation.Nullable;
 import java.util.List;
 
-/**
- * 「手搓」工作模式。
- * 女仆会自动寻找附近的工作盆 / 置物台 / 传送带，并用手中工具加工。
- */
 public class TaskHandMade implements IMaidTask {
 
     public static final ResourceLocation UID =
@@ -36,7 +33,8 @@ public class TaskHandMade implements IMaidTask {
 
     @Override
     public List<Pair<Integer, BehaviorControl<? super EntityMaid>>> createBrainTasks(EntityMaid maid) {
-        return List.of(
+        // ★ 必须返回可变列表：TLM 会在返回值上调用 .add(...) 追加自己的行为
+        return Lists.newArrayList(
                 Pair.of(5, new MaidUsePressHammerBehavior()),
                 Pair.of(6, new MaidUseInfusionGunBehavior()),
                 Pair.of(7, new MaidUseHandSawBehavior())
@@ -48,10 +46,24 @@ public class TaskHandMade implements IMaidTask {
         return true;
     }
 
-    /** ★ 1.20.1 的 IMaidTask 要求实现此方法，返回 null 表示使用默认音效 */
     @Nullable
     @Override
     public SoundEvent getAmbientSound(EntityMaid maid) {
         return null;
+    }
+
+    @Override
+    public boolean enableLookAndRandomWalk(EntityMaid maid) {
+        return false;
+    }
+
+    @Override
+    public boolean enablePanic(EntityMaid maid) {
+        return false;
+    }
+
+    @Override
+    public boolean enableEating(EntityMaid maid) {
+        return false;
     }
 }
