@@ -66,6 +66,14 @@ repositories {
         }
     }
 
+    // ★ 车万女仆 Modrinth 仓库
+    maven {
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+
     // JEI 仓库
     maven { url = "https://maven.blamejared.com/" }
 
@@ -177,6 +185,11 @@ dependencies {
 
     // ★ KubeJS（可选依赖，不打包进 jar）
     compileOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
+
+    // ★ 车万女仆（可选依赖，不打包进 jar）
+    compileOnly fg.deobf("maven.modrinth:touhou-little-maid:1.5.2-forge+mc1.20.1")
+    // 如需运行时测试女仆兼容，取消下面这行注释
+    // runtimeOnly fg.deobf("maven.modrinth:touhou-little-maid:1.5.2-forge+mc1.20.1")
 
     // Mixin 注解处理器
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
