@@ -2,6 +2,7 @@ package com.alben.createhandmade.compat.tlm;
 
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseHandSawBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseInfusionGunBehavior;
+import com.alben.createhandmade.compat.tlm.behavior.MaidUsePointerBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUsePressHammerBehavior;
 import com.alben.createhandmade.item.ModItems;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
@@ -35,6 +36,7 @@ public class TaskHandMade implements IMaidTask {
     public List<Pair<Integer, BehaviorControl<? super EntityMaid>>> createBrainTasks(EntityMaid maid) {
         // ★ 必须返回可变列表：TLM 会在返回值上调用 .add(...) 追加自己的行为
         return Lists.newArrayList(
+                Pair.of(4, new MaidUsePointerBehavior()),
                 Pair.of(5, new MaidUsePressHammerBehavior()),
                 Pair.of(6, new MaidUseInfusionGunBehavior()),
                 Pair.of(7, new MaidUseHandSawBehavior())
