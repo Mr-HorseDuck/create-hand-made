@@ -3,35 +3,35 @@ package com.alben.createhandmade.network;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 
-/**
- * ★ Forge 1.20.1 版本：
- *   - 不再实现 CustomPacketPayload / Type / StreamCodec
- *   - 编解码基于 FriendlyByteBuf
- *   - BlockPos.STREAM_CODEC → buf.writeBlockPos / readBlockPos
- */
 public class HighlightBlockPacket {
 
+    public static final int COLOR_WORK   = 0xFFFF00;
+    public static final int COLOR_INPUT  = 0x00FF00;
+    public static final int COLOR_OUTPUT = 0x0080FF;
+
     private final BlockPos pos;
+    private final int color;
 
-    public HighlightBlockPacket(BlockPos pos) {
+    public HighlightBlockPacket(BlockPos pos, int color) {
         this.pos = pos;
+        this.color = color;
     }
-
-    // ================= 解码构造器 =================
 
     public HighlightBlockPacket(FriendlyByteBuf buf) {
         this.pos = buf.readBlockPos();
+        this.color = buf.readInt();
     }
-
-    // ================= 编码 =================
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeBlockPos(pos);
+        buf.writeInt(color);
     }
-
-    // ================= 访问器 =================
 
     public BlockPos pos() {
         return pos;
+    }
+
+    public int color() {
+        return color;
     }
 }
