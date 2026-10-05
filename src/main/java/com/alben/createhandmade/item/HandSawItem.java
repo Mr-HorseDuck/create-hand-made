@@ -109,9 +109,10 @@ public class HandSawItem extends Item {
 
     @Override
     public int getUseDuration(ItemStack stack, LivingEntity entity) {
-        if (entity instanceof Player player && CUTTING_PLAYERS.contains(player.getUUID())) {
-            return CUT_DURATION;
-        }
+        // ★ 连续切削：使用时长恒为"无限"（72000），真正的结算周期由 onUseTick 按 CUT_DURATION 控制，
+        //   直到副手没料或玩家松手。
+        //   必须是常量：LivingEntity.getTicksUsingItem() = getUseDuration() - useItemRemaining，
+        //   渲染器（HandSawItemRenderer）依赖它算一阶段/二阶段进度。
         return 72000;
     }
 
@@ -283,7 +284,31 @@ public class HandSawItem extends Item {
         if (!(entity instanceof Player player)) return;
         if (!CUTTING_PLAYERS.contains(player.getUUID())) return;
 
+        // ★ 耐久耗尽：原版 hurtAndBreak 会把锯子栈清空（count → 0），但 LivingEntity.updatingUsingItem()
+        //   判定是否继续使用用的是 ItemStack.isSameItem()（只比 item，不比耐久/组件），所以使用状态
+        //   不会自动结束 —— 不在这里拦住就会"空手"继续结算（材料照扣、产物照出）。
+        if (stack.isEmpty()) {
+            player.stopUsingItem();
+            CUTTING_PLAYERS.remove(player.getUUID());
+            return;
+        }
+
         int usedTicks = getUseDuration(stack, entity) - remainingTicks;
+
+        // ★ 连续切削：每 CUT_DURATION tick 结算一份
+        if (usedTicks > 0 && usedTicks % CUT_DURATION == 0) {
+            if (!level.isClientSide) {
+                executeCut(level, player, stack);
+            }
+            // 切完这一份后，副手没料 / 已无配方 → 两端停止使用
+            ItemStack offAfterCut = player.getOffhandItem();
+            if (offAfterCut.isEmpty() || getCuttingRecipes(level, offAfterCut).isEmpty()) {
+                player.stopUsingItem();
+                CUTTING_PLAYERS.remove(player.getUUID());
+                return;
+            }
+        }
+
         if (usedTicks < CUT_MOVE_TICKS) return;
         if (usedTicks % 4 != 0) return;
 
@@ -319,17 +344,15 @@ public class HandSawItem extends Item {
         }
     }
 
-    // ================= finishUsingItem：切削完成 =================
+    // ================= finishUsingItem：仅清理状态 =================
 
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
+        // ★ 结算已移到 onUseTick（按 CUT_DURATION 周期）。getUseDuration() = 72000 后这里基本不会
+        //   自然触发（原版只在 useItemRemaining 归零时调用，且仅服务端），保留清理只为安全。
         if (!(entity instanceof Player player)) return stack;
 
-        boolean wasCutting = CUTTING_PLAYERS.remove(player.getUUID());
-        if (!wasCutting) return stack;
-        if (level.isClientSide) return stack;
-
-        executeCut(level, player, stack);
+        CUTTING_PLAYERS.remove(player.getUUID());
         return stack;
     }
 
