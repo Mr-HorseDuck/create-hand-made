@@ -47,13 +47,15 @@ public class StirringStaffRenderer extends CustomRenderedItemModelRenderer {
             int modifier = leftHand ? -1 : 1;
 
             // 位移：无位移 → 搅拌位置
-            ms.translate(modifier * 0.1f * progress,
+            // 实测定稿：X 不镜像、Y 不镜像、Z 镜像
+            ms.translate(0.1f * progress,
                     -0.15f * progress,
-                    -1f * progress);
+                    modifier * -1f * progress);
 
-            // 旋转：0° → 90°/180°
-            ms.mulPose(Axis.XP.rotationDegrees(90 * progress));
-            ms.mulPose(Axis.ZP.rotationDegrees(180 * progress));
+            // 旋转：0° → 90°/180°，乘 progress 做起手插值
+            // 实测定稿：XP 乘 modifier、ZP 不乘
+            ms.mulPose(Axis.XP.rotationDegrees(90f * modifier * progress));
+            ms.mulPose(Axis.ZP.rotationDegrees(180f * progress));
         }
 
         itemRenderer.render(stack, ItemDisplayContext.NONE, false, ms, buffer, light, overlay,

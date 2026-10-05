@@ -23,6 +23,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -35,7 +36,12 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import com.alben.createhandmade.client.ClientStirringState;
 import javax.annotation.Nullable;
@@ -43,6 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+@EventBusSubscriber
 public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     private static final int STIR_DURATION = 60;   // 3 秒
@@ -51,17 +58,59 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     public StirringStaffItem(Properties properties) {
         super(properties);
     }
+
     @Override
     public int getEnchantmentValue(ItemStack stack) {
         return 15;
     }
+
+    // ================= 攻击消耗耐久 =================
+
+    @SubscribeEvent
+    public static void onAttackEntity(AttackEntityEvent event) {
+        Player player = event.getEntity();
+        if (player.level().isClientSide) return;
+
+        ItemStack mainHand = player.getMainHandItem();
+        if (mainHand.getItem() instanceof StirringStaffItem) {
+            mainHand.hurtAndBreak(1, player, EquipmentSlot.MAINHAND);
+            return;
+        }
+        ItemStack offHand = player.getOffhandItem();
+        if (offHand.getItem() instanceof StirringStaffItem) {
+            offHand.hurtAndBreak(1, player, EquipmentSlot.OFFHAND);
+        }
+    }
+
+    // ================= 右键拦截：把"工作盆的空手交互"让给搅拌杖 =================
+
+    /**
+     * 原版 {@code Minecraft#startUseItem} 在准星命中方块时，只要**当前手**的 useItemOn
+     * 返回 SUCCESS/CONSUME（或 FAIL）就直接 return，副手根本不会被尝试。
+     * 而 Create 的工作盆在**空手**时 useItemOn 无条件返回 SUCCESS（把盆里的东西掏回背包），
+     * 于是"主手空着 + 搅拌杖在副手"永远走不到搅拌杖的 use()，只有潜行（跳过方块交互）才用得出。
+     *
+     * <p>这里按 {@link PlayerInteractEvent.RightClickBlock} 的既有做法（BellowsItem /
+     * InfusionGunItem / PressHammerItem 同款）显式关掉方块交互，让 useItemOn 返回 PASS，
+     * 手部循环才能轮到副手的 useItem。判定必须用 {@code event.getHand()}（正在使用的那只手），
+     * 不能用 {@code getMainHandItem()}，否则副手场景不生效。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        if (!(player.getItemInHand(event.getHand()).getItem() instanceof StirringStaffItem)) return;
+
+        if (!(event.getLevel().getBlockEntity(event.getPos()) instanceof BasinBlockEntity basin)) return;
+        if (basin.isEmpty()) return;
+
+        // TriState 全限定：本类已 import net.createmod.catnip.data.TriState（CustomUseEffectsItem 用）
+        event.setUseBlock(net.neoforged.neoforge.common.util.TriState.FALSE);
+    }
+
     // ================= 右键 =================
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        if (hand == InteractionHand.OFF_HAND) {
-            return InteractionResultHolder.pass(player.getItemInHand(hand));
-        }
         ItemStack stack = player.getItemInHand(hand);
 
         BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);

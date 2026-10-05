@@ -163,18 +163,20 @@ public class PressHammerItem extends Item {
             BlockPos pos = hit.getBlockPos();
             List<ItemStack> particleItems = findTargetItems(level, pos);
 
-            boolean success = tryPressBasin(level, pos)
-                    || tryPressTransported(level, pos);
+            // 先压工作盆，未命中再压置物台/传送带（保持原来的短路顺序）
+            if (!tryPressBasin(level, pos)) {
+                tryPressTransported(level, pos);
+            }
 
             if (!particleItems.isEmpty()) {
                 broadcastParticles(level, pos, particleItems);
             }
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(level, pos, 1f, 0.8f);
 
-            if (success) {
-                stack.hurtAndBreak(1, player, EquipmentSlot.MAINHAND);
-            }
-        }  else {
+            // ★ 修复：蓄力挥击本身消耗耐久，无论是否真的压到东西。
+            //   此前只有 success（真压到物品）才扣，导致对着地面/普通方块蓄力敲不扣耐久。
+            stack.hurtAndBreak(1, player, EquipmentSlot.MAINHAND);
+        } else {
             // ★ 空挥：用原版重击挥空音效，而不是机械压床启动音
             Vec3 soundPos = eye.add(look.scale(1.0));
             level.playSound(null, BlockPos.containing(soundPos),
