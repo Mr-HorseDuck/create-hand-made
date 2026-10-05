@@ -29,6 +29,7 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.EnderMan;
@@ -82,11 +83,12 @@ public class BellowsItem extends Item {
     private static final long BELLOWS_RAY_MAX_DISTANCE_SQR = 64L * 64L;
 
     /**
-     * 风箱喷嘴相对玩家胸口的局部坐标（主手视角）：
+     * 风箱喷嘴相对玩家胸口的局部坐标（右手臂视角）：
      *   X = 屏幕右为正
      *   Y = 上为正
      *   Z = 前为正
-     * 主手/副手会自动镜像 X。
+     * ★ 由"这条手臂在玩家的哪一侧"决定是否镜像 X（见 getItemMuzzlePos），
+     *   不是由"主手/副手槽位"决定 —— 左手模式下二者结论相反。
      */
     private static final Vec3 BELLOWS_MUZZLE_OFFSET = new Vec3(0.55, -0.25, 0.7);
 
@@ -133,6 +135,10 @@ public class BellowsItem extends Item {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        // 风箱仅限主手使用（副手放介质）
+        if (hand != InteractionHand.MAIN_HAND) {
+            return InteractionResultHolder.pass(player.getItemInHand(hand));
+        }
         ItemStack stack = player.getItemInHand(hand);
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
@@ -176,8 +182,11 @@ public class BellowsItem extends Item {
         BlockPos pos = hit.getType() == HitResult.Type.BLOCK ? hit.getBlockPos() : null;
 
         // 粒子起点：风箱喷嘴（局部 → 世界）
-        boolean mainHand = player.getUsedItemHand() == InteractionHand.MAIN_HAND;
-        Vec3 origin = getItemMuzzlePos(player, mainHand, BELLOWS_MUZZLE_OFFSET);
+        // ★ 左右判据必须是"这条手臂在玩家的哪一侧"，而不是"在哪个槽位"：
+        //   左手模式（mainArm = LEFT）下主手出现在屏幕左侧，只看槽位会把喷嘴放到反侧。
+        boolean rightArm = (player.getUsedItemHand() == InteractionHand.MAIN_HAND)
+                == (player.getMainArm() == HumanoidArm.RIGHT);
+        Vec3 origin = getItemMuzzlePos(player, rightArm, BELLOWS_MUZZLE_OFFSET);
 
         // =========================================================
         // ★ 两条独立路径：
@@ -354,8 +363,8 @@ public class BellowsItem extends Item {
 
     // ================= 风箱喷嘴世界坐标 =================
 
-    private static Vec3 getItemMuzzlePos(Player player, boolean mainHand, Vec3 offset) {
-        double lx = offset.x * (mainHand ? 1 : -1);
+    private static Vec3 getItemMuzzlePos(Player player, boolean rightArm, Vec3 offset) {
+        double lx = offset.x * (rightArm ? 1 : -1);
         double ly = offset.y;
         double lz = offset.z;
 

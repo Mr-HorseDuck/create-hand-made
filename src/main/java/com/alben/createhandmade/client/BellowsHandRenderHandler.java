@@ -12,33 +12,44 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 
+/**
+ * 正在使用风箱时，隐藏"另一只手（持有介质的那只）"的原版渲染。
+ *
+ * <p>风箱渲染器（{@code BellowsItemRenderer}）会在**风箱所在那只手**的渲染 pass 里，
+ * 把介质作为一份"预览副本"画到风箱附近；如果介质那只手再按原版画一份，玩家就会看到
+ * 两份介质（"分身"）。</p>
+ *
+ * <p>关键点：风箱可以拿在主手，也可以拿在副手（取决于玩家怎么换手），所以
+ * **不能写死要取消哪一只手**——必须根据 {@code getUsedItemHand()} 动态判断
+ * "风箱在哪只手、介质在另一只手"，然后取消**介质那只手**的渲染。</p>
+ */
 @EventBusSubscriber(modid = CreateHandMade.MODID, value = Dist.CLIENT)
 public class BellowsHandRenderHandler {
 
     @SubscribeEvent
     public static void onRenderHand(RenderHandEvent event) {
-        // 只处理副手
-        if (event.getHand() != InteractionHand.OFF_HAND) return;
-
-        Minecraft mc = Minecraft.getInstance();
-        LocalPlayer player = mc.player;
+        LocalPlayer player = Minecraft.getInstance().player;
         if (player == null) return;
 
-        // 主手必须是风箱
-        ItemStack main = player.getMainHandItem();
-        if (!(main.getItem() instanceof BellowsItem)) return;
-
-        // 必须正在蓄力主手风箱
+        // 必须正在使用风箱
         if (!player.isUsingItem()) return;
-        if (player.getUsedItemHand() != InteractionHand.MAIN_HAND) return;
-        if (player.getUseItem() != main) return;
+        ItemStack used = player.getUseItem();
+        if (!(used.getItem() instanceof BellowsItem)) return;
 
-        // 副手必须是合法介质
-        ItemStack off = player.getOffhandItem();
-        if (off.isEmpty()) return;
-        if (BellowsMediaRegistry.resolve(off) == null) return;
+        // 风箱正在被哪只手使用？介质在另一只手。
+        InteractionHand bellowsHand = player.getUsedItemHand();
+        InteractionHand mediaHand = (bellowsHand == InteractionHand.MAIN_HAND)
+                ? InteractionHand.OFF_HAND
+                : InteractionHand.MAIN_HAND;
 
-        // ★ 取消原副手渲染，改由 BellowsItemRenderer 在主手事件里画
+        // 只取消"介质那只手"的原版渲染 —— 那正是会与预览重复的一份。
+        if (event.getHand() != mediaHand) return;
+
+        // 介质必须存在且是合法介质（与渲染器绘制预览的条件严格对应）。
+        ItemStack media = player.getItemInHand(mediaHand);
+        if (media.isEmpty()) return;
+        if (BellowsMediaRegistry.resolve(media) == null) return;
+
         event.setCanceled(true);
     }
 }
