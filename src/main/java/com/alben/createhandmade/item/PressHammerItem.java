@@ -174,7 +174,6 @@ public class PressHammerItem extends Item {
             BlockPos pos = hit.getBlockPos();
             List<ItemStack> particleItems = findTargetItems(level, pos);
 
-            // ★ 玩家手动触发时不用过滤器
             tryPressBasin(level, pos, null);
             tryPressTransported(level, pos, null);
 
@@ -314,15 +313,10 @@ public class PressHammerItem extends Item {
 
     // ================= 过滤器辅助 =================
 
-    /**
-     * 检查配方产物是否通过过滤器。
-     * filter 为 null 时直接返回 true（不过滤）。
-     */
     private static boolean resultsPassFilter(Level level, Recipe<?> recipe,
                                              @Nullable FilterItemStack filter) {
         if (filter == null) return true;
 
-        // 优先用 BasinRecipe 的 rollResults 获取真实产物
         if (recipe instanceof BasinRecipe br) {
             try {
                 List<ItemStack> results = br.rollResults();
@@ -331,7 +325,6 @@ public class PressHammerItem extends Item {
                 }
                 return false;
             } catch (Exception ignored) {
-                // 退回到 getResultItem
             }
         }
 
@@ -339,9 +332,6 @@ public class PressHammerItem extends Item {
         return !result.isEmpty() && filter.test(level, result);
     }
 
-    /**
-     * 检查一组 ItemStack 是否通过过滤器。
-     */
     private static boolean resultsPassFilter(Level level, List<ItemStack> results,
                                              @Nullable FilterItemStack filter) {
         if (filter == null) return true;
@@ -353,21 +343,14 @@ public class PressHammerItem extends Item {
 
     // ================= 工作盆（三层配方） =================
 
-    /**
-     * ★ 女仆兼容：
-     *   - public static，供 TLM 行为类调用
-     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
-     */
     public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
         if (basin.isEmpty()) return false;
 
-        // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getAllCustomRecipes(ToolType.PRESS_HAMMER);
         for (Recipe<?> r : custom) {
             if (!BasinRecipe.match(basin, r)) continue;
 
-            // ★ 过滤产物
             if (!resultsPassFilter(level, r, filter)) continue;
 
             if (BasinRecipe.apply(basin, r)) {
@@ -376,18 +359,15 @@ public class PressHammerItem extends Item {
             }
         }
 
-        // ★ L1：原有逻辑 + ★ L2 过滤
         try {
             for (Recipe<?> recipe : RecipeFinder.get(COMPACTING_RECIPE_KEY, level,
                     PressHammerItem::matchStaticFilters)) {
                 if (!BasinRecipe.match(basin, recipe)) continue;
 
-                // ★ L2：应用过滤，被过滤的跳过继续找下一个
                 List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                         ToolType.PRESS_HAMMER, level, List.of(recipe));
                 if (filtered.isEmpty()) continue;
 
-                // ★ 过滤产物
                 if (!resultsPassFilter(level, recipe, filter)) continue;
 
                 if (BasinRecipe.apply(basin, recipe)) {
@@ -420,8 +400,11 @@ public class PressHammerItem extends Item {
 
     // ================= 置物台 / 传送带（三层配方） =================
 
+    /**
+     * ★ 女仆兼容：改为 public static，供 MaidUsePointerBehavior 判断物品是否可冲压
+     */
     @Nullable
-    private static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
+    public static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
         if (stack.isEmpty()) return null;
 
         List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
@@ -457,11 +440,6 @@ public class PressHammerItem extends Item {
         return filtered.isEmpty() ? null : filtered.get(0);
     }
 
-    /**
-     * ★ 女仆兼容：
-     *   - public static，供 TLM 行为类调用
-     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
-     */
     public static boolean tryPressTransported(Level level, BlockPos pos,
                                               @Nullable FilterItemStack filter) {
         TransportedItemStackHandlerBehaviour handler =
@@ -481,7 +459,6 @@ public class PressHammerItem extends Item {
             List<ItemStack> results = RecipeApplier.applyRecipeOn(
                     level, stack.copyWithCount(1), recipe, true);
 
-            // ★ 过滤产物
             if (!resultsPassFilter(level, results, filter)) {
                 return TransportedResult.doNothing();
             }
