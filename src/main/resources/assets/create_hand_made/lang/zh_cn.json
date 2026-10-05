@@ -67,7 +67,6 @@
   "item.create_hand_made.hand_saw.tooltip.condition4": "潜行+右键点击时",
   "item.create_hand_made.hand_saw.tooltip.behaviour4": "切换_切削配方_",
 
-
   "jei.create_hand_made.hand_saw": "手锯切削",
   "jei.create_hand_made.hand_press_depot": "冲压锤压印",
   "jei.create_hand_made.hand_press_basin": "冲压锤成型",
@@ -82,6 +81,12 @@
   "jei.create_hand_made.bellows_blasting": "风箱熔炼",
   "jei.create_hand_made.bellows_smoking": "风箱烟熏",
   "jei.create_hand_made.bellows_haunting": "风箱缠魂",
-  "jei.create_hand_made.bellows_splashing": "风箱洗涤"
+  "jei.create_hand_made.bellows_splashing": "风箱洗涤",
+
+  "task.create_hand_made.hand_made": "手搓",
+  "task.create_hand_made.hand_made.desc": "使用手搓工具加工附近的方块与物品",
+
+  "message.create_hand_made.pointer.incomplete": "指杆标记不完整：请先标记工作方块、输入和输出",
+  "message.create_hand_made.pointer.applied": "已应用标记 工作方块%s 输入%s 输出%s"
 
 }

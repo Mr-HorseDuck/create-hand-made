@@ -81,5 +81,10 @@
   "jei.create_hand_made.bellows_blasting": "Bellows Blasting",
   "jei.create_hand_made.bellows_smoking": "Bellows Smoking",
   "jei.create_hand_made.bellows_haunting": "Bellows Haunting",
-  "jei.create_hand_made.bellows_splashing": "Bellows Splashing"
+  "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
+
+  "task.create_hand_made.hand_made": "Hand Made",
+  "task.create_hand_made.hand_made.desc": "Uses hand tools to process nearby blocks and items",
+  "message.create_hand_made.pointer.incomplete": "Pointer marks incomplete: please mark work block, input, and output first",
+  "message.create_hand_made.pointer.applied": "Marks applied - Work %s, Input %s, Output %s"
 }
