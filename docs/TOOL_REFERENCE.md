@@ -12,16 +12,16 @@
 
 ## 表 1 · 工具总览
 
-| 工具 | item id | 初始耐久 | 可副手持加工 | 机械手持加工 | 对应 Create 机械 | 覆盖完整性 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 冲压锤<br>Press Hammer | `create_hand_made:press_hammer` | 256 | 是 | 否 | 动力冲压机<br>`create:mechanical_press` | **部分**（注 1） |
-| 研钵<br>Mortar | `create_hand_made:mortar` | 256 | 是 | 否 | 石磨<br>`create:millstone` | **部分**（注 2） |
-| 碾钵<br>Crusher Mortar | `create_hand_made:crusher_mortar` | 512 | 是 | 否 | 粉碎轮 + 石磨（兜底）<br>`create:crushing_wheel` / `create:millstone` | **部分**（注 3） |
-| 指杆<br>Pointer | `create_hand_made:pointer` | 512 | 否 | 否 | 机械手<br>`create:deployer` | **部分**（注 4） |
-| 搅拌杖<br>Stirring Staff | `create_hand_made:stirring_staff` | 256 | 否 | 否 | 动力搅拌器（工作盆）<br>`create:mechanical_mixer` | **部分**（注 5） |
-| 灌注枪<br>Infusion Gun | `create_hand_made:infusion_gun` | 256 | 否 | 否 | 注液器<br>`create:spout` | **部分**（注 6） |
-| 风箱<br>Bellows | `create_hand_made:bellows` | 256 | 否 | 否 | 鼓风机<br>`create:encased_fan` | **部分**（注 7） |
-| 手锯<br>Hand Saw | `create_hand_made:hand_saw` | 512 | 否 | 否 | 动力锯<br>`create:mechanical_saw` | **部分**（注 8） |
+| 工具                     | item id                           | 初始耐久 | 可副手持加工 | 机械手持加工 | 对应 Create 机械                                                      | 覆盖完整性       |
+|--------------------------|-----------------------------------|----------|--------------|--------------|-----------------------------------------------------------------------|------------------|
+| 冲压锤<br>Press Hammer   | `create_hand_made:press_hammer`   | 256      | 是           | 否           | 动力冲压机<br>`create:mechanical_press`                               | **部分**（注 1） |
+| 研钵<br>Mortar           | `create_hand_made:mortar`         | 256      | 是           | 否           | 石磨<br>`create:millstone`                                            | **部分**（注 2） |
+| 碾钵<br>Crusher Mortar   | `create_hand_made:crusher_mortar` | 512      | 是           | 否           | 粉碎轮 + 石磨（兜底）<br>`create:crushing_wheel` / `create:millstone` | **部分**（注 3） |
+| 指杆<br>Pointer          | `create_hand_made:pointer`        | 512      | 否           | 否           | 机械手<br>`create:deployer`                                           | **部分**（注 4） |
+| 搅拌杖<br>Stirring Staff | `create_hand_made:stirring_staff` | 256      | 是           | 否           | 动力搅拌器（工作盆）<br>`create:mechanical_mixer`                     | **部分**（注 5） |
+| 灌注枪<br>Infusion Gun   | `create_hand_made:infusion_gun`   | 256      | 否           | 否           | 注液器<br>`create:spout`                                              | **部分**（注 6） |
+| 风箱<br>Bellows          | `create_hand_made:bellows`        | 256      | 否           | 否           | 鼓风机<br>`create:encased_fan`                                        | **部分**（注 7） |
+| 手锯<br>Hand Saw         | `create_hand_made:hand_saw`       | 512      | 否           | 否           | 动力锯<br>`create:mechanical_saw`                                     | **部分**（注 8） |
 
 > **`可副手持加工` 的含义**：该工具放在**副手**时，仍能右键触发加工（与主手持有时行为一致）。由作者在游戏内实测填写。
 > **`机械手持加工` 的含义**：Create 的机械手 / 机械臂能使用该工具执行加工。由作者在游戏内实测填写。
