@@ -10,7 +10,7 @@
     "p": { "tag": "minecraft:planks" }
   },
   "result": {
-    "id": "create_hand_made:hand_saw",
+    "item": "create_hand_made:hand_saw",
     "count": 1
   }
 }

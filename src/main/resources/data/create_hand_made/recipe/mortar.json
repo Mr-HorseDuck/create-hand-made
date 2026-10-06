@@ -14,7 +14,7 @@
     }
   },
   "result": {
-    "id": "create_hand_made:mortar",
+    "item": "create_hand_made:mortar",
     "count": 1
   }
 }

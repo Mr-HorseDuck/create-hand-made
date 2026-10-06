@@ -17,7 +17,7 @@
     }
   },
   "result": {
-    "id": "create_hand_made:infusion_gun",
+    "item": "create_hand_made:infusion_gun",
     "count": 1
   }
 }
