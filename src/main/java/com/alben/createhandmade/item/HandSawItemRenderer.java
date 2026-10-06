@@ -33,7 +33,8 @@ public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
     // ================= 副手物品：独立玩家空间坐标 =================
     private static final float OFFHAND_START_X = -0.5f;
     private static final float OFFHAND_START_Y = -0.55f;
-    private static final float OFFHAND_START_Z = 0.15f;
+    /** 实测定稿：起点 Z 从 0.15 改为 1.0（起点落在副手侧画面外） */
+    private static final float OFFHAND_START_Z = 1.0f;
 
     private static final float OFFHAND_TARGET_X = -0.4f;
     private static final float OFFHAND_TARGET_Y = 0.12f;
@@ -86,6 +87,7 @@ public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
                 float afterMove = Math.max(0f, usedTicks - CUT_MOVE_TICKS);
                 vibrateProgress = Math.min(1f, afterMove / 3f);
 
+                // 原料固定在副手槽
                 offhand = player.getOffhandItem();
             } else {
                 boolean leftMouseDown = mc.options.keyAttack.isDown();
@@ -110,16 +112,22 @@ public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
         if (cutting && !offhand.isEmpty()) {
             int modifier = leftHand ? -1 : 1;
 
-            float startX = OFFHAND_START_X * modifier;
-            float targetX = OFFHAND_TARGET_X * modifier;
+            // ★ 实测定稿（左手逐位对照右手）：X 不镜像、Y 不镜像、Z 镜像、YAW 镜像
+            //   与锯子本体同一条规律：Z 分量镜像、X/Y 不镜像
+            float startX = OFFHAND_START_X;
+            float targetX = OFFHAND_TARGET_X;
+            float startY = OFFHAND_START_Y;
+            float targetY = OFFHAND_TARGET_Y;
+            float startZ = OFFHAND_START_Z * modifier;
+            float targetZ = OFFHAND_TARGET_Z * modifier;
 
             // ★ 位移用 moveProgress，振动只叠加微颤
             float tx = startX + (targetX - startX) * moveProgress;
-            float ty = OFFHAND_START_Y + (OFFHAND_TARGET_Y - OFFHAND_START_Y) * moveProgress;
-            float tz = OFFHAND_START_Z + (OFFHAND_TARGET_Z - OFFHAND_START_Z) * moveProgress;
+            float ty = startY + (targetY - startY) * moveProgress;
+            float tz = startZ + (targetZ - startZ) * moveProgress;
 
             // ★ 振动阶段才有的微颤
-            float shake = (float) Math.sin(player.tickCount ) * OFFHAND_SHAKE * vibrateProgress;
+            float shake = (float) Math.sin(player.tickCount) * OFFHAND_SHAKE * vibrateProgress;
             tx += shake;
             ty += shake;
 
@@ -137,25 +145,31 @@ public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
         // ================= 2. 锯子姿态动画 =================
         if (felling) {
             int modifier = leftHand ? -1 : 1;
-            ms.translate(modifier * 0.1f * fellProgress,
+            // 实测确定（与切削同规律）：X/Y 不镜像、Z 镜像
+            ms.translate(0.1f * fellProgress,
                     -0.15f * fellProgress,
-                    -1f * fellProgress);
+                    modifier * -1f * fellProgress);
+
         } else if (cutting) {
+            int modifier = leftHand ? -1 : 1;
+
             // ★ 位移阶段：从原位滑到目标
+            //   实测定稿（左手对照右手）：X 不镜像、Y 不镜像、Z 镜像
             float sawX = SAW_TARGET_X * moveProgress;
             float sawY = SAW_TARGET_Y * moveProgress;
-            float sawZ = SAW_TARGET_Z * moveProgress;
+            float sawZ = SAW_TARGET_Z * modifier * moveProgress;
 
             // ★ 振动阶段：叠加摆动
-            float swing = (float) Math.sin(player.tickCount ) * SAW_SWING;
+            //   实测定稿：Y 不镜像、Z 镜像（与位移同一条规律：Z 分量镜像、X/Y 不镜像）
+            float swing = (float) Math.sin(player.tickCount) * SAW_SWING;
             sawY += swing * vibrateProgress;
-            sawZ += swing * vibrateProgress;
+            sawZ += swing * vibrateProgress * modifier;
 
             ms.translate(sawX, sawY, sawZ);
             // ★ 起手完成后：沿 YP 轴旋转 90°（用 moveProgress 做平滑过渡）
-            int modifier = leftHand ? -1 : 1;
+            //   实测定稿：YP 乘 modifier、ZP 不乘
             ms.mulPose(Axis.YP.rotationDegrees(SAW_ROTATE_Y * modifier * moveProgress));
-            ms.mulPose(Axis.ZP.rotationDegrees(SAW_ROTATE_Z * modifier * moveProgress));
+            ms.mulPose(Axis.ZP.rotationDegrees(SAW_ROTATE_Z * moveProgress));
         }
 
         // ================= 3. 锯子本体 =================

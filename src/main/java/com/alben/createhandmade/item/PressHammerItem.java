@@ -12,8 +12,8 @@ import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackH
 import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.simibubi.create.content.kinetics.crafter.MechanicalCraftingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
-import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
+import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlock;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
@@ -182,12 +182,14 @@ public class PressHammerItem extends Item {
             }
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(level, pos, 1f, 0.8f);
 
+            // ★ 蓄力挥击本身消耗耐久，无论是否真的压到东西
             stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         } else {
             Vec3 soundPos = eye.add(look.scale(1.0));
             level.playSound(null, BlockPos.containing(soundPos),
                     SoundEvents.PLAYER_ATTACK_STRONG,
                     SoundSource.PLAYERS, 0.6f, 0.9f);
+            // ★ 空挥也扣耐久
             stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         }
     }
@@ -201,6 +203,8 @@ public class PressHammerItem extends Item {
                 e -> !e.isSpectator() && e.isPickable() && e instanceof LivingEntity,
                 reach * reach);
     }
+
+    // ================= 普通攻击扣耐久 =================
 
     @SubscribeEvent
     public static void onAttackEntity(AttackEntityEvent event) {
@@ -218,6 +222,8 @@ public class PressHammerItem extends Item {
     public static void onBreakBlock(BlockEvent.BreakEvent event) {
         // 保留原逻辑，TOOL 组件自动扣耐久
     }
+
+    // ================= 蓄力暴击（1.20.1 版：用 LivingHurtEvent） =================
 
     @SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent event) {
@@ -252,6 +258,8 @@ public class PressHammerItem extends Item {
                 && !player.isFallFlying();
     }
 
+    // ================= 蓄力额外击退 =================
+
     @SubscribeEvent
     public static void onKnockback(LivingKnockBackEvent event) {
         LivingEntity target = event.getEntity();
@@ -267,6 +275,8 @@ public class PressHammerItem extends Item {
         event.setStrength(event.getStrength() + 2.0F);
         CHARGE_TARGET.remove(target.getUUID());
     }
+
+    // ================= 探测目标物品 =================
 
     private static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
         List<ItemStack> result = new ArrayList<>();
@@ -297,6 +307,8 @@ public class PressHammerItem extends Item {
         return result;
     }
 
+    // ================= 广播粒子 =================
+
     private static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
         if (!(level instanceof ServerLevel serverLevel)) return;
         if (stacks.isEmpty()) return;
@@ -311,37 +323,7 @@ public class PressHammerItem extends Item {
         }
     }
 
-    // ================= 过滤器辅助 =================
-
-    private static boolean resultsPassFilter(Level level, Recipe<?> recipe,
-                                             @Nullable FilterItemStack filter) {
-        if (filter == null) return true;
-
-        if (recipe instanceof BasinRecipe br) {
-            try {
-                List<ItemStack> results = br.rollResults();
-                for (ItemStack s : results) {
-                    if (!s.isEmpty() && filter.test(level, s)) return true;
-                }
-                return false;
-            } catch (Exception ignored) {
-            }
-        }
-
-        ItemStack result = recipe.getResultItem(level.registryAccess());
-        return !result.isEmpty() && filter.test(level, result);
-    }
-
-    private static boolean resultsPassFilter(Level level, List<ItemStack> results,
-                                             @Nullable FilterItemStack filter) {
-        if (filter == null) return true;
-        for (ItemStack s : results) {
-            if (!s.isEmpty() && filter.test(level, s)) return true;
-        }
-        return false;
-    }
-
-    // ================= 工作盆（三层配方） =================
+    // ================= 工作盆 =================
 
     public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
@@ -350,9 +332,7 @@ public class PressHammerItem extends Item {
         List<Recipe<?>> custom = HandMadeRecipePool.getAllCustomRecipes(ToolType.PRESS_HAMMER);
         for (Recipe<?> r : custom) {
             if (!BasinRecipe.match(basin, r)) continue;
-
             if (!resultsPassFilter(level, r, filter)) continue;
-
             if (BasinRecipe.apply(basin, r)) {
                 basin.notifyChangeOfContents();
                 return true;
@@ -398,11 +378,8 @@ public class PressHammerItem extends Item {
                 && ItemHelper.matchAllIngredients(ingredients);
     }
 
-    // ================= 置物台 / 传送带（三层配方） =================
+    // ================= 置物台 / 传送带 =================
 
-    /**
-     * ★ 女仆兼容：改为 public static，供 MaidUsePointerBehavior 判断物品是否可冲压
-     */
     @Nullable
     public static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
         if (stack.isEmpty()) return null;
@@ -440,8 +417,7 @@ public class PressHammerItem extends Item {
         return filtered.isEmpty() ? null : filtered.get(0);
     }
 
-    public static boolean tryPressTransported(Level level, BlockPos pos,
-                                              @Nullable FilterItemStack filter) {
+    public static boolean tryPressTransported(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -493,5 +469,35 @@ public class PressHammerItem extends Item {
         });
 
         return success[0];
+    }
+
+    // ================= 过滤器辅助 =================
+
+    private static boolean resultsPassFilter(Level level, Recipe<?> recipe,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+
+        if (recipe instanceof BasinRecipe br) {
+            try {
+                List<ItemStack> results = br.rollResults();
+                for (ItemStack s : results) {
+                    if (!s.isEmpty() && filter.test(level, s)) return true;
+                }
+                return false;
+            } catch (Exception ignored) {
+            }
+        }
+
+        ItemStack result = recipe.getResultItem(level.registryAccess());
+        return !result.isEmpty() && filter.test(level, result);
+    }
+
+    private static boolean resultsPassFilter(Level level, List<ItemStack> results,
+                                             @Nullable FilterItemStack filter) {
+        if (filter == null) return true;
+        for (ItemStack s : results) {
+            if (!s.isEmpty() && filter.test(level, s)) return true;
+        }
+        return false;
     }
 }

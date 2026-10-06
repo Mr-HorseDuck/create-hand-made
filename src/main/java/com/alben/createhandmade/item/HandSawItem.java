@@ -112,14 +112,22 @@ public class HandSawItem extends Item {
         consumer.accept(SimpleCustomRenderer.create(this, new HandSawItemRenderer()));
     }
 
+    // ================= 使用动画 =================
+
     @Override
     public UseAnim getUseAnimation(ItemStack stack) {
         return UseAnim.BOW;
     }
 
+    /**
+     * ★ 连续切削：使用时长恒为"无限"（72000），真正的结算周期由 onUseTick 按 CUT_DURATION 控制，
+     *   直到副手没料或玩家松手。
+     *   必须是常量：LivingEntity.getTicksUsingItem() = getUseDuration() - useItemRemaining，
+     *   渲染器（HandSawItemRenderer）依赖它算一阶段/二阶段进度。
+     */
     @Override
     public int getUseDuration(ItemStack stack) {
-        return CUT_DURATION;
+        return 72000;
     }
 
     // ================= 攻击扣耐久 =================
@@ -140,6 +148,8 @@ public class HandSawItem extends Item {
         }
     }
 
+    // ================= 左键 START：潜行 + 可锯方块 → 记录候选目标 =================
+
     @SubscribeEvent
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
         Player player = event.getEntity();
@@ -151,8 +161,9 @@ public class HandSawItem extends Item {
         BlockPos pos = event.getPos();
 
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
-            if (!player.isShiftKeyDown()) return;
+            // ★ 配置开关提前：关闭时完全零开销
             if (!Config.INSTANCE.enableTreeFelling.get()) return;
+            if (!player.isShiftKeyDown()) return;
 
             BlockState state = level.getBlockState(pos);
             if (!SawBlockEntity.isSawable(state)) return;
@@ -162,6 +173,8 @@ public class HandSawItem extends Item {
             FELL_PENDING.remove(player.getUUID());
         }
     }
+
+    // ================= 服务端 tick：砍树循环音效 =================
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -197,6 +210,8 @@ public class HandSawItem extends Item {
         }
     }
 
+    // ================= 方块真正被挖碎时：判定并触发整树砍伐 =================
+
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         Player player = event.getPlayer();
@@ -223,6 +238,8 @@ public class HandSawItem extends Item {
         serverLevel.getServer().execute(() ->
                 fellTreeFromBroken(serverLevel, player, saw, immutablePos, stateSnapshot));
     }
+
+    // ================= 右键 =================
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
@@ -275,12 +292,37 @@ public class HandSawItem extends Item {
         return handleAxeAction(context);
     }
 
+    // ================= 切削 tick：连续切削 + 音效 + 粒子 =================
+
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
         if (!CUTTING_PLAYERS.contains(player.getUUID())) return;
 
+        // ★ 耐久耗尽：主动停止（否则 LivingEntity.updatingUsingItem 不会自动结束，会"空手"继续结算）
+        if (stack.isEmpty()) {
+            player.stopUsingItem();
+            CUTTING_PLAYERS.remove(player.getUUID());
+            return;
+        }
+
         int usedTicks = getUseDuration(stack) - remainingTicks;
+
+        // ★ 连续切削：每 CUT_DURATION tick 结算一份
+        if (usedTicks > 0 && usedTicks % CUT_DURATION == 0) {
+            if (!level.isClientSide) {
+                executeCut(level, player, stack, null);
+            }
+            // 切完这一份后，副手没料 / 已无配方 → 两端停止使用
+            ItemStack offAfterCut = player.getOffhandItem();
+            if (offAfterCut.isEmpty() || getCuttingRecipes(level, offAfterCut).isEmpty()) {
+                player.stopUsingItem();
+                CUTTING_PLAYERS.remove(player.getUUID());
+                return;
+            }
+        }
+
+        // 振动阶段：音效 + 粒子（每 4 tick 一次）
         if (usedTicks < CUT_MOVE_TICKS) return;
         if (usedTicks % 4 != 0) return;
 
@@ -315,18 +357,17 @@ public class HandSawItem extends Item {
         }
     }
 
+    // ================= finishUsingItem：仅清理状态 =================
+
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
+        // ★ 结算已移到 onUseTick。getUseDuration() = 72000 后这里基本不会自然触发，保留清理只为安全。
         if (!(entity instanceof Player player)) return stack;
-
-        boolean wasCutting = CUTTING_PLAYERS.remove(player.getUUID());
-        if (!wasCutting) return stack;
-        if (level.isClientSide) return stack;
-
-        // ★ 玩家手动触发时不用过滤器
-        executeCut(level, player, stack, null);
+        CUTTING_PLAYERS.remove(player.getUUID());
         return stack;
     }
+
+    // ================= releaseUsing：切削取消 =================
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
@@ -344,6 +385,9 @@ public class HandSawItem extends Item {
      */
     public static boolean executeCut(Level level, LivingEntity entity, ItemStack saw,
                                      @Nullable FilterItemStack filter) {
+        // ★ 锯子已碎直接返回
+        if (saw.isEmpty()) return false;
+
         ItemStack off = entity.getOffhandItem();
         if (off.isEmpty()) return false;
 
@@ -459,6 +503,9 @@ public class HandSawItem extends Item {
 
     private static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
                                            BlockPos pos, BlockState brokenState) {
+        // ★ 配置开关：关闭时只破坏当前方块。放在任何整树扫描之前早退，零开销。
+        if (!Config.INSTANCE.enableTreeFelling.get()) return;
+
         if (!(level instanceof ServerLevel)) return;
         if (!SawBlockEntity.isSawable(brokenState)) return;
         if (pos.distSqr(player.blockPosition()) > 64L * 64L) return;

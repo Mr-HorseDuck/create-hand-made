@@ -8,8 +8,6 @@ import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
-import com.simibubi.create.content.fluids.potion.PotionMixingRecipes;
-import com.simibubi.create.content.kinetics.mixer.MixingRecipe;
 import com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
@@ -43,6 +41,9 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
@@ -86,13 +87,39 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         }
     }
 
+    // ================= 右键拦截：把"工作盆的空手交互"让给搅拌杖 =================
+
+    /**
+     * 原版 {@code Minecraft#startUseItem} 在准星命中方块时，只要**当前手**的 useItemOn
+     * 返回 SUCCESS/CONSUME（或 FAIL）就直接 return，副手根本不会被尝试。
+     * 而 Create 的工作盆在**空手**时 useItemOn 无条件返回 SUCCESS（把盆里的东西掏回背包），
+     * 于是"主手空着 + 搅拌杖在副手"永远走不到搅拌杖的 use()，只有潜行（跳过方块交互）才用得出。
+     *
+     * <p>这里按 {@link PlayerInteractEvent.RightClickBlock} 的既有做法（BellowsItem /
+     * InfusionGunItem / PressHammerItem 同款）显式关掉方块交互，让 useItemOn 返回 PASS，
+     * 手部循环才能轮到副手的 useItem。判定必须用 {@code event.getHand()}（正在使用的那只手），
+     * 不能用 {@code getMainHandItem()}，否则副手场景不生效。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        if (!(player.getItemInHand(event.getHand()).getItem() instanceof StirringStaffItem)) return;
+
+        if (!(event.getLevel().getBlockEntity(event.getPos()) instanceof BasinBlockEntity basin)) return;
+        if (basin.isEmpty()) return;
+
+        event.setUseBlock(Event.Result.DENY);
+    }
+
     // ================= 右键 =================
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        if (hand == InteractionHand.OFF_HAND) {
+        // ★ 副手使用需要潜行，避免和主手冲突（主手的 useItemOn 通常已经拦过一层）
+        if (hand == InteractionHand.OFF_HAND && !player.isShiftKeyDown()) {
             return InteractionResultHolder.pass(player.getItemInHand(hand));
         }
+
         ItemStack stack = player.getItemInHand(hand);
 
         BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);
@@ -228,7 +255,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
                     StirringStaffItem::matchStaticFilters)) {
                 if (!BasinRecipe.match(basin, recipe)) continue;
 
-                // ★ L2：应用过滤，被过滤的跳过继续找下一个
                 List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                         ToolType.STIRRING_STAFF, level, List.of(recipe));
                 if (filtered.isEmpty()) continue;
@@ -237,19 +263,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             }
         } catch (Exception ignored) {
         }
-
-        // ★ 自动酿造暂时禁用（如需恢复，参考 PotionMixingRecipes.BY_ITEM）
-        // if (AllConfigs.server().recipes.allowBrewingInMixer.get()) {
-        //     for (int i = 0; i < basin.inputInventory.getSlots(); i++) {
-        //         ItemStack s = basin.inputInventory.getItem(i);
-        //         if (s.isEmpty()) continue;
-        //         List<MixingRecipe> list = PotionMixingRecipes.BY_ITEM.get(s.getItem());
-        //         if (list == null) continue;
-        //         for (MixingRecipe mixingRecipe : list) {
-        //             if (BasinRecipe.match(basin, mixingRecipe)) return mixingRecipe;
-        //         }
-        //     }
-        // }
 
         return null;
     }
