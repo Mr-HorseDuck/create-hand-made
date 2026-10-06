@@ -14,16 +14,14 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 
 /**
  * 指杆标记系统（仅模式 2）。
  *
- * 客户端拦截在 PointerModeHandler.onMouseButton 里处理，
+ * 客户端拦截在 PointerModeHandler 里处理，
  * 这里只提供服务端 doMark 和切换物品清除标记的逻辑。
  */
-@Mod.EventBusSubscriber(modid = "create_hand_made")
 public class PointerMarker {
 
     /**

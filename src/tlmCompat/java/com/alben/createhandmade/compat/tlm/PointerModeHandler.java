@@ -19,15 +19,12 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
-@Mod.EventBusSubscriber(modid = CreateHandMade.MODID, value = Dist.CLIENT)
 public class PointerModeHandler {
 
     private static boolean lastShiftRightDown = false;
@@ -80,7 +77,6 @@ public class PointerModeHandler {
             return;
         }
 
-        // 主手不是指杆时清空本地缓存
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) {
             clientWork = null;
             clientInput = null;
@@ -108,10 +104,8 @@ public class PointerModeHandler {
         HitResult hit = mc.hitResult;
         if (hit == null) return;
 
-        // ★ 命中实体：检查是否为女仆
         if (hit instanceof EntityHitResult entityHit) {
             Entity target = entityHit.getEntity();
-            // 用类名判断，避免与 TLM 直接耦合
             if (isMaid(target)) {
                 CreateHandMade.LOGGER.info("[HandMade] Apply marks to maid id={}", target.getId());
                 MaidNetwork.CHANNEL.sendToServer(new PointerApplyToMaidPacket(target.getId()));
@@ -119,7 +113,6 @@ public class PointerModeHandler {
             return;
         }
 
-        // 命中方块：标记逻辑
         if (!(hit instanceof BlockHitResult blockHit)) return;
         if (hit.getType() != HitResult.Type.BLOCK) return;
 
@@ -131,7 +124,6 @@ public class PointerModeHandler {
 
         boolean isWorkBlock = be instanceof DepotBlockEntity || be instanceof BasinBlockEntity;
         if (!isWorkBlock) {
-            // 非工作方块，且无 capability 时忽略
             boolean hasItemHandler = be.getCapability(
                     net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER, null).isPresent();
             if (!hasItemHandler) return;
@@ -162,9 +154,6 @@ public class PointerModeHandler {
         MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
     }
 
-    /**
-     * 用类名判断是否为 TLM 女仆，避免编译期依赖。
-     */
     private static boolean isMaid(Entity entity) {
         return entity.getClass().getName()
                 .equals("com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid");

@@ -10,11 +10,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +20,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-@Mod.EventBusSubscriber(modid = "create_hand_made", value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class MaidLangOverride {
 
     private static final Gson GSON = new Gson();
@@ -35,7 +32,6 @@ public class MaidLangOverride {
     private static void onReload(ResourceManager rm) {
         if (!ModList.get().isLoaded("maidassemblyline")) return;
 
-        // ★ 1.20.1 的 getSelected() 返回 String
         String code = Minecraft.getInstance().getLanguageManager().getSelected();
         applyOverride(rm, code);
     }
@@ -60,7 +56,6 @@ public class MaidLangOverride {
                 overrides.put(e.getKey(), e.getValue().getAsString());
             }
 
-            // ★ 用 net.minecraft.locale.Language
             Language.getInstance().getLanguageData().putAll(overrides);
 
             CreateHandMade.LOGGER.info(

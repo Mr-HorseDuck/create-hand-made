@@ -12,9 +12,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
@@ -22,19 +19,28 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 import java.util.function.Supplier;
 
-@Mod.EventBusSubscriber(modid = "create_hand_made", bus = Mod.EventBusSubscriber.Bus.MOD)
 public class MaidNetwork {
 
     private static final String VERSION = "1";
+    private static boolean initialized = false;
 
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation("create_hand_made", "maid_network"),
-            () -> VERSION,
-            VERSION::equals,
-            VERSION::equals);
+    /** ★ 不再静态初始化，改为 init() 里创建 */
+    public static SimpleChannel CHANNEL;
 
-    @SubscribeEvent
-    public static void onCommonSetup(FMLCommonSetupEvent event) {
+    /**
+     * ★ 由 main 主类在 mod 构造阶段反射调用，确保在 Forge 通道锁关闭前完成注册。
+     *   幂等：多次调用只执行一次。
+     */
+    public static synchronized void init() {
+        if (initialized) return;
+        initialized = true;
+
+        CHANNEL = NetworkRegistry.newSimpleChannel(
+                new ResourceLocation("create_hand_made", "maid_network"),
+                () -> VERSION,
+                VERSION::equals,
+                VERSION::equals);
+
         int id = 0;
 
         CHANNEL.messageBuilder(PointerModePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
@@ -98,7 +104,6 @@ public class MaidNetwork {
                     return;
                 }
 
-                // ★ 直接用 Entity 类型，避免任何 EntityMaid 方法覆写问题
                 Entity maidEntity = target;
 
                 BlockPos work = PointerDataHelper.getWork(player, serverLevel);
