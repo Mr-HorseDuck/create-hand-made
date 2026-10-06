@@ -28,14 +28,10 @@ mixin {
 
 // ------------------ 仓库配置 ------------------
 repositories {
-    // Create / Ponder / Flywheel 官方仓库
     maven { url = "https://maven.createmod.net" }
-    // Registrate 镜像
     maven { url = "https://maven.ithundxr.dev/mirror" }
-    // ForgeConfigAPIPort（Create 1.20.1 依赖）
     maven { url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/" }
 
-    // ★ KubeJS 官方仓库
     maven {
         url = "https://maven.latvian.dev/releases"
         content {
@@ -43,21 +39,18 @@ repositories {
             includeGroup "dev.latvian.apps"
         }
     }
-    // ★ KubeJS 传递依赖：jitpack
     maven {
         url = "https://jitpack.io"
         content {
             includeGroup "com.github.rtyley"
         }
     }
-    // ★ KubeJS 传递依赖：Architectury
     maven {
         url = "https://maven.architectury.dev"
         content {
             includeGroup "dev.architectury"
         }
     }
-    // ★ KubeJS 传递依赖：Rhino / Shedaniel
     maven {
         url = "https://maven.shedaniel.me/"
         content {
@@ -66,7 +59,6 @@ repositories {
         }
     }
 
-    // ★ 车万女仆 Modrinth 仓库
     maven {
         url = "https://api.modrinth.com/maven"
         content {
@@ -74,14 +66,22 @@ repositories {
         }
     }
 
-    // JEI 仓库
     maven { url = "https://maven.blamejared.com/" }
-
-    // 通用库（ASM、Guava 等）
     mavenCentral()
-
-    // 可选：国内加速镜像
     maven { url = "https://maven.aliyun.com/repository/public" }
+}
+
+// ------------------ SourceSets：女仆兼容独立隔离 ------------------
+// ★ 目的：主代码回退/改动时，compat/tlm 下的代码不受影响
+//   - 目录：src/tlmCompat/java
+//   - 编译输出合并到同一个 jar
+//   - 依赖方向：tlmCompat → main（单向）
+sourceSets {
+    tlmCompat {
+        java.srcDir 'src/tlmCompat/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
 }
 
 // ------------------ Forge 配置 ------------------
@@ -99,6 +99,7 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                    source sourceSets.tlmCompat
                 }
             }
         }
@@ -114,6 +115,7 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                    source sourceSets.tlmCompat
                 }
             }
         }
@@ -129,6 +131,7 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                    source sourceSets.tlmCompat
                 }
             }
         }
@@ -147,6 +150,7 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                    source sourceSets.tlmCompat
                 }
             }
         }
@@ -179,20 +183,27 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
 
-    // ★ KubeJS 的 Rhino 传递依赖（必须显式声明，否则编译失败）
+    // KubeJS 的 Rhino 传递依赖
     compileOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
     runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
 
-    // ★ KubeJS（可选依赖，不打包进 jar）
+    // KubeJS（可选依赖，不打包进 jar）
     compileOnly fg.deobf("dev.latvian.mods:kubejs-forge:${kubejs_version}")
 
-    // ★ 车万女仆（可选依赖，不打包进 jar）
-    compileOnly fg.deobf("maven.modrinth:touhou-little-maid:1.5.2-forge+mc1.20.1")
-    // 如需运行时测试女仆兼容，取消下面这行注释
-    // runtimeOnly fg.deobf("maven.modrinth:touhou-little-maid:1.5.2-forge+mc1.20.1")
+    // ★ 车万女仆（可选依赖，隔离到 tlmCompat sourceSet）
+    //   - 编译期：只给 tlmCompat 使用，主代码看不到
+    //   - 运行期：加到全局 runtimeClasspath，让客户端能加载 TLM
+    tlmCompatCompileOnly fg.deobf("maven.modrinth:touhou-little-maid:${tlm_version}")
+    runtimeOnly fg.deobf("maven.modrinth:touhou-little-maid:${tlm_version}")
 
     // Mixin 注解处理器
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// ------------------ 编译顺序 ------------------
+// tlmCompat 依赖 main 的输出，所以必须在 main 之后编译
+tasks.named('compileTlmCompatJava') {
+    dependsOn tasks.named('compileJava')
 }
 
 // ------------------ 元数据生成 ------------------
@@ -222,6 +233,9 @@ tasks.named('compileJava') {
 
 // ------------------ Jar 清单 ------------------
 jar {
+    // ★ 把 tlmCompat sourceSet 的输出合并到同一个 jar
+    from sourceSets.tlmCompat.output
+
     manifest {
         attributes([
                 "Specification-Title"     : mod_id,
