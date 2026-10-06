@@ -13,7 +13,6 @@ import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
-import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.recipe.RecipeApplier;
@@ -30,9 +29,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
@@ -94,21 +90,6 @@ public class PointerItem extends Item {
         if (offHand.getItem() instanceof PointerItem) {
             offHand.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.OFFHAND));
         }
-    }
-
-    // ================= 切换物品时清除标记 =================
-
-    @SubscribeEvent
-    public static void onEquipmentChange(LivingEquipmentChangeEvent event) {
-        if (!(event.getEntity() instanceof Player player)) return;
-        if (player.level().isClientSide) return;
-        if (event.getSlot() != EquipmentSlot.MAINHAND) return;
-
-        // 只在"从指杆切换到非指杆"时清除
-        if (event.getTo().getItem() instanceof PointerItem) return;
-        if (!(event.getFrom().getItem() instanceof PointerItem)) return;
-
-        PointerDataHelper.clear(player);
     }
 
     // ================= 置物台拦截 =================
@@ -215,7 +196,13 @@ public class PointerItem extends Item {
 
         if (player.isShiftKeyDown()) {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                return handlePointerMark(player, serverLevel, pos);
+                HighlightBlockPacket packet = new HighlightBlockPacket(pos);
+                ModNetwork.CHANNEL.send(
+                        PacketDistributor.TRACKING_CHUNK.with(() -> serverLevel.getChunkAt(pos)),
+                        packet);
+
+                level.playSound(null, pos, SoundEvents.EXPERIENCE_ORB_PICKUP,
+                        SoundSource.PLAYERS, 1.0F, 1.0F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -228,62 +215,6 @@ public class PointerItem extends Item {
         }
 
         return InteractionResult.PASS;
-    }
-
-    // ================= 标记逻辑 =================
-
-    /**
-     * Shift+右键的标记逻辑：
-     *   - 置物台 / 工作盆 → 工作方块（黄）
-     *   - 有 IItemHandler 的方块 → 输入（绿）/ 输出（蓝）
-     *   - 其他 → 不处理
-     */
-    private static InteractionResult handlePointerMark(Player player, ServerLevel level, BlockPos pos) {
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) return InteractionResult.PASS;
-
-        // 1. 工作方块：置物台 / 工作盆
-        if (be instanceof DepotBlockEntity || be instanceof BasinBlockEntity) {
-            PointerDataHelper.setWork(player, level, pos);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_WORK);
-            playMarkSound(level, pos);
-            return InteractionResult.SUCCESS;
-        }
-
-        // 2. 物品容器：有 IItemHandler 能力
-        boolean hasItemHandler = be.getCapability(ForgeCapabilities.ITEM_HANDLER, null).isPresent();
-        if (hasItemHandler) {
-            BlockPos inputPos = PointerDataHelper.getInput(player, level);
-            BlockPos outputPos = PointerDataHelper.getOutput(player, level);
-
-            if (inputPos == null) {
-                PointerDataHelper.setInput(player, level, pos);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
-            } else if (outputPos == null) {
-                PointerDataHelper.setOutput(player, level, pos);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_OUTPUT);
-            } else {
-                PointerDataHelper.setInput(player, level, pos);
-                PointerDataHelper.setOutput(player, level, null);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
-            }
-            playMarkSound(level, pos);
-            return InteractionResult.SUCCESS;
-        }
-
-        return InteractionResult.PASS;
-    }
-
-    private static void sendHighlight(ServerLevel level, BlockPos pos, int color) {
-        HighlightBlockPacket packet = new HighlightBlockPacket(pos, color);
-        ModNetwork.CHANNEL.send(
-                PacketDistributor.TRACKING_CHUNK.with(() -> level.getChunkAt(pos)),
-                packet);
-    }
-
-    private static void playMarkSound(ServerLevel level, BlockPos pos) {
-        level.playSound(null, pos, SoundEvents.EXPERIENCE_ORB_PICKUP,
-                SoundSource.PLAYERS, 1.0F, 1.0F);
     }
 
     // ================= 传送带加工 =================

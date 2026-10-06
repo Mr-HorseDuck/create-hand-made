@@ -4,6 +4,7 @@ import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
+import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.item.CustomUseEffectsItem;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
@@ -28,17 +29,19 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
+import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.items.wrapper.RecipeWrapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 public class MortarItem extends Item implements CustomUseEffectsItem {
 
-    private static final int FORCED_DURATION = 100;
+    public static final int FORCED_DURATION = 100;
     private static final int WINDUP_TICKS = FORCED_DURATION / 5;
 
     public MortarItem(Properties properties) {
@@ -68,7 +71,6 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
-        // ★ 三层配方查询：L3 → L1 → L2
         if (findRecipe(level, input) == null) {
             return InteractionResultHolder.fail(stack);
         }
@@ -104,7 +106,6 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
         if (level.isClientSide) return stack;
 
-        // ★ 三层配方查询
         Recipe<?> recipe = findRecipe(level, contents.stack());
         if (recipe instanceof ProcessingRecipe<?> pr) {
             List<ItemStack> results = pr.rollResults();
@@ -147,17 +148,17 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
      *   L3 独占配方（命中直接返回）
      *   L1 原有 Create 配方
      *   L2 数据包过滤
+     *
+     * ★ 女仆兼容：改为 public static
      */
     @Nullable
-    private static Recipe<?> findRecipe(Level level, ItemStack input) {
+    public static Recipe<?> findRecipe(Level level, ItemStack input) {
         if (input.isEmpty()) return null;
 
-        // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
                 ToolType.MORTAR, level, input);
         if (!custom.isEmpty()) return custom.get(0);
 
-        // ★ L1：原有逻辑
         ItemStackHandler handler = new ItemStackHandler(1);
         handler.setStackInSlot(0, input.copyWithCount(1));
         RecipeWrapper wrapper = new RecipeWrapper(handler);
@@ -165,10 +166,150 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
         Optional<MillingRecipe> recipeOpt = AllRecipeTypes.MILLING.find(wrapper, level);
         if (recipeOpt.isEmpty()) return null;
 
-        // ★ L2：应用过滤
         List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                 ToolType.MORTAR, level, List.of(recipeOpt.get()));
         return filtered.isEmpty() ? null : filtered.get(0);
+    }
+
+    // ================= 女仆一次性研磨辅助 =================
+
+    /**
+     * ★ 女仆一次性研磨。
+     *   副手优先，副手空则从 inputInv 取；产物进 outputInv，失败退女仆背包。
+     */
+    public static boolean tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
+                                        @Nullable IItemHandler inputInv,
+                                        @Nullable IItemHandler outputInv,
+                                        @Nullable FilterItemStack filter) {
+        if (level.isClientSide) return false;
+        if (!(level instanceof ServerLevel serverLevel)) return false;
+
+        ItemStack material = ItemStack.EMPTY;
+        boolean fromOffhand = false;
+        int fromInputSlot = -1;
+
+        ItemStack off = entity.getOffhandItem();
+        if (!off.isEmpty() && findRecipe(level, off) != null) {
+            material = off.copyWithCount(1);
+            fromOffhand = true;
+        } else if (inputInv != null) {
+            for (int i = 0; i < inputInv.getSlots(); i++) {
+                ItemStack slot = inputInv.getStackInSlot(i);
+                if (slot.isEmpty()) continue;
+                if (findRecipe(level, slot) == null) continue;
+                material = inputInv.extractItem(i, 1, false);
+                if (!material.isEmpty()) {
+                    fromInputSlot = i;
+                    break;
+                }
+            }
+        }
+
+        if (material.isEmpty()) return false;
+
+        Recipe<?> recipe = findRecipe(level, material);
+        if (!(recipe instanceof ProcessingRecipe<?> pr)) {
+            rollbackMaterial(entity, inputInv, material, fromOffhand, fromInputSlot);
+            return false;
+        }
+
+        if (fromOffhand) {
+            off.shrink(1);
+        }
+
+        List<ItemStack> results = pr.rollResults();
+        List<ItemStack> accepted = new ArrayList<>();
+        for (ItemStack result : results) {
+            if (result.isEmpty()) continue;
+            if (filter != null && !filter.test(level, result)) continue;
+            accepted.add(result);
+        }
+
+        if (accepted.isEmpty()) {
+            rollbackMaterial(entity, inputInv, material, fromOffhand, fromInputSlot);
+            return false;
+        }
+
+        for (ItemStack result : accepted) {
+            ItemStack remaining = result.copy();
+
+            if (outputInv != null) {
+                for (int i = 0; i < outputInv.getSlots(); i++) {
+                    remaining = outputInv.insertItem(i, remaining, false);
+                    if (remaining.isEmpty()) break;
+                }
+            }
+
+            if (!remaining.isEmpty()) {
+                if (entity instanceof Player player) {
+                    player.getInventory().placeItemBackInInventory(remaining);
+                } else {
+                    entity.spawnAtLocation(remaining);
+                }
+            }
+        }
+
+        level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
+                SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+
+        Vec3 eye = entity.getEyePosition(1f);
+        Vec3 look = entity.getLookAngle();
+        Vec3 spawnPos = eye.add(look.scale(0.5)).add(0, -0.3, 0);
+
+        for (int i = 0; i < 8; i++) {
+            double angle = level.random.nextDouble() * Math.PI * 2;
+            double horizSpeed = 0.05 + level.random.nextDouble() * 0.1;
+            double vx = Math.cos(angle) * horizSpeed;
+            double vz = Math.sin(angle) * horizSpeed;
+            double vy = 0.15 + level.random.nextDouble() * 0.15;
+
+            serverLevel.sendParticles(
+                    new ItemParticleOption(ParticleTypes.ITEM, material),
+                    spawnPos.x, spawnPos.y, spawnPos.z,
+                    1, vx, vy, vz, 0.0
+            );
+        }
+
+        EquipmentSlot slot = entity.getUsedItemHand() == InteractionHand.MAIN_HAND
+                ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
+        mortar.hurtAndBreak(1, entity, e -> {
+            if (e instanceof Player p) {
+                p.broadcastBreakEvent(slot);
+            }
+        });
+
+        return true;
+    }
+
+    private static void rollbackMaterial(LivingEntity entity, @Nullable IItemHandler inputInv,
+                                          ItemStack material, boolean fromOffhand, int fromInputSlot) {
+        if (material.isEmpty()) return;
+
+        if (fromOffhand) {
+            ItemStack off = entity.getOffhandItem();
+            if (off.isEmpty()) {
+                entity.setItemInHand(InteractionHand.OFF_HAND, material);
+            } else if (ItemStack.isSameItemSameTags(off, material) && off.getCount() < off.getMaxStackSize()) {
+                off.grow(1);
+            } else {
+                entity.spawnAtLocation(material);
+            }
+            return;
+        }
+
+        if (inputInv != null) {
+            if (fromInputSlot >= 0 && fromInputSlot < inputInv.getSlots()) {
+                ItemStack leftover = inputInv.insertItem(fromInputSlot, material, false);
+                if (leftover.isEmpty()) return;
+                material = leftover;
+            }
+            for (int i = 0; i < inputInv.getSlots(); i++) {
+                material = inputInv.insertItem(i, material, false);
+                if (material.isEmpty()) return;
+            }
+        }
+
+        entity.spawnAtLocation(material);
     }
 
     // ================= 动画 / 音效屏蔽 =================
