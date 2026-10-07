@@ -47,3 +47,10 @@ mandatory=false
 versionRange="[${jei_version},)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="cloth_config"
+    mandatory=false
+    versionRange="[11.0.0,)"
+    ordering="NONE"
+    side="CLIENT"
