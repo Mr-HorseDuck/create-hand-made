@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "bcb",
+    " ab",
+    " a "
+  ],
+  "key": {
+    "a": {
+      "item": "minecraft:stick"
+    },
+    "b": {
+      "item": "minecraft:iron_ingot"
+    },
+    "c": {
+      "item": "create:andesite_alloy"
+    }
+  },
+  "result": {
+    "item": "create_hand_made:press_hammer"
+  }
+}
