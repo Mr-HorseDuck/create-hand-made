@@ -33,6 +33,8 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.ShapedRecipe;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
@@ -69,6 +71,13 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         return 15;
     }
 
+    // ★ 允许锋利附魔
+    @Override
+    public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
+        if (enchantment == Enchantments.SHARPNESS) return true;
+        return super.canApplyAtEnchantingTable(stack, enchantment);
+    }
+
     // ================= 攻击扣耐久 =================
 
     @SubscribeEvent
@@ -89,17 +98,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     // ================= 右键拦截：把"工作盆的空手交互"让给搅拌杖 =================
 
-    /**
-     * 原版 {@code Minecraft#startUseItem} 在准星命中方块时，只要**当前手**的 useItemOn
-     * 返回 SUCCESS/CONSUME（或 FAIL）就直接 return，副手根本不会被尝试。
-     * 而 Create 的工作盆在**空手**时 useItemOn 无条件返回 SUCCESS（把盆里的东西掏回背包），
-     * 于是"主手空着 + 搅拌杖在副手"永远走不到搅拌杖的 use()，只有潜行（跳过方块交互）才用得出。
-     *
-     * <p>这里按 {@link PlayerInteractEvent.RightClickBlock} 的既有做法（BellowsItem /
-     * InfusionGunItem / PressHammerItem 同款）显式关掉方块交互，让 useItemOn 返回 PASS，
-     * 手部循环才能轮到副手的 useItem。判定必须用 {@code event.getHand()}（正在使用的那只手），
-     * 不能用 {@code getMainHandItem()}，否则副手场景不生效。</p>
-     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         Player player = event.getEntity();
@@ -115,7 +113,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        // ★ 副手使用需要潜行，避免和主手冲突（主手的 useItemOn 通常已经拦过一层）
+        // ★ 副手使用需要潜行，避免和主手冲突
         if (hand == InteractionHand.OFF_HAND && !player.isShiftKeyDown()) {
             return InteractionResultHolder.pass(player.getItemInHand(hand));
         }
@@ -229,19 +227,10 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     // ================= 三层配方查询：MIXING + 无序合成 =================
 
-    /**
-     * ★ 三层模型：
-     *   L3 独占配方（遍历所有 L3 配方，用 BasinRecipe.match 匹配）
-     *   L1 原有 Create 配方（MIXING + shapeless crafting）
-     *   L2 数据包过滤（对每个匹配的 L1 配方应用过滤，被过滤的跳过）
-     *
-     *   ⚠️ 自动酿造暂时禁用
-     */
     @Nullable
     public static Recipe<?> findMatchingRecipe(Level level, BasinBlockEntity basin) {
         if (basin.isEmpty()) return null;
 
-        // ★ L3：优先查独占配方
         List<Recipe<?>> custom = HandMadeRecipePool.getAllCustomRecipes(ToolType.STIRRING_STAFF);
         for (Recipe<?> r : custom) {
             if (BasinRecipe.match(basin, r)) {
@@ -249,7 +238,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             }
         }
 
-        // ★ L1：原有逻辑 + ★ L2 过滤
         try {
             for (Recipe<?> recipe : RecipeFinder.get(MIXING_RECIPE_KEY, level,
                     StirringStaffItem::matchStaticFilters)) {

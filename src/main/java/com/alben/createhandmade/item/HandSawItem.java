@@ -34,6 +34,8 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -87,6 +89,13 @@ public class HandSawItem extends Item {
     @Override
     public int getEnchantmentValue(ItemStack stack) {
         return 15;
+    }
+
+    // ★ 允许锋利附魔
+    @Override
+    public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
+        if (enchantment == Enchantments.SHARPNESS) return true;
+        return super.canApplyAtEnchantingTable(stack, enchantment);
     }
 
     @Override
@@ -161,7 +170,6 @@ public class HandSawItem extends Item {
         BlockPos pos = event.getPos();
 
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
-            // ★ 配置开关提前：关闭时完全零开销
             if (!Config.INSTANCE.enableTreeFelling.get()) return;
             if (!player.isShiftKeyDown()) return;
 
@@ -299,7 +307,7 @@ public class HandSawItem extends Item {
         if (!(entity instanceof Player player)) return;
         if (!CUTTING_PLAYERS.contains(player.getUUID())) return;
 
-        // ★ 耐久耗尽：主动停止（否则 LivingEntity.updatingUsingItem 不会自动结束，会"空手"继续结算）
+        // ★ 耐久耗尽：主动停止
         if (stack.isEmpty()) {
             player.stopUsingItem();
             CUTTING_PLAYERS.remove(player.getUUID());
@@ -361,7 +369,6 @@ public class HandSawItem extends Item {
 
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
-        // ★ 结算已移到 onUseTick。getUseDuration() = 72000 后这里基本不会自然触发，保留清理只为安全。
         if (!(entity instanceof Player player)) return stack;
         CUTTING_PLAYERS.remove(player.getUUID());
         return stack;
@@ -377,15 +384,8 @@ public class HandSawItem extends Item {
 
     // ================= 切削执行 =================
 
-    /**
-     * ★ 女仆兼容：
-     *   - public static，供 TLM 行为类调用
-     *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
-     *   - 返回 boolean 表示是否成功切削
-     */
     public static boolean executeCut(Level level, LivingEntity entity, ItemStack saw,
                                      @Nullable FilterItemStack filter) {
-        // ★ 锯子已碎直接返回
         if (saw.isEmpty()) return false;
 
         ItemStack off = entity.getOffhandItem();
@@ -394,12 +394,10 @@ public class HandSawItem extends Item {
         List<Recipe<?>> recipes = getCuttingRecipes(level, off);
         if (recipes.isEmpty()) return false;
 
-        // ★ 选出要执行的配方
         Recipe<?> recipe = null;
         List<ItemStack> results = new ArrayList<>();
 
         if (filter != null) {
-            // 有过滤器：遍历所有配方，找产物通过过滤的第一个
             for (Recipe<?> candidate : recipes) {
                 List<ItemStack> candidateResults = new ArrayList<>();
                 if (candidate instanceof CuttingRecipe cr) {
@@ -415,7 +413,6 @@ public class HandSawItem extends Item {
             }
             if (recipe == null) return false;
         } else {
-            // 无过滤器：用当前选中索引
             int index = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
             if (index < 0 || index >= recipes.size()) index = 0;
             recipe = recipes.get(index);
@@ -503,7 +500,6 @@ public class HandSawItem extends Item {
 
     private static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
                                            BlockPos pos, BlockState brokenState) {
-        // ★ 配置开关：关闭时只破坏当前方块。放在任何整树扫描之前早退，零开销。
         if (!Config.INSTANCE.enableTreeFelling.get()) return;
 
         if (!(level instanceof ServerLevel)) return;
