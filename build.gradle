@@ -183,6 +183,13 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
 
+    // ★ Cloth Config（可选依赖）
+    //   - compileOnly：编译期可见，不打包进 jar
+    //   - runtimeOnly：仅开发环境加载，方便本地调试配置界面，同样不进 jar
+    //   - 玩家侧：安装了就显示配置界面，未安装则静默跳过
+    compileOnly fg.deobf("me.shedaniel.cloth:cloth-config-forge:${cloth_config_version}")
+    runtimeOnly fg.deobf("me.shedaniel.cloth:cloth-config-forge:${cloth_config_version}")
+
     // KubeJS 的 Rhino 传递依赖
     compileOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
     runtimeOnly fg.deobf("dev.latvian.mods:rhino-forge:${rhino_version}")
@@ -218,7 +225,8 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_license            : mod_license,
             mod_version            : mod_version,
             create_mod_version     : create_mod_version,
-            jei_version            : jei_version
+            jei_version            : jei_version,
+            cloth_config_version   : cloth_config_version,
     ]
     inputs.properties replaceProperties
     expand replaceProperties
