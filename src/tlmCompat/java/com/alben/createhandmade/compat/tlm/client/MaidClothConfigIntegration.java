@@ -69,6 +69,8 @@ public class MaidClothConfigIntegration {
                 .build());
 
         // ---- 屏蔽模组列表（List<? extends String> → List<String>）----
+        // ★ 修改后需重启游戏才会生效：
+        //   女仆兼容的加载判定在 addMaidTask 启动阶段执行一次，运行时不重判。
         List<String> blocked = new ArrayList<>(MaidConfig.INSTANCE.blockedMods.get());
 
         maid.addEntry(entry
@@ -76,8 +78,10 @@ public class MaidClothConfigIntegration {
                         Component.translatable("config.create_hand_made.maid.blocked_mods"),
                         blocked)
                 .setDefaultValue(List.of("maidassemblyline"))
-                .setTooltip(Component.translatable(
-                        "config.create_hand_made.maid.blocked_mods.tooltip"))
+                .setTooltip(
+                        Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.0"),
+                        Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.1"),
+                        Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.2"))
                 .setSaveConsumer(MaidConfig.INSTANCE.blockedMods::set)
                 .build());
     }
