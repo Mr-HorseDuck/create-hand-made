@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " c ",
+    "nkn",
+    " c "
+  ],
+  "key": {
+    "c": {
+      "tag": "forge:plates/copper"
+    },
+    "n": {
+      "tag": "forge:nuggets/copper"
+    },
+    "k": {
+      "item": "minecraft:bucket"
+    }
+  },
+  "result": {
+    "item": "create_hand_made:infusion_gun",
+    "count": 1
+  }
+}
