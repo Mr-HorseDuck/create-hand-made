@@ -58,6 +58,23 @@ public enum HandMadeRecipeTypes implements IRecipeTypeInfo {
     TOOL_RECIPE(HandMadeToolRecipeSerializer::new),
 
     /**
+     * 手锯 · 切石独占配方（{@code create_hand_made:stonecutting_recipe}，T7 批次 2）。
+     *
+     * <p><b>为什么不并进 {@link #TOOL_RECIPE}：</b>后者的 serializer
+     * （{@link HandMadeToolRecipeSerializer}）整体建立在 Create 的
+     * {@code StandardProcessingRecipe} 上（codec 返回的就是它、按 {@code tool} 字段分派家族），
+     * 而切石配方属于原版 {@code SingleItemRecipe} 家族
+     * （见 {@link HandMadeStonecuttingRecipe}），两者无法共用一条解析路径。
+     * 因此照 {@link #BELLOWS_RECIPE} 的先例，给它一个独立 type + 独立 serializer。</p>
+     *
+     * <p><b>独占性：</b>原版切石机与 Create 机械锯查的都是 {@code minecraft:stonecutting}，
+     * 永远看不到本 type 下的配方 —— 只有手锯切石段
+     * （{@link HandMadeTool#HAND_SAW_STONECUTTING} 的候选集，在
+     * {@code HandMadeRecipePool.collectHandSawStonecutting} 里以 L1 之后的位置并入）会读到。</p>
+     */
+    STONECUTTING_RECIPE(HandMadeStonecuttingRecipeSerializer::new),
+
+    /**
      * 风箱独占配方（{@code fan_type} + 单品输入）。
      *
      * <p><b>为什么不并进 {@link #TOOL_RECIPE}：</b>风箱不属于 {@code HandMadeTool} 体系

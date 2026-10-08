@@ -367,16 +367,29 @@ public final class HandMadeRecipePool {
      * （{@link #collectStirringStaffAutoShapeless}）的处理方式一致。关掉配置时这里返回空列表，
      * 手锯的行为与本次改造前逐字相同。</p>
      *
-     * <p><b>只收 {@link StonecutterRecipe}：</b>与 {@code collectHandSaw} 只收
+     * <p><b>两层的收集顺序：L1（原版 {@code minecraft:stonecutting}）在前、L3（本模组
+     * {@code create_hand_made:stonecutting_recipe}）在后</b> —— 与 {@code tool_recipe} 的
+     * "L1 优先"约定一致（见 {@code docs/RECIPE_API.md} 的「两种 L3 的匹配顺序」）。
+     * 手锯取第一个匹配的配方，所以想让 L3 生效，作者要先用 L2 把对应的 L1 那条禁掉；
+     * 反过来，L1 里没有的输入，L3 直接生效。</p>
+     *
+     * <p><b>只收 {@link StonecutterRecipe}（L1）：</b>与 {@code collectHandSaw} 只收
      * {@code CuttingRecipe} 对称。切石类型下正常只会是原版这个类（datapack / 其它 mod 都经由
      * {@code minecraft:stonecutting} 这个 serializer 构造它），这里做一次 instanceof 收窄既是
      * 防御也是类型需要。</p>
+     *
+     * <p><b>L3 只收 {@link HandMadeStonecuttingRecipe}：</b>同理 —— 本模组自己的 type 只会由
+     * {@link HandMadeStonecuttingRecipeSerializer} 产出这个类。</p>
      *
      * <p><b>不做 automation 过滤：</b>{@code shouldIgnoreInAutomation} 判的是 Create 的
      * {@code _manual_only} 约定（{@code create:cutting} 家族才有），原版切石配方没有这个概念，
      * 动力锯那一侧也没有对切石配方做这个过滤。</p>
      *
-     * <p><b>JEI 路径：</b>本批次（T7 批次 1）不建 JEI 类别；批次 3 会用它。</p>
+     * <p><b>L2 自动生效：</b>本方法把 L1 与 L3 一起放进同一个列表，而
+     * {@code getBaseRecipes} 的最后一步是 {@code HandMadeRecipeFilters.isDisabled(tool, id)}
+     * ——按 recipe id 过滤，与配方 type 无关，所以两个层都能被数据包 / KubeJS 单独禁用。</p>
+     *
+     * <p><b>JEI 路径：</b>本批次（T7 批次 2）不建 JEI 类别；批次 3 会用它。</p>
      */
     private static List<RecipeHolder<?>> collectHandSawStonecutting(Level level) {
         List<RecipeHolder<?>> result = new ArrayList<>();
@@ -386,11 +399,20 @@ public final class HandMadeRecipePool {
             return result;
         }
 
+        // L1：原版切石配方。
         for (RecipeHolder<?> holder : recipesOfType(level, RecipeType.STONECUTTING)) {
             if (holder.value() instanceof StonecutterRecipe) {
                 result.add(holder);
             }
         }
+
+        // L3：本模组自己的切石独占配方（独立 type，Create / 原版都看不到）。
+        for (RecipeHolder<?> holder : recipesOfType(level, HandMadeRecipeTypes.STONECUTTING_RECIPE.getType())) {
+            if (holder.value() instanceof HandMadeStonecuttingRecipe) {
+                result.add(holder);
+            }
+        }
+
         return result;
     }
 

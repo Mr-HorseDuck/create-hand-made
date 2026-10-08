@@ -33,8 +33,8 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SingleItemRecipe;
 import net.minecraft.world.item.crafting.SingleRecipeInput;
-import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -388,9 +388,9 @@ public class HandSawItem extends Item {
             results = exclusive.rollResults(level.random);
         } else if (recipe instanceof CuttingRecipe cr) {
             results = cr.rollResults(level.random);
-        } else if (recipe instanceof StonecutterRecipe sc) {
-            // ★ 切石段（T7 批次 1）：单产物。SingleItemRecipe#getResultItem 返回的是内部
-            //   result 实例（不 copy），所以这里必须自己 copy。
+        } else if (recipe instanceof SingleItemRecipe sc) {
+            // ★ 切石段：单产物。覆盖 L1（原版 StonecutterRecipe）与 L3（HandMadeStonecuttingRecipe）。
+            //   SingleItemRecipe#getResultItem 返回的是内部 result 实例（不 copy），所以这里必须自己 copy。
             results.add(sc.getResultItem(level.registryAccess()).copy());
         } else {
             results.add(recipe.getResultItem(level.registryAccess()).copy());
@@ -470,7 +470,10 @@ public class HandSawItem extends Item {
         if (result.isEmpty()) {
             for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(
                     HandMadeTool.HAND_SAW_STONECUTTING, level)) {
-                if (!(holder.value() instanceof StonecutterRecipe stonecutting)) continue;
+                // 用 SingleItemRecipe 而不是 StonecutterRecipe：切石段同时承载 L1（原版
+                // StonecutterRecipe）与 L3（本模组的 HandMadeStonecuttingRecipe，直接继承
+                // SingleItemRecipe 而非 StonecutterRecipe）。两者都是 SingleItemRecipe 的子类。
+                if (!(holder.value() instanceof SingleItemRecipe stonecutting)) continue;
                 // 原版切石是单输入：用 SingleRecipeInput（不是上面的 RecipeWrapper）。
                 if (!stonecutting.matches(new SingleRecipeInput(input.copyWithCount(1)), level)) continue;
                 result.add(holder);
