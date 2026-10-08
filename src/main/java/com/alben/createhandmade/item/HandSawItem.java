@@ -33,6 +33,8 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
+import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -380,16 +382,31 @@ public class HandSawItem extends Item {
 
         List<ItemStack> results = new ArrayList<>();
         // L3 独占配方（切削家族）与 Create 的 CuttingRecipe 一样支持多产物 / 概率产物，
-        // 所以必须走 rollResults；只有都不是时才退回"取第一个产物"的兜底分支。
+        // 所以必须走 rollResults；切石（原版 StonecutterRecipe）是单产物；
+        // 都不是时才退回"取第一个产物"的兜底分支。
         if (recipe instanceof HandMadeCuttingRecipe exclusive) {
             results = exclusive.rollResults(level.random);
         } else if (recipe instanceof CuttingRecipe cr) {
             results = cr.rollResults(level.random);
+        } else if (recipe instanceof StonecutterRecipe sc) {
+            // ★ 切石段（T7 批次 1）：单产物。SingleItemRecipe#getResultItem 返回的是内部
+            //   result 实例（不 copy），所以这里必须自己 copy。
+            results.add(sc.getResultItem(level.registryAccess()).copy());
         } else {
             results.add(recipe.getResultItem(level.registryAccess()).copy());
         }
 
+        // ★ 容器残留（对齐动力锯 SawBlockEntity.applyRecipe 里的
+        //   input.hasCraftingRemainingItem() / getCraftingRemainingItem() 分支）。
+        //   必须在 off.shrink(1) 之前取：getCraftingRemainingItem() 是 ItemStack 敏感版本，
+        //   而 shrink 会把数量为 1 的副手栈清空 —— 之后再取就依赖"空栈仍记得原物品"这种实现细节。
+        ItemStack craftingRemainder = off.getCraftingRemainingItem();
+
         off.shrink(1);
+
+        if (!craftingRemainder.isEmpty()) {
+            results.add(craftingRemainder);
+        }
 
         for (ItemStack result : results) {
             if (result.isEmpty()) continue;
@@ -442,6 +459,22 @@ public class HandSawItem extends Item {
             if (!(holder.value() instanceof CuttingRecipe cuttingRecipe)) continue;
             if (!cuttingRecipe.matches(wrapper, level)) continue;
             result.add(holder);
+        }
+
+        // ★ 三段式的第三段（T7 决策 1，方案 B1）：锯木段（序列组装 + 切削）**全部不命中**时，
+        //   才退到切石段。这保证「锯木优先」是硬保证 —— 只要有一条切削配方匹配，就永远不会
+        //   显示 / 执行切石配方（与 Create 动力锯「合并成一个候选集」的做法刻意不同，
+        //   后者会让候选顺序取决于配方管理器的全局顺序）。
+        //   门控（跟随 Create 的 allowStonecuttingOnSaw）在配方池里做，这里不重复判断 ——
+        //   这样游戏内工具与 JEI 共用同一个门。
+        if (result.isEmpty()) {
+            for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(
+                    HandMadeTool.HAND_SAW_STONECUTTING, level)) {
+                if (!(holder.value() instanceof StonecutterRecipe stonecutting)) continue;
+                // 原版切石是单输入：用 SingleRecipeInput（不是上面的 RecipeWrapper）。
+                if (!stonecutting.matches(new SingleRecipeInput(input.copyWithCount(1)), level)) continue;
+                result.add(holder);
+            }
         }
 
         return result;

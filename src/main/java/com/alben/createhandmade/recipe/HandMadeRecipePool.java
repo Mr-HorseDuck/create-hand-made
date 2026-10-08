@@ -17,6 +17,7 @@ import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
+import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -90,6 +91,7 @@ public final class HandMadeRecipePool {
                     case MORTAR -> collectMortar(level);
                     case CRUSHER_MORTAR -> collectCrusherMortar(level);
                     case HAND_SAW -> collectHandSaw(level);
+                    case HAND_SAW_STONECUTTING -> collectHandSawStonecutting(level);
                     case STIRRING_STAFF -> collectStirringStaff(level);
                     case STIRRING_STAFF_AUTO_SHAPELESS -> collectStirringStaffAutoShapeless(level);
                     case STIRRING_STAFF_AUTO_BREWING -> collectStirringStaffAutoBrewing(level);
@@ -345,6 +347,76 @@ public final class HandMadeRecipePool {
             }
         }
         return result;
+    }
+
+    /**
+     * 手锯 · 原版切石（STONECUTTING）—— T7 批次 1 的新增段。
+     *
+     * <p>游戏内路径：{@code HandSawItem.getCuttingRecipes} 的<b>第三段</b>。
+     * 手锯的三段式查询是「序列组装 → 切削 → 切石，各自早退」（T7 决策 1，方案 B1）：
+     * 前两段（含序列组装）全部不命中，才会走到这里。</p>
+     *
+     * <p><b>为什么读原版 {@code minecraft:stonecutting} 而不是 Create 的类型：</b>
+     * 动力锯（Create 的 {@code SawBlockEntity.getRecipes}）在
+     * {@code allowStonecuttingOnSaw} 打开时会把原版切石配方一并纳入候选集，
+     * 本段就是复刻它那一半行为；Create 自己没有 "cutting 版"的切石类型。</p>
+     *
+     * <p><b>门控：</b>直接跟随 Create 的 server config {@code recipes.allowStonecuttingOnSaw}
+     * （见 {@link #createAllowsStonecutting()}）。放在池里而不是工具里，是为了让
+     * <b>游戏内工具与 JEI 共用同一个门</b> —— 与 {@code allowShapelessInMixer}
+     * （{@link #collectStirringStaffAutoShapeless}）的处理方式一致。关掉配置时这里返回空列表，
+     * 手锯的行为与本次改造前逐字相同。</p>
+     *
+     * <p><b>只收 {@link StonecutterRecipe}：</b>与 {@code collectHandSaw} 只收
+     * {@code CuttingRecipe} 对称。切石类型下正常只会是原版这个类（datapack / 其它 mod 都经由
+     * {@code minecraft:stonecutting} 这个 serializer 构造它），这里做一次 instanceof 收窄既是
+     * 防御也是类型需要。</p>
+     *
+     * <p><b>不做 automation 过滤：</b>{@code shouldIgnoreInAutomation} 判的是 Create 的
+     * {@code _manual_only} 约定（{@code create:cutting} 家族才有），原版切石配方没有这个概念，
+     * 动力锯那一侧也没有对切石配方做这个过滤。</p>
+     *
+     * <p><b>JEI 路径：</b>本批次（T7 批次 1）不建 JEI 类别；批次 3 会用它。</p>
+     */
+    private static List<RecipeHolder<?>> collectHandSawStonecutting(Level level) {
+        List<RecipeHolder<?>> result = new ArrayList<>();
+
+        // 门控：直接跟随 Create 的 allowStonecuttingOnSaw。
+        if (!createAllowsStonecutting()) {
+            return result;
+        }
+
+        for (RecipeHolder<?> holder : recipesOfType(level, RecipeType.STONECUTTING)) {
+            if (holder.value() instanceof StonecutterRecipe) {
+                result.add(holder);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Create 的 {@code recipes.allowStonecuttingOnSaw} 当前是否为 true。
+     *
+     * <p><b>为什么要防御 null：</b>该值是 Create 的 <b>server config</b>，由 Create 在自身
+     * 构造期经 {@code AllConfigs.register(...)} 注册（{@code AllConfigs.java:60-71}）。
+     * 在 Create 注册之前，{@code AllConfigs.server()} 返回 {@code null}；而 catnip 的
+     * {@code ConfigBase.CValue.get()} 在未注册时直接抛
+     * {@code AssertionError("Config ... was accessed, but not registered before!")}
+     * （catnip {@code ConfigBase.java:124-127}）。</p>
+     *
+     * <p>所以这里显式判 null：读不到的场合（极早的调用时机）按「Create 未开启」处理 ——
+     * 即失败关闭（fail-closed），而不是让异常冒到调用方。正常运行时本方法总在玩家交互 /
+     * JEI 收配方时被调用，那时 Create 的 config 早已加载。</p>
+     *
+     * <p><b>为什么每次调用都读值：</b>NeoForge 的 {@code ConfigValue#get()} 读的是当前缓存值，
+     * config 重载后自动更新；而且 {@code ModConfigEvent} 只投递给 config 的所属 mod，
+     * 我们<b>无法</b>订阅 Create 的 config 事件。所以「每次读」既是唯一选择也是正确做法 ——
+     * 与 {@code allowShapedSquareInPress}（{@link #collectPressHammerAutoSquare}）、
+     * {@code allowShapelessInMixer}、{@code allowBrewingInMixer} 三处现有读法完全一致。</p>
+     */
+    private static boolean createAllowsStonecutting() {
+        var server = AllConfigs.server();   // Create config 未加载时为 null
+        return server != null && server.recipes.allowStonecuttingOnSaw.get();
     }
 
     // ==================================================================

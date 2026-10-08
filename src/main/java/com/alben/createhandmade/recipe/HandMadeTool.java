@@ -99,5 +99,30 @@ public enum HandMadeTool {
      * 灌注枪 · 注液（FILLING）。
      * 游戏内对应 {@code InfusionGunItem.findFillingRecipe}。
      */
-    INFUSION_GUN
+    INFUSION_GUN,
+
+    // ==================== 手锯 · 切石 ====================
+
+    /**
+     * 手锯 · 原版切石（STONECUTTING）。
+     *
+     * <p>游戏内对应 {@code HandSawItem.getCuttingRecipes} 的<b>第三段</b>（T7 决策 1，方案 B1）：
+     * 序列组装 → 切削全部不命中之后，才查这一段的 {@code minecraft:stonecutting} 配方。</p>
+     *
+     * <p><b>为什么必须追加到枚举末尾：</b>{@link HandMadeToolRecipeSerializer} 的 streamCodec
+     * 用 {@code buf.writeEnum/readEnum(HandMadeTool.class)} 同步归属工具，写的是
+     * <b>ordinal</b>。插在中间会让后面所有常量的序号漂移，导致新旧版本 mod 混连时同步错位。
+     * 所以本常量只能加在最后（`INFUSION_GUN` 之后）。</p>
+     *
+     * <p><b>与 {@link #HAND_SAW} 的关系：</b>这是同一个物品（手锯）的第二个「工具 + 配方类型」
+     * 组合，粒度与本枚举的设计一致（见类注释）。两者<b>分开</b>是为了让 L2 能独立控制族：
+     * 数据包 {@code tool_filter/hand_saw.json} 与 {@code tool_filter/hand_saw_stonecutting.json}
+     * 各管一段，互不牵连。</p>
+     *
+     * <p><b>注意：</b>本常量<b>刻意不进</b> {@code HandMadeToolRecipeSerializer.familyOf}
+     * 的分派表，也<b>刻意不进</b> {@code HandMadeRecipePool.supportsExclusiveRecipes} 白名单 ——
+     * 那两个都是 {@code create_hand_made:tool_recipe}（L3 独占）的机制，而切石目前只有 L1，
+     * 独占配方属于后续批次（走它自己的 type）。</p>
+     */
+    HAND_SAW_STONECUTTING
 }
