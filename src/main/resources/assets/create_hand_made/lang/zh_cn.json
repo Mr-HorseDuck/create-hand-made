@@ -89,5 +89,7 @@
   "jei.create_hand_made.bellows_smoking": "风箱烟熏",
   "jei.create_hand_made.bellows_haunting": "风箱缠魂",
   "jei.create_hand_made.bellows_splashing": "风箱洗涤",
+
+  "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树"
 }

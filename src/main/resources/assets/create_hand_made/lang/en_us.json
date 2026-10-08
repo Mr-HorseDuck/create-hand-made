@@ -88,5 +88,7 @@
   "jei.create_hand_made.bellows_smoking": "Bellows Smoking",
   "jei.create_hand_made.bellows_haunting": "Bellows Haunting",
   "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
+
+  "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling"
 }
