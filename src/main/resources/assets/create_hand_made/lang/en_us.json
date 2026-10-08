@@ -74,6 +74,7 @@
   "item.create_hand_made.hand_saw.tooltip.behaviour4": "Cycle the _cutting recipe_",
 
   "jei.create_hand_made.hand_saw": "Hand Saw Cutting",
+  "jei.create_hand_made.hand_saw_stonecutting": "Hand Saw Stonecutting",
   "jei.create_hand_made.hand_press_depot": "Press Hammer Stamping",
   "jei.create_hand_made.hand_press_basin": "Press Hammer Forming",
   "jei.create_hand_made.hand_infusion_gun": "Infusion Gun Filling",

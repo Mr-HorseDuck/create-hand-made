@@ -6,7 +6,7 @@
 
 > **数据来源**：所有字段都是读代码得到的（在括号里给了 `文件:行`），不是凭记忆。
 > **`可副手持加工` / `机械手持加工` 两列由作者在游戏内实测填写**，本表不做推断（含义见 表 1 下方）。
-> **术语**：L1 = Create 自己的配方；L2 = 本模组的数据包/KubeJS 过滤层（`HandMadeRecipeFilters`）；L3 = 手搓独占配方层 —— 分两种：`create_hand_made:tool_recipe`（8 个 id / 7 个工具）与 `create_hand_made:bellows_recipe`（风箱，独立 RecipeType）。
+> **术语**：L1 = Create 自己的配方；L2 = 本模组的数据包/KubeJS 过滤层（`HandMadeRecipeFilters`）；L3 = 手搓独占配方层 —— 分三种：`create_hand_made:tool_recipe`（8 个 id / 7 个工具）、`create_hand_made:bellows_recipe`（风箱，独立 RecipeType）与 `create_hand_made:stonecutting_recipe`（手锯切石，独立 RecipeType）。
 
 ---
 
@@ -37,7 +37,7 @@
 - **注 5 · 搅拌杖**：对**工作盆**整体执行 Create 的 `BasinRecipe.apply`（`StirringStaffItem.java:112`），因此热量校验、容器残留等语义与搅拌器一致。差异：**手动单次**（蓄力 60 tick）、成功扣 1 耐久；额外支持"自动无序合成"与"自动酿造"两个场景（受 Create 配置门控）。
 - **注 6 · 灌注枪**：同为 `create:filling`、同样支持 Create 的通用物品注液 `GenericItemFilling`（`InfusionGunItem.java:653`）。差异：手持 + 枪内流体（数据组件）而非方块 + 流体输入；**不做** `CAN_BE_AUTOMATED` 过滤（`:818` 明确注明"改造前就没有，不新增"）；另有 3 项与配方无关的能力：从容器 / 流体源抽流体（`:714`）、把 1000mB 放成流体源（`:526`）、把枪内流体存进容器。
 - **注 7 · 风箱**：4 种鼓风类型与鼓风机共用同一批配方与粒子 / 生物效果（`BellowsItem.java:307-345`、`BellowsAirParticle.java:148` 调 `type.morphAirFlow`）。差异：只处理**置物台 / 传送带**上的物品、**瞬发**（蓄力 10 tick、扣 1 耐久），鼓风机按 config `fanProcessingTime` 计时且能处理世界掉落物（`FanProcessing.java:60-63`）；风箱还需要**副手介质**来决定鼓风类型；额外会推动射线上的实体。**L2 对风箱无效**（见 表 4）。
-- **注 8 · 手锯**：配方同为 `create:cutting`、**概率 / 多产物保留**（`HandSawItem.java:361-364`）、`shouldIgnoreInAutomation` 过滤一致（`:409`）、序列组装优先（`:389-393`）。差异：手持 + 副手放原料、右键蓄力触发、消耗副手 1 个并扣 1 耐久；额外有**斧头能力**（去皮 / 刮蜡 / 除锈，`:453-469`）与**整树砍伐**（配置开关 `enableTreeFelling`，`:151,432`），这两项动力锯都没有。
+- **注 8 · 手锯**：配方同为 `create:cutting`、**概率 / 多产物保留**（`HandSawItem.java:387-397`）、`shouldIgnoreInAutomation` 过滤一致（`:449`）、序列组装优先（`:429-433`）。差异：手持 + 副手放原料、右键蓄力触发、消耗副手 1 个并扣 1 耐久；额外有**斧头能力**（去皮 / 刮蜡 / 除锈，`:554-599`）与**整树砍伐**（配置开关 `enableTreeFelling`，`:154,491`），这两项动力锯都没有。此外手锯还支持**切石**：`minecraft:stonecutting`（外加本模组的 L3 `create_hand_made:stonecutting_recipe`）——**锯木优先**，只有锯木段（序列组装 + `create:cutting`）全部不命中时才查切石；整个切石段跟随 Create 的 server config `allowStonecuttingOnSaw`（关掉即不切石）。
 
 > 耐久数值出处：`ModItems.java`（冲压锤 `:22`、研钵 `:49`、碾钵 `:55`、指杆 `:61`、搅拌杖 `:101`、风箱 `:133`、灌注枪 `:139`、手锯 `:144`）。
 > 工具中英文名出处：`assets/create_hand_made/lang/zh_cn.json` 与 `en_us.json`（键名 `item.create_hand_made.<id>`）。
@@ -69,7 +69,9 @@
 | 风箱 | 同上 | `create:smoking`（底层 `minecraft:smoking`，`:337-342`） | ❌ | ✅ `bellows_recipe`（`fan_type: smoking`） | 同上 |
 | 风箱 | 同上 | `create:haunting`（`AllRecipeTypes.HAUNTING`，`:221-224`） | ❌ | ✅ `bellows_recipe`（`fan_type: haunting`） | 同上 |
 | 风箱 | 同上 | `create:splashing`（`AllRecipeTypes.SPLASHING`，`:401-404`） | ❌ | ✅ `bellows_recipe`（`fan_type: splashing`） | 同上 |
-| 手锯 | 手持（副手放原料） | `create:cutting` | ✅ | ✅ cutting 家族（`HandMadeCuttingRecipe`） | 叠加 `shouldIgnoreInAutomation` 过滤（`:409`）；序列组装优先且不在池里 |
+| 手锯 | 手持（副手放原料） | `create:cutting` | ✅ | ✅ cutting 家族（`HandMadeCuttingRecipe`） | 叠加 `shouldIgnoreInAutomation` 过滤（`:449`）；序列组装优先且不在池里 |
+| 手锯 | 副手放原料 · 切石 | `minecraft:stonecutting` | ✅ | ✅ `stonecutting_recipe` | 门控：跟随 Create 的 `allowStonecuttingOnSaw`；**只在锯木无匹配时才查**（锯木优先） |
+| 手锯 | 副手放原料 · 切石 | `create_hand_made:stonecutting_recipe`（L3） | ✅ | ✅ | L1 之后追加；L1 优先 |
 
 **风箱的两条注**
 
@@ -87,6 +89,7 @@
 | `minecraft:blasting` | 原版**高炉**；Create **鼓风机**的"鼓风熔炼"（`create:blasting` 会读 `minecraft:blasting`，且**优先**读 `minecraft:smelting`） |
 | `minecraft:smelting` | 原版**熔炉**；Create **鼓风机**的"鼓风熔炼"（优先读取的就是它） |
 | `minecraft:smoking` | 原版**烟熏炉**；Create **鼓风机**的"鼓风烟熏" |
+| `minecraft:stonecutting` | 原版**切石机**；Create **动力锯**（只有 `allowStonecuttingOnSaw` 打开时才会读它，`SawBlockEntity.java:395-396`） |
 | `minecraft:crafting` | 原版**工作台**；Create **动力合成器**（`RecipeGridHandler.java:149`）、**动力冲压机**的自动摆放（`MechanicalPressBlockEntity.java:190`）、**动力搅拌器**的自动无序（`MechanicalMixerBlockEntity.java:264`）—— 以及本模组**冲压锤的自动摆放**与**搅拌杖的自动无序**（这两个场景运行时实时读 crafting） |
 
 **L2 的过滤只对工具侧生效，不影响原版机器与 Create 机器。**
@@ -108,6 +111,8 @@
 
 为什么不同：`tool_recipe` 复用配方池的"收集 + 追加"流程（顺序由池决定，且 L2 要能过滤整份列表）；`bellows_recipe` 不在池里，是 `BellowsItem` 自己写的两段式查询（L3 → L1 回落，`BellowsItem.java:474-500`）。
 
+> `create_hand_made:stonecutting_recipe`（手锯切石）走的是**和 `tool_recipe` 相同的那一列**：候选集同样由配方池给出（L1 原版切石在前、L3 在后），L1 优先 —— 想让它的 L3 生效也要先用 L2 让开 L1。详见 RECIPE_API.md 的「手锯切石独占配方」。
+
 ## 表 5 · 三个容易踩的点
 
 1. **风箱完全不受 L2 管辖（设计决定，不是临时状态）。** 证据与影响见 表 2 的「风箱的两条注」。想禁用风箱的鼓风配方只有两条路：① 从 RecipeManager 层面移除那条 L1 配方（会**连带 Create 鼓风机**）；② 用 `bellows_recipe` 独立控制自己的独占配方。
@@ -119,6 +124,6 @@
 
 ## 附：本表的统计口径
 
-- 工具物品：**8 个**（`HandMadeTool` 枚举有 **11** 个常量：冲压锤 3 + 研钵/碾钵 2 + 手锯 1 + 搅拌杖 3 + 指杆 1 + 灌注枪 1，因为部分工具有多个"配方场景"）。
-- L3 支持面：`tool_recipe` 覆盖 **8 个 id / 7 个工具**（`press_hammer_basin` 与 `press_hammer_depot` 是**同一个物品**冲压锤的两个使用场景；家族分派见 `HandMadeToolRecipeSerializer.java:108-118`）；此外**风箱**走独立的 `create_hand_made:bellows_recipe`（第 8 个工具，运行时已接通）。
+- 工具物品：**8 个**（`HandMadeTool` 枚举有 **12** 个常量：冲压锤 3 + 研钵/碾钵 2 + 手锯 2 + 搅拌杖 3 + 指杆 1 + 灌注枪 1，因为部分工具有多个"配方场景"）。
+- L3 支持面：`tool_recipe` 覆盖 **8 个 id / 7 个工具**（`press_hammer_basin` 与 `press_hammer_depot` 是**同一个物品**冲压锤的两个使用场景；家族分派见 `HandMadeToolRecipeSerializer.java:108-118`）；此外**风箱**走独立的 `create_hand_made:bellows_recipe`（第 8 个工具，运行时已接通），**手锯切石**走独立的 `create_hand_made:stonecutting_recipe`。
 - 本表只描述"配方读取"；工具的战斗 / 工具属性（攻击力、挖掘速度、交互距离）见 `ModItems.java`，不在本表范围。

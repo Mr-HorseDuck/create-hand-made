@@ -10,6 +10,7 @@ import com.alben.createhandmade.compat.jei.category.HandInfusionGunCategory;
 import com.alben.createhandmade.compat.jei.category.HandPressBasinCategory;
 import com.alben.createhandmade.compat.jei.category.HandPressDepotCategory;
 import com.alben.createhandmade.compat.jei.category.HandSawCategory;
+import com.alben.createhandmade.compat.jei.category.HandSawStonecuttingCategory;
 import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
@@ -31,6 +32,8 @@ import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.compat.jei.CreateJEI;
 import com.simibubi.create.compat.jei.DoubleItemIcon;
 import com.simibubi.create.compat.jei.EmptyBackground;
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory;
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.compat.jei.category.SpoutCategory;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
@@ -95,6 +98,22 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.HAND_SAW.get()))
         );
         allCategories.add(new HandSawCategory(handSawInfo));
+
+        // ==================== 手锯切石 ====================
+        // 背景必须 177×70（不是手锯切削用的 177×55）：本类别复用了 Create 的
+        // BlockCuttingCategory 布局，产物网格纵向跨 y 10..66，55 高会画到背景外。
+        CreateRecipeCategory.Info<CondensedBlockCuttingRecipe> handSawStonecuttingInfo =
+                new CreateRecipeCategory.Info<>(
+                        ModJeiTypes.HAND_SAW_STONECUTTING,
+                        Component.translatable("jei.create_hand_made.hand_saw_stonecutting"),
+                        new EmptyBackground(177, 70),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.HAND_SAW.get()),
+                                () -> new ItemStack(Items.STONE_BRICK_STAIRS)),
+                        CreateHandMadeJEI::collectHandSawStonecuttingRecipes,
+                        List.of(() -> new ItemStack(ModItems.HAND_SAW.get()))
+                );
+        allCategories.add(new HandSawStonecuttingCategory(handSawStonecuttingInfo));
 
         // ==================== 冲压锤 · 置物台 ====================
         CreateRecipeCategory.Info<PressingRecipe> handPressDepotInfo = new CreateRecipeCategory.Info<>(
@@ -376,6 +395,31 @@ public class CreateHandMadeJEI implements IModPlugin {
     /** 手锯 · 切削（CUTTING）。 */
     private static List<RecipeHolder<CuttingRecipe>> collectHandSawRecipes() {
         return collectFromPoolWithProxy(HandMadeTool.HAND_SAW, CuttingRecipe.class, CuttingRecipe::new);
+    }
+
+    /**
+     * 手锯 · 切石（原版 {@code minecraft:stonecutting} + L3 {@code create_hand_made:stonecutting_recipe}）。
+     *
+     * <p><b>为什么走 {@link BlockCuttingCategory#condenseRecipes}：</b>切石是"一个输入 → 多条产物"
+     * 的形态（原版单输入最多 16 条），逐条平铺会让 JEI 里出现几十行同输入的配方。Create 的
+     * 块切类别为此提供了公开的折叠助手：它接收 {@code List<RecipeHolder<?>>}（内部只用
+     * {@code getIngredients()} / {@code getResultItem(...)} 这两个通用 {@code Recipe} API，
+     * 不检查配方类），把同输入的配方折成一条 {@code CondensedBlockCuttingRecipe}。</p>
+     *
+     * <p><b>为什么不需要显示代理：</b>本模组的 L3 配方 {@code HandMadeStonecuttingRecipe} 继承
+     * 原版 {@code SingleItemRecipe}（不是 {@code StonecutterRecipe}），但折叠助手对它一视同仁 ——
+     * 前面说的两个通用 API 它都有实现。所以直接把配方池的候选集喂进去即可。</p>
+     *
+     * <p><b>候选集为什么取自配方池：</b>池里 L1（原版切石）在前、L3（本模组独占）在后，
+     * 且池自带两道闸：第一步是 Create 配置 {@code allowStonecuttingOnSaw} 的门，最后一步是 L2
+     * 过滤。所以本类别的显示内容与游戏内手锯的候选集完全一致（关配置 → 返回空列表 → JEI 不
+     * 显示该类别；被 L2 禁用的配方 → 也不显示）。</p>
+     */
+    private static List<RecipeHolder<CondensedBlockCuttingRecipe>> collectHandSawStonecuttingRecipes() {
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return List.of();
+        return BlockCuttingCategory.condenseRecipes(
+                HandMadeRecipePool.getBaseRecipes(HandMadeTool.HAND_SAW_STONECUTTING, level));
     }
 
     /** 冲压锤 · 置物台（PRESSING）。 */

@@ -45,6 +45,7 @@ JEI 的分类显示的是同一份候选集，所以上面三层的结果在 JEI
 | `mortar` | 研钵                        | `create:milling` |
 | `crusher_mortar` | 碾钵                        | `create:crushing`，匹配不到再兜底 `create:milling` |
 | `hand_saw` | 手锯                        | `create:cutting` |
+| `hand_saw_stonecutting` | 手锯 · 切石      | `minecraft:stonecutting`（L1）+ `create_hand_made:stonecutting_recipe`（L3） |
 | `stirring_staff` | 搅拌杖 · 工作盆             | `create:mixing` |
 | `stirring_staff_auto_shapeless` | 搅拌杖 · 自动无序合成       | `minecraft:crafting`（无序、多原料、非 shaped、不可压缩） |
 | `stirring_staff_auto_brewing` | 搅拌杖 · 自动酿造           | 运行时由 `PotionMixingRecipes` 生成，不是数据包配方 |
@@ -91,6 +92,10 @@ JEI 的分类显示的是同一份候选集，所以上面三层的结果在 JEI
 
 含义：研钵不再读取「木炭」「青金石」两条研磨配方，并且不再读取 `thermal` 命名空间下的任何研磨配方。
 
+> 手锯的**切石段**（`hand_saw_stonecutting`）同样受 L2 管辖：它的候选集也来自配方池，所以
+> `disabled` 里既可以写原版切石配方的 id，也可以写 `create_hand_made:stonecutting_recipe` 的 id。
+> 示例见「手锯切石独占配方」一节。
+
 解析失败的行为：文件名不是合法 `tool_id` → 记一条 warning 并跳过该文件；JSON 不是对象、字段类型不对、recipe id 写错 → 记 warning 并跳过对应条目。整个数据包重载不会因此失败。
 
 ### KubeJS 方式
@@ -133,13 +138,15 @@ Create 的机器查询的是 `create:compacting` / `create:mixing` 等自己的�
 
 | | recipe id（= 工具 id） |
 | --- | --- |
-| ✅ 支持 | `press_hammer_basin`、`press_hammer_depot`、`stirring_staff`、`mortar`、`crusher_mortar`、`hand_saw`、`infusion_gun`、`pointer` —— 共 **8 个 id / 7 个工具**（`press_hammer_basin` 与 `press_hammer_depot` 属同一个物品：冲压锤） |
+| ✅ 支持（`tool_recipe`） | `press_hammer_basin`、`press_hammer_depot`、`stirring_staff`、`mortar`、`crusher_mortar`、`hand_saw`、`infusion_gun`、`pointer` —— 共 **8 个 id / 7 个工具**（`press_hammer_basin` 与 `press_hammer_depot` 属同一个物品：冲压锤） |
+| ✅ 支持（另一种 L3） | `hand_saw_stonecutting` —— 它**不用** `tool_recipe`，走自己的 `create_hand_made:stonecutting_recipe`（见「手锯切石独占配方」一节）。所以它不在下面那张 8 个 id 的家族分派表里 |
 | ❌ 不涉及 | 风箱（它有自己的 `create_hand_made:bellows_recipe`，见下一节）；`press_hammer_auto_square`、`stirring_staff_auto_shapeless`（这两类源自 `minecraft:crafting`）；`stirring_staff_auto_brewing`（运行时生成） |
 
 原因：
 
 - **支持的那 8 个 id（7 个工具）**各有一个继承 Create 对应配方类的 L3 配方类，并用接受自定义 `IRecipeTypeInfo` 的构造把自己挂到 `create_hand_made:tool_recipe` 上：`HandMadeToolRecipe extends BasinRecipe`、`HandMadeCrushingRecipe extends AbstractCrushingRecipe`、`HandMadePressingRecipe` / `HandMadeCuttingRecipe` / `HandMadeFillingRecipe` / `HandMadeApplicationRecipe extends StandardProcessingRecipe`。Create 的 `BasinRecipe` 只把该构造留成 `protected`（子类可用），其余家族在 `StandardProcessingRecipe` / `AbstractCrushingRecipe` 上是 `public`；配方类型由本模组自己的 `IRecipeTypeInfo` 提供，所以 `getType()` 返回的是 `create_hand_made:tool_recipe`。
 - **风箱不涉及 `tool_recipe`**：它没有 `tool_id`，独占配方走自己的 `create_hand_made:bellows_recipe`（`fan_type` 字段 + 副手介质匹配，见下一节）。
+- **手锯切石不涉及 `tool_recipe`**：它的配方类继承的是原版 `SingleItemRecipe`，而 `tool_recipe` 的 serializer 整体建立在 Create 的 `StandardProcessingRecipe` 上（codec 的返回类型就是它），两者无法共用一条解析路径 —— 所以照 `bellows_recipe` 的先例另立 `create_hand_made:stonecutting_recipe`。
 - **3 个 auto 类别不涉及**：`press_hammer_auto_square` 与 `stirring_staff_auto_shapeless` 是从 `minecraft:crafting` 派生的展示类别（原料来自普通工作台配方），`stirring_staff_auto_brewing` 由代码在运行时生成 —— 三者都不是数据包里的处理配方，所以没有"独占配方"可言。
 
 ### 数据包方式
@@ -423,6 +430,88 @@ ServerEvents.recipes(event => {
 
 ---
 
+## 手锯切石独占配方（`create_hand_made:stonecutting_recipe`）
+
+手锯的**切石段**（`HandMadeTool.HAND_SAW_STONECUTTING`）有自己独立的 L3 类型：
+
+```
+create_hand_made:stonecutting_recipe
+```
+
+原版切石机查的是 `minecraft:stonecutting`、Create 机械锯查的是 `create:cutting`（`allowStonecuttingOnSaw` 打开时外加 `minecraft:stonecutting`），两者都**永远看不到**这个类型下的配方 —— 只有手锯的切石段会读到它们。
+
+### 覆盖范围
+
+| | 说明 |
+| --- | --- |
+| ✅ 支持 | `hand_saw_stonecutting`（唯一使用者）。整个 type 就是手锯切石专用，所以**没有 `tool` 字段** |
+| ❌ 不涉及 | 其它手搓工具；风箱（它有 `bellows_recipe`） |
+
+### 字段
+
+JSON 形状与**原版切石配方完全一致** —— 本模组直接复用了原版的 `SingleItemRecipe.Serializer`（没有自写序列化逻辑）：
+
+| 字段 | 必填 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| `ingredient` | ✅ | 原料 | **单数**（原版切石是单输入），写 `{ "item": ... }` / `{ "tag": ... }` |
+| `result` | ✅ | 物品栈 | `{ "id": ..., "count": ... }`，`count` 缺省 1 |
+| `group` | ❌ | 字符串 | 与 `minecraft:stonecutting` 同名的可选分组字段，缺省 `""`（手锯不读它） |
+
+**没有** `tool` 字段（归属由 type 隐含），**没有** `processing_time` / `heat_requirement`（原版切石没有这些概念）。
+
+### 数据包方式
+
+- 目录：`data/<你的命名空间>/recipe/<任意文件名>.json`（与普通配方同目录）
+- 示例，`data/mypack/recipe/handmade_dirt_to_diamond.json`：
+
+```json
+{
+  "type": "create_hand_made:stonecutting_recipe",
+  "ingredient": { "item": "minecraft:dirt" },
+  "result": { "id": "minecraft:diamond", "count": 1 }
+}
+```
+
+### KubeJS 方式
+
+模组自带 schema（`data/create_hand_made/kubejs/recipe_schema/stonecutting_recipe.json`），写在 **server script** 里：
+
+```js
+ServerEvents.recipes(event => {
+    // 位置参数：(result, ingredient)
+    event.recipes.create_hand_made.stonecutting_recipe(
+        '2x minecraft:emerald',
+        'minecraft:gravel'
+    )
+
+    // 可选第三个参数：group
+    event.recipes.create_hand_made.stonecutting_recipe(
+        '1x minecraft:gold_ingot',
+        'minecraft:dirt',
+        'mypack'
+    ).id('mypack:dirt_to_gold')   // .id() 可选；不写就按 result 自动生成
+})
+```
+
+- `ingredient` 写**纯 id** 或 tag（如 `'#minecraft:stone_bricks'`），**不能**写 `'2x ...'` 计数简写（单输入）。
+- `result` 可以写 `'Nx item'` 计数简写。
+
+### 与 L1 / L2 的关系
+
+| | 说明 |
+| --- | --- |
+| **L1 优先** | 候选集顺序是「原版切石（L1）在前、本 type（L3）在后」，手锯取第一条匹配 —— 与 `tool_recipe` 一致。同一输入已经有原版切石配方时，想让 L3 生效必须先**用 L2 把那几条 L1 让开**；反过来，原版切石里没有的输入（例如 `minecraft:dirt`、`minecraft:gravel`）L3 直接生效 |
+| **L2 可过滤** | 候选集同样出自配方池，所以在 `tool_filter/hand_saw_stonecutting.json` 的 `disabled` 里写 L3 的 recipe id 即可单独禁用它（不影响原版切石机与 Create 机械锯） |
+| **Create 配置门控** | 整个切石段（L1 + L3）都跟随 Create 的 server config `recipes.allowStonecuttingOnSaw`：关掉它，手锯不再切石，本 type 的 L3 配方也不会被读取 |
+
+### JEI 里怎么看
+
+自成一个类别「手锯切石」（UID `create_hand_made:hand_saw_stonecutting`），**L1 与 L3 混在一起**，
+按输入折叠显示（同输入的配方折成一条，产物铺进最多 15 个槽）。`allowStonecuttingOnSaw` 关掉时池返回空列表，
+该类别随之不显示。
+
+---
+
 ## 工具 ID 清单
 
 `tool_id` 就是 `HandMadeTool` 枚举常量名的小写下划线形式（`PRESS_HAMMER_BASIN` → `press_hammer_basin`）。用于 L2 的文件名/参数，以及 L3 的 `tool` 字段。
@@ -435,14 +524,16 @@ ServerEvents.recipes(event => {
 | `mortar` | 研钵 · 研磨 | ✅ |
 | `crusher_mortar` | 碾钵 · 粉碎 + 研磨 | ✅ |
 | `hand_saw` | 手锯 · 切削 | ✅ |
+| `hand_saw_stonecutting` | 手锯 · 切石 | ✅（走 `stonecutting_recipe`，不是 `tool_recipe`） |
 | `stirring_staff` | 搅拌杖 · 混合 | ✅ |
 | `stirring_staff_auto_shapeless` | 搅拌杖 · 自动无序合成 | ❌ |
 | `stirring_staff_auto_brewing` | 搅拌杖 · 自动酿造 | ❌ |
 | `pointer` | 指杆 · 应用 | ✅ |
 | `infusion_gun` | 灌注枪 · 注液 | ✅ |
 
-> 上表共 11 个 tool_id，其中 **8 个支持 `tool_recipe` 独占配方（对应 7 个工具物品）**：
+> 上表共 12 个 tool_id，其中 **8 个支持 `tool_recipe` 独占配方（对应 7 个工具物品）**：
 > `press_hammer_basin` 与 `press_hammer_depot` 是同一个物品"冲压锤"的两个场景。
+> 另有 **`hand_saw_stonecutting` 支持 `create_hand_made:stonecutting_recipe`**（另一种 L3，见「手锯切石独占配方」）。
 > 风箱（鼓风熔炼 / 烟熏 / 缠魂 / 洗涤）**不在本表内** —— 它没有 tool_id，独占配方走 `create_hand_made:bellows_recipe`（`fan_type` 字段），
 > L2 的 `tool_filter/<tool_id>.json` 也对它无效。
 

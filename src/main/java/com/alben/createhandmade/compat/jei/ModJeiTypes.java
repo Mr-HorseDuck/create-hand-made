@@ -1,5 +1,6 @@
 package com.alben.createhandmade.compat.jei;
 
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
@@ -20,6 +21,22 @@ public class ModJeiTypes {
     public static final RecipeType<RecipeHolder<CuttingRecipe>> HAND_SAW_CUTTING =
             RecipeType.createRecipeHolderType(
                     ResourceLocation.fromNamespaceAndPath("create_hand_made", "hand_saw_cutting"));
+
+    /**
+     * 手锯 · 切石（原版 {@code minecraft:stonecutting} + 本模组的 L3
+     * {@code create_hand_made:stonecutting_recipe}）。
+     *
+     * <p><b>泛型为什么绑 {@link CondensedBlockCuttingRecipe}：</b>本类别复用的是 Create 的
+     * {@code BlockCuttingCategory}（{@code CreateRecipeCategory<CondensedBlockCuttingRecipe>}），
+     * 而 {@code CreateRecipeCategory.Info<T>} 要求
+     * {@code RecipeType<RecipeHolder<T>>} 与收集器的 {@code Supplier<List<RecipeHolder<T>>>}
+     * 泛型一致。所以这里绑的是<b>显示类型</b>（Create 的折叠配方类），不是本模组自己的
+     * {@code HandMadeStonecuttingRecipe} —— 后者由收集器在运行时经
+     * {@code BlockCuttingCategory.condenseRecipes(...)} 折进前者。</p>
+     */
+    public static final RecipeType<RecipeHolder<CondensedBlockCuttingRecipe>> HAND_SAW_STONECUTTING =
+            RecipeType.createRecipeHolderType(
+                    ResourceLocation.fromNamespaceAndPath("create_hand_made", "hand_saw_stonecutting"));
 
     /** 冲压锤 · 置物台 / 传送带 */
     public static final RecipeType<RecipeHolder<PressingRecipe>> HAND_PRESS_DEPOT =
