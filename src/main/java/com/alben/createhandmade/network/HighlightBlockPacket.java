@@ -4,18 +4,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 
 /**
- * ★ 兼容两种用法：
- *   - new HighlightBlockPacket(pos)              // 原始版本，默认金色
- *   - new HighlightBlockPacket(pos, color)       // 标记系统，三色
+ * 方块高亮包。
+ * ★ 颜色语义由 tlmCompat 的 PointerColors 管理，main 侧只保留默认色。
  */
 public class HighlightBlockPacket {
 
     /** 默认高亮色（原始版本用的金色） */
     public static final int COLOR_DEFAULT = 0xFFD966;
-
-    public static final int COLOR_WORK   = 0xFFFF00;
-    public static final int COLOR_INPUT  = 0x00FF00;
-    public static final int COLOR_OUTPUT = 0x0080FF;
 
     private final BlockPos pos;
     private final int color;
