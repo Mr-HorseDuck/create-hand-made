@@ -1,5 +1,6 @@
 package com.alben.createhandmade.compat.tlm.behavior;
 
+import com.alben.createhandmade.compat.tlm.MaidConfig;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
 import com.alben.createhandmade.item.PressHammerItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -26,11 +27,10 @@ import javax.annotation.Nullable;
  *   置物台有原料 → 冲压
  *   置物台有产物 → 移入输出容器
  *
- * 每 20 tick 触发一次，单次最多处理 1 个。
+ * 单次最多处理 1 个，冷却由 MaidConfig.maidPressHammerCooldown 控制。
  */
 public class MaidUsePointerBehavior implements BehaviorControl<EntityMaid> {
 
-    private static final int CHECK_INTERVAL = 20;
     private static final int MAX_OPERATIONS_PER_ROUND = 1;
 
     private Behavior.Status status = Behavior.Status.STOPPED;
@@ -53,7 +53,8 @@ public class MaidUsePointerBehavior implements BehaviorControl<EntityMaid> {
             status = Behavior.Status.STOPPED;
             return false;
         }
-        cooldown = CHECK_INTERVAL;
+        // ★ 从配置读冷却，而不是硬编码
+        cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
 
         // ★ 强转 LivingEntity，避免 TLM 版本间方法签名变化导致 NoSuchMethodError
         ItemStack tool = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
@@ -68,6 +69,12 @@ public class MaidUsePointerBehavior implements BehaviorControl<EntityMaid> {
         BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
 
         if (workPos == null || inputPos == null || outputPos == null) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
+        // ★ 交互距离校验
+        if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
