@@ -39,21 +39,21 @@ public class PointerMarker {
 
         if (isWorkBlock) {
             PointerDataHelper.setWork(player, level, pos);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_WORK);
+            sendHighlight(level, pos, PointerColors.WORK);
         } else {
             BlockPos inputPos = PointerDataHelper.getInput(player, level);
             BlockPos outputPos = PointerDataHelper.getOutput(player, level);
 
             if (inputPos == null) {
                 PointerDataHelper.setInput(player, level, pos);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
+                sendHighlight(level, pos, PointerColors.INPUT);
             } else if (outputPos == null) {
                 PointerDataHelper.setOutput(player, level, pos);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_OUTPUT);
+                sendHighlight(level, pos, PointerColors.OUTPUT);
             } else {
                 PointerDataHelper.setInput(player, level, pos);
                 PointerDataHelper.setOutput(player, level, null);
-                sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
+                sendHighlight(level, pos, PointerColors.INPUT);
             }
         }
 

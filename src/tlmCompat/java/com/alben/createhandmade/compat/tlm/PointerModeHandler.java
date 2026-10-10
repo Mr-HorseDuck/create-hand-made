@@ -150,7 +150,7 @@ public class PointerModeHandler {
         }
     }
 
-    // ================= MODE_MARK 的标记逻辑（原逻辑不变） =================
+    // ================= MODE_MARK 的标记逻辑 =================
 
     private static void handleMarkMode(Minecraft mc, BlockPos pos) {
         BlockEntity be = mc.level.getBlockEntity(pos);
@@ -166,18 +166,18 @@ public class PointerModeHandler {
         int color;
         if (isWorkBlock) {
             clientWork = pos;
-            color = HighlightBlockPacket.COLOR_WORK;
+            color = PointerColors.WORK;
         } else {
             if (clientInput == null) {
                 clientInput = pos;
-                color = HighlightBlockPacket.COLOR_INPUT;
+                color = PointerColors.INPUT;
             } else if (clientOutput == null) {
                 clientOutput = pos;
-                color = HighlightBlockPacket.COLOR_OUTPUT;
+                color = PointerColors.OUTPUT;
             } else {
                 clientInput = pos;
                 clientOutput = null;
-                color = HighlightBlockPacket.COLOR_INPUT;
+                color = PointerColors.INPUT;
             }
         }
 
@@ -188,7 +188,7 @@ public class PointerModeHandler {
         MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
     }
 
-    // ================= MODE_LIQUID 的标记逻辑（新增） =================
+    // ================= MODE_LIQUID 的标记逻辑 =================
 
     /**
      * 液体模式标记三个坐标：
@@ -209,24 +209,24 @@ public class PointerModeHandler {
             // 第 1 个：输入，必须是 Basin
             if (!isBasin) return;
             clientLiquidInput = pos;
-            color = HighlightBlockPacket.COLOR_INPUT;
+            color = PointerColors.INPUT;
         } else if (clientLiquidOutput == null) {
             // 第 2 个：输出，Basin 或 Depot 都可以
             if (!isBasin && !isDepot) return;
             clientLiquidOutput = pos;
-            color = HighlightBlockPacket.COLOR_OUTPUT;
+            color = PointerColors.OUTPUT;
         } else if (clientLiquidOverflow == null) {
             // 第 3 个：过剩输出，必须是 Basin
             if (!isBasin) return;
             clientLiquidOverflow = pos;
-            color = HighlightBlockPacket.COLOR_OUTPUT;
+            color = PointerColors.OVERFLOW;
         } else {
             // 三个都标完了，再右键重置为输入
             if (!isBasin) return;
             clientLiquidInput = pos;
             clientLiquidOutput = null;
             clientLiquidOverflow = null;
-            color = HighlightBlockPacket.COLOR_INPUT;
+            color = PointerColors.INPUT;
         }
 
         PointerHighlightClient.setHighlight(color, pos);
