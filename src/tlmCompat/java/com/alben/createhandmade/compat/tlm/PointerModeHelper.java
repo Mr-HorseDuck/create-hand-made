@@ -10,6 +10,11 @@ public final class PointerModeHelper {
 
     public static final int MODE_DEFAULT = 0;
     public static final int MODE_MARK = 1;
+    /** ★ 新增：液体搬运模式 */
+    public static final int MODE_LIQUID = 2;
+
+    /** 模式总数，用于循环 */
+    private static final int MODE_COUNT = 3;
 
     private static final String NBT_MODE = "HandMadePointerMode";
 
@@ -26,6 +31,11 @@ public final class PointerModeHelper {
     }
 
     public static void cycleMode(ItemStack stack) {
-        setMode(stack, (getMode(stack) + 1) % 2);
+        setMode(stack, (getMode(stack) + 1) % MODE_COUNT);
+    }
+
+    /** ★ 是否为液体模式 */
+    public static boolean isLiquidMode(ItemStack stack) {
+        return getMode(stack) == MODE_LIQUID;
     }
 }

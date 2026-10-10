@@ -3,9 +3,11 @@ package com.alben.createhandmade.compat.tlm;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseCrusherMortarBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseHandSawBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseInfusionGunBehavior;
+import com.alben.createhandmade.compat.tlm.behavior.MaidUseLiquidTransferBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseMortarBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUsePointerBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUsePressHammerBehavior;
+import com.alben.createhandmade.compat.tlm.behavior.MaidUseStirringStaffBehavior;
 import com.alben.createhandmade.item.ModItems;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -40,10 +42,15 @@ public class TaskHandMade implements IMaidTask {
         return Lists.newArrayList(
                 Pair.of(4, new MaidUsePointerBehavior()),
                 Pair.of(5, new MaidUsePressHammerBehavior()),
-                Pair.of(6, new MaidUseInfusionGunBehavior()),
-                Pair.of(7, new MaidUseHandSawBehavior()),
-                Pair.of(8, new MaidUseMortarBehavior()),
-                Pair.of(9, new MaidUseCrusherMortarBehavior())
+                // ★ 液体模式必须优先于 MaidUseInfusionGunBehavior，
+                //   两者都以灌注枪为主手，靠优先级区分：
+                //   有液体标记时先走 LiquidTransfer，无标记时落到 InfusionGun。
+                Pair.of(6, new MaidUseLiquidTransferBehavior()),
+                Pair.of(7, new MaidUseInfusionGunBehavior()),
+                Pair.of(8, new MaidUseStirringStaffBehavior()),
+                Pair.of(9, new MaidUseHandSawBehavior()),
+                Pair.of(10, new MaidUseMortarBehavior()),
+                Pair.of(11, new MaidUseCrusherMortarBehavior())
         );
     }
 

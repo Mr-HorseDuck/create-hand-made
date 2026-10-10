@@ -40,17 +40,27 @@ public class HandMadeMaidExtension implements ILittleMaid {
         CreateHandMade.LOGGER.info("[HandMade] Maid compatibility initialized");
     }
 
-    private static boolean isBlockedByMod() {
+        private static boolean isBlockedByMod() {
         try {
-            for (String modId : MaidConfig.INSTANCE.blockedMods.get()) {
-                if (ModList.get().isLoaded(modId)) {
+            var list = MaidConfig.INSTANCE.blockedMods.get();
+            CreateHandMade.LOGGER.info(
+                    "[HandMade-Debug] blockedMods content = {} (size={})",
+                    list, list.size());
+
+            for (String modId : list) {
+                boolean loaded = ModList.get().isLoaded(modId);
+                CreateHandMade.LOGGER.info(
+                        "[HandMade-Debug] checking mod '{}': loaded={}",
+                        modId, loaded);
+                if (loaded) {
                     CreateHandMade.LOGGER.info(
                             "[HandMade] Blocked by loaded mod: {}", modId);
                     return true;
                 }
             }
         } catch (Exception e) {
-            // 配置未加载时静默跳过
+            CreateHandMade.LOGGER.warn(
+                    "[HandMade-Debug] isBlockedByMod exception", e);
         }
         return false;
     }

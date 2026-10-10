@@ -32,7 +32,8 @@ public class MaidConfig {
         builder.comment("车万女仆兼容设置").push("maid");
 
         maidSearchRadius = builder
-                .comment("女仆搜索目标方块的半径（格）",
+                .comment("女仆与容器/工作方块的最大交互距离（格）",
+                         "作用于：灌注枪就近搜索 + 指杆标记（冲压锤/手锯/液体搬运/搅拌杖）",
                          "默认: 8.0")
                 .defineInRange("search_radius", 8.0, 1.0, 32.0);
 

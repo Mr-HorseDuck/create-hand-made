@@ -29,9 +29,29 @@ public class PointerModeHandler {
 
     private static boolean lastShiftRightDown = false;
 
+    // ★ MODE_MARK 的客户端缓存
     private static BlockPos clientWork = null;
     private static BlockPos clientInput = null;
     private static BlockPos clientOutput = null;
+
+    // ★ MODE_LIQUID 的客户端缓存
+    private static BlockPos clientLiquidInput = null;
+    private static BlockPos clientLiquidOutput = null;
+    private static BlockPos clientLiquidOverflow = null;
+
+    // ================= HUD 读取接口 =================
+
+    public static BlockPos getClientLiquidInput() {
+        return clientLiquidInput;
+    }
+
+    public static BlockPos getClientLiquidOutput() {
+        return clientLiquidOutput;
+    }
+
+    public static BlockPos getClientLiquidOverflow() {
+        return clientLiquidOverflow;
+    }
 
     // ================= Ctrl + 滚轮 切换模式 =================
 
@@ -81,6 +101,9 @@ public class PointerModeHandler {
             clientWork = null;
             clientInput = null;
             clientOutput = null;
+            clientLiquidInput = null;
+            clientLiquidOutput = null;
+            clientLiquidOverflow = null;
         }
 
         long window = mc.getWindow().getWindow();
@@ -99,11 +122,12 @@ public class PointerModeHandler {
         if (!(mainHand.getItem() instanceof PointerItem)) return;
 
         int mode = PointerModeHelper.getMode(mainHand);
-        if (mode != PointerModeHelper.MODE_MARK) return;
+        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
 
         HitResult hit = mc.hitResult;
         if (hit == null) return;
 
+        // ---- 右键女仆：应用标记（两种模式通用） ----
         if (hit instanceof EntityHitResult entityHit) {
             Entity target = entityHit.getEntity();
             if (isMaid(target)) {
@@ -119,6 +143,16 @@ public class PointerModeHandler {
         BlockPos pos = blockHit.getBlockPos().immutable();
         if (mc.level == null) return;
 
+        if (mode == PointerModeHelper.MODE_MARK) {
+            handleMarkMode(mc, pos);
+        } else {
+            handleLiquidMode(mc, pos);
+        }
+    }
+
+    // ================= MODE_MARK 的标记逻辑（原逻辑不变） =================
+
+    private static void handleMarkMode(Minecraft mc, BlockPos pos) {
         BlockEntity be = mc.level.getBlockEntity(pos);
         if (be == null) return;
 
@@ -154,6 +188,56 @@ public class PointerModeHandler {
         MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
     }
 
+    // ================= MODE_LIQUID 的标记逻辑（新增） =================
+
+    /**
+     * 液体模式标记三个坐标：
+     *   1. 输入（必须是 Basin）
+     *   2. 输出（Basin 或 Depot）
+     *   3. 过剩输出（必须是 Basin）
+     * 标完第三个后，再右键覆盖回输入。
+     */
+    private static void handleLiquidMode(Minecraft mc, BlockPos pos) {
+        BlockEntity be = mc.level.getBlockEntity(pos);
+        if (be == null) return;
+
+        boolean isBasin = be instanceof BasinBlockEntity;
+        boolean isDepot = be instanceof DepotBlockEntity;
+
+        int color;
+        if (clientLiquidInput == null) {
+            // 第 1 个：输入，必须是 Basin
+            if (!isBasin) return;
+            clientLiquidInput = pos;
+            color = HighlightBlockPacket.COLOR_INPUT;
+        } else if (clientLiquidOutput == null) {
+            // 第 2 个：输出，Basin 或 Depot 都可以
+            if (!isBasin && !isDepot) return;
+            clientLiquidOutput = pos;
+            color = HighlightBlockPacket.COLOR_OUTPUT;
+        } else if (clientLiquidOverflow == null) {
+            // 第 3 个：过剩输出，必须是 Basin
+            if (!isBasin) return;
+            clientLiquidOverflow = pos;
+            color = HighlightBlockPacket.COLOR_OUTPUT;
+        } else {
+            // 三个都标完了，再右键重置为输入
+            if (!isBasin) return;
+            clientLiquidInput = pos;
+            clientLiquidOutput = null;
+            clientLiquidOverflow = null;
+            color = HighlightBlockPacket.COLOR_INPUT;
+        }
+
+        PointerHighlightClient.setHighlight(color, pos);
+
+        CreateHandMade.LOGGER.info(
+                "[HandMade] Liquid marker client: pos={}, color={}",
+                pos, Integer.toHexString(color));
+
+        MaidNetwork.CHANNEL.sendToServer(new PointerLiquidMarkerPacket(pos));
+    }
+
     private static boolean isMaid(Entity entity) {
         return entity.getClass().getName()
                 .equals("com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid");
@@ -171,7 +255,9 @@ public class PointerModeHandler {
         if (player == null) return;
         if (!player.isShiftKeyDown()) return;
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) return;
-        if (PointerModeHelper.getMode(player.getMainHandItem()) != PointerModeHelper.MODE_MARK) return;
+
+        int mode = PointerModeHelper.getMode(player.getMainHandItem());
+        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
 
         event.setCanceled(true);
     }

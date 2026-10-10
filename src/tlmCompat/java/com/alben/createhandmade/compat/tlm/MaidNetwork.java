@@ -24,13 +24,8 @@ public class MaidNetwork {
     private static final String VERSION = "1";
     private static boolean initialized = false;
 
-    /** ★ 不再静态初始化，改为 init() 里创建 */
     public static SimpleChannel CHANNEL;
 
-    /**
-     * ★ 由 main 主类在 mod 构造阶段反射调用，确保在 Forge 通道锁关闭前完成注册。
-     *   幂等：多次调用只执行一次。
-     */
     public static synchronized void init() {
         if (initialized) return;
         initialized = true;
@@ -55,6 +50,12 @@ public class MaidNetwork {
                 .consumerMainThread(MaidNetwork::handlePointerMarker)
                 .add();
 
+        CHANNEL.messageBuilder(PointerLiquidMarkerPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(PointerLiquidMarkerPacket::encode)
+                .decoder(PointerLiquidMarkerPacket::new)
+                .consumerMainThread(MaidNetwork::handlePointerLiquidMarker)
+                .add();
+
         CHANNEL.messageBuilder(PointerApplyToMaidPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(PointerApplyToMaidPacket::encode)
                 .decoder(PointerApplyToMaidPacket::new)
@@ -68,11 +69,17 @@ public class MaidNetwork {
                                           Supplier<NetworkEvent.Context> ctx) {
         NetworkEvent.Context context = ctx.get();
         context.enqueueWork(() -> {
+            MaidDebug.log("handlePointerMode received: mode={}", packet.mode());
             ServerPlayer player = context.getSender();
             if (player == null) return;
             ItemStack stack = player.getMainHandItem();
-            if (!(stack.getItem() instanceof PointerItem)) return;
+            if (!(stack.getItem() instanceof PointerItem)) {
+                MaidDebug.log("handlePointerMode: main hand not pointer");
+                return;
+            }
             PointerModeHelper.setMode(stack, packet.mode());
+            MaidDebug.log("handlePointerMode: set mode={}, now={}",
+                    packet.mode(), PointerModeHelper.getMode(stack));
         });
         context.setPacketHandled(true);
     }
@@ -89,6 +96,25 @@ public class MaidNetwork {
         context.setPacketHandled(true);
     }
 
+    private static void handlePointerLiquidMarker(PointerLiquidMarkerPacket packet,
+                                                  Supplier<NetworkEvent.Context> ctx) {
+        NetworkEvent.Context context = ctx.get();
+        context.enqueueWork(() -> {
+            MaidDebug.log("handlePointerLiquidMarker received: pos={}", packet.pos());
+            ServerPlayer player = context.getSender();
+            if (player == null) {
+                MaidDebug.log("handlePointerLiquidMarker: player NULL");
+                return;
+            }
+            if (!(player.level() instanceof ServerLevel serverLevel)) {
+                MaidDebug.log("handlePointerLiquidMarker: not ServerLevel");
+                return;
+            }
+            PointerLiquidMarker.doMark(player, serverLevel, packet.pos());
+        });
+        context.setPacketHandled(true);
+    }
+
     private static void handleApplyToMaid(PointerApplyToMaidPacket packet,
                                           Supplier<NetworkEvent.Context> ctx) {
         NetworkEvent.Context context = ctx.get();
@@ -100,32 +126,65 @@ public class MaidNetwork {
 
                 Entity target = serverLevel.getEntity(packet.entityId());
                 if (!(target instanceof EntityMaid)) {
-                    CreateHandMade.LOGGER.info("[HandMade] ApplyToMaid: target not maid");
+                    MaidDebug.log("ApplyToMaid: target not maid");
                     return;
                 }
 
                 Entity maidEntity = target;
 
-                BlockPos work = PointerDataHelper.getWork(player, serverLevel);
-                BlockPos input = PointerDataHelper.getInput(player, serverLevel);
-                BlockPos output = PointerDataHelper.getOutput(player, serverLevel);
+                int mode = PointerModeHelper.getMode(player.getMainHandItem());
+                MaidDebug.log("ApplyToMaid: mode={}, mainHand={}",
+                        mode, player.getMainHandItem().getItem());
 
-                if (work == null || input == null || output == null) {
+                if (mode == PointerModeHelper.MODE_LIQUID) {
+                    BlockPos li = PointerDataHelper.getLiquidInput(player, serverLevel);
+                    BlockPos lo = PointerDataHelper.getLiquidOutput(player, serverLevel);
+                    BlockPos lov = PointerDataHelper.getLiquidOverflow(player, serverLevel);
+
+                    MaidDebug.log("ApplyToMaid LIQUID: input={}, output={}, overflow={}",
+                            li, lo, lov);
+
+                    if (li == null || lo == null || lov == null) {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.incomplete"),
+                                true);
+                        return;
+                    }
+
+                    PointerDataHelper.copyFrom(player, maidEntity);
+
+                    MaidDebug.log("ApplyToMaid LIQUID: applied to maid {}",
+                            maidEntity.getId());
+
                     player.displayClientMessage(
-                            Component.translatable("message.create_hand_made.pointer.incomplete"),
+                            Component.translatable("message.create_hand_made.pointer.applied.liquid",
+                                    formatPos(li), formatPos(lo), formatPos(lov)),
                             true);
-                    return;
+                } else {
+                    BlockPos work = PointerDataHelper.getWork(player, serverLevel);
+                    BlockPos input = PointerDataHelper.getInput(player, serverLevel);
+                    BlockPos output = PointerDataHelper.getOutput(player, serverLevel);
+
+                    MaidDebug.log("ApplyToMaid MARK: work={}, input={}, output={}",
+                            work, input, output);
+
+                    if (work == null || input == null || output == null) {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.incomplete"),
+                                true);
+                        return;
+                    }
+
+                    PointerDataHelper.copyFrom(player, maidEntity);
+
+                    MaidDebug.log("ApplyToMaid MARK: applied to maid {}",
+                            maidEntity.getId());
+
+                    player.displayClientMessage(
+                            Component.translatable("message.create_hand_made.pointer.applied",
+                                    formatPos(work), formatPos(input), formatPos(output)),
+                            true);
                 }
-
-                PointerDataHelper.copyFrom(player, maidEntity);
-
-                CreateHandMade.LOGGER.info("[HandMade] Applied marks to maid {}",
-                        maidEntity.getId());
-
-                player.displayClientMessage(
-                        Component.translatable("message.create_hand_made.pointer.applied",
-                                formatPos(work), formatPos(input), formatPos(output)),
-                        true);
 
                 serverLevel.playSound(null, maidEntity.blockPosition(),
                         SoundEvents.EXPERIENCE_ORB_PICKUP,

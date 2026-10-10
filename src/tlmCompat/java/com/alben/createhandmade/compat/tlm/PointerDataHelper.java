@@ -14,7 +14,14 @@ public final class PointerDataHelper {
     public static final String KEY_INPUT = "InputBlock";
     public static final String KEY_OUTPUT = "OutputBlock";
 
+    // ★ 液体模式（MODE_LIQUID）
+    public static final String KEY_LIQUID_INPUT = "LiquidInputBlock";
+    public static final String KEY_LIQUID_OUTPUT = "LiquidOutputBlock";
+    public static final String KEY_LIQUID_OVERFLOW = "LiquidOverflowBlock";
+
     private PointerDataHelper() {}
+
+    // ================= MODE_MARK =================
 
     public static void setWork(Entity entity, Level level, BlockPos pos) {
         writeBlock(entity, KEY_WORK, level, pos);
@@ -26,23 +33,10 @@ public final class PointerDataHelper {
 
     public static void setOutput(Entity entity, Level level, @Nullable BlockPos pos) {
         if (pos == null) {
-            CompoundTag root = entity.getPersistentData().getCompound(NBT_ROOT);
-            root.remove(KEY_OUTPUT);
-            entity.getPersistentData().put(NBT_ROOT, root);
+            removeBlock(entity, KEY_OUTPUT);
             return;
         }
         writeBlock(entity, KEY_OUTPUT, level, pos);
-    }
-
-    private static void writeBlock(Entity entity, String key, Level level, BlockPos pos) {
-        CompoundTag root = entity.getPersistentData().getCompound(NBT_ROOT);
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("X", pos.getX());
-        tag.putInt("Y", pos.getY());
-        tag.putInt("Z", pos.getZ());
-        tag.putString("Dim", level.dimension().location().toString());
-        root.put(key, tag);
-        entity.getPersistentData().put(NBT_ROOT, root);
     }
 
     @Nullable
@@ -58,6 +52,70 @@ public final class PointerDataHelper {
     @Nullable
     public static BlockPos getOutput(Entity entity, Level level) {
         return readBlock(entity, KEY_OUTPUT, level);
+    }
+
+    // ================= MODE_LIQUID（新增） =================
+
+    public static void setLiquidInput(Entity entity, Level level, BlockPos pos) {
+        writeBlock(entity, KEY_LIQUID_INPUT, level, pos);
+    }
+
+    public static void setLiquidOutput(Entity entity, Level level, BlockPos pos) {
+        writeBlock(entity, KEY_LIQUID_OUTPUT, level, pos);
+    }
+
+    public static void setLiquidOverflow(Entity entity, Level level, BlockPos pos) {
+        writeBlock(entity, KEY_LIQUID_OVERFLOW, level, pos);
+    }
+
+    @Nullable
+    public static BlockPos getLiquidInput(Entity entity, Level level) {
+        return readBlock(entity, KEY_LIQUID_INPUT, level);
+    }
+
+    @Nullable
+    public static BlockPos getLiquidOutput(Entity entity, Level level) {
+        return readBlock(entity, KEY_LIQUID_OUTPUT, level);
+    }
+
+    @Nullable
+    public static BlockPos getLiquidOverflow(Entity entity, Level level) {
+        return readBlock(entity, KEY_LIQUID_OVERFLOW, level);
+    }
+
+    /** 清除液体模式的三个坐标 */
+    public static void clearLiquid(Entity entity) {
+        removeBlock(entity, KEY_LIQUID_INPUT);
+        removeBlock(entity, KEY_LIQUID_OUTPUT);
+        removeBlock(entity, KEY_LIQUID_OVERFLOW);
+    }
+
+    /**
+     * ★ 只清输出和过剩，保留输入。
+     * 用于三标满后再次标记、覆盖输入的场景。
+     */
+    public static void clearLiquidPartial(Entity entity) {
+        removeBlock(entity, KEY_LIQUID_OUTPUT);
+        removeBlock(entity, KEY_LIQUID_OVERFLOW);
+    }
+
+    // ================= 通用 =================
+
+    private static void writeBlock(Entity entity, String key, Level level, BlockPos pos) {
+        CompoundTag root = entity.getPersistentData().getCompound(NBT_ROOT);
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("X", pos.getX());
+        tag.putInt("Y", pos.getY());
+        tag.putInt("Z", pos.getZ());
+        tag.putString("Dim", level.dimension().location().toString());
+        root.put(key, tag);
+        entity.getPersistentData().put(NBT_ROOT, root);
+    }
+
+    private static void removeBlock(Entity entity, String key) {
+        CompoundTag root = entity.getPersistentData().getCompound(NBT_ROOT);
+        root.remove(key);
+        entity.getPersistentData().put(NBT_ROOT, root);
     }
 
     @Nullable

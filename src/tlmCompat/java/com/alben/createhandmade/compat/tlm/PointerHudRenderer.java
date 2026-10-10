@@ -20,8 +20,8 @@ public class PointerHudRenderer {
 
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) return;
 
-        // ★ 只在指定模式显示 HUD
-        if (PointerModeHelper.getMode(player.getMainHandItem()) != PointerModeHelper.MODE_MARK) return;
+        int mode = PointerModeHelper.getMode(player.getMainHandItem());
+        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
 
         GuiGraphics graphics = event.getGuiGraphics();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
@@ -30,19 +30,63 @@ public class PointerHudRenderer {
         int lineHeight = 12;
         int startY = screenHeight - 60;
 
-        renderLine(graphics, mc, screenWidth, startY,
-                "工作方块", HighlightBlockPacket.COLOR_WORK);
-        renderLine(graphics, mc, screenWidth, startY + lineHeight,
-                "输入", HighlightBlockPacket.COLOR_INPUT);
-        renderLine(graphics, mc, screenWidth, startY + lineHeight * 2,
-                "输出", HighlightBlockPacket.COLOR_OUTPUT);
+        if (mode == PointerModeHelper.MODE_MARK) {
+            renderMarkMode(graphics, mc, screenWidth, startY, lineHeight);
+        } else {
+            renderLiquidMode(graphics, mc, screenWidth, startY, lineHeight);
+        }
     }
 
+    // ================= MODE_MARK（原逻辑不变） =================
+
+    private static void renderMarkMode(GuiGraphics graphics, Minecraft mc,
+                                        int screenWidth, int startY, int lineHeight) {
+        renderLine(graphics, mc, screenWidth, startY,
+                "工作方块", HighlightBlockPacket.COLOR_WORK, true);
+        renderLine(graphics, mc, screenWidth, startY + lineHeight,
+                "输入", HighlightBlockPacket.COLOR_INPUT, true);
+        renderLine(graphics, mc, screenWidth, startY + lineHeight * 2,
+                "输出", HighlightBlockPacket.COLOR_OUTPUT, true);
+    }
+
+    // ================= MODE_LIQUID（新增） =================
+
+    private static void renderLiquidMode(GuiGraphics graphics, Minecraft mc,
+                                          int screenWidth, int startY, int lineHeight) {
+        renderPosLine(graphics, mc, screenWidth, startY,
+                "液体输入", PointerModeHandler.getClientLiquidInput(), 0xFF4FC3F7, true);
+        renderPosLine(graphics, mc, screenWidth, startY + lineHeight,
+                "液体输出", PointerModeHandler.getClientLiquidOutput(), 0xFF66BB6A, true);
+        renderPosLine(graphics, mc, screenWidth, startY + lineHeight * 2,
+                "过剩输出", PointerModeHandler.getClientLiquidOverflow(), 0xFFFFA726, true);
+    }
+
+    // ================= 通用渲染 =================
+
+    /**
+     * 通过颜色键从 PointerHighlightClient 读坐标（MODE_MARK 用）。
+     */
     private static void renderLine(GuiGraphics graphics, Minecraft mc,
                                     int screenWidth, int y,
-                                    String label, int colorKey) {
+                                    String label, int colorKey, boolean shadow) {
         BlockPos pos = PointerHighlightClient.getHighlight(colorKey);
+        drawLine(graphics, mc, screenWidth, y, label, pos, 0xFF000000 | colorKey, shadow);
+    }
 
+    /**
+     * 直接传坐标渲染（MODE_LIQUID 用）。
+     */
+    private static void renderPosLine(GuiGraphics graphics, Minecraft mc,
+                                       int screenWidth, int y,
+                                       String label, BlockPos pos,
+                                       int color, boolean shadow) {
+        drawLine(graphics, mc, screenWidth, y, label, pos, color, shadow);
+    }
+
+    private static void drawLine(GuiGraphics graphics, Minecraft mc,
+                                  int screenWidth, int y,
+                                  String label, BlockPos pos,
+                                  int color, boolean shadow) {
         String text;
         if (pos == null) {
             text = label + "：未标记";
@@ -53,6 +97,6 @@ public class PointerHudRenderer {
         int textWidth = mc.font.width(text);
         int x = (screenWidth - textWidth) / 2;
 
-        graphics.drawString(mc.font, text, x, y, 0xFF000000 | colorKey, true);
+        graphics.drawString(mc.font, text, x, y, color, shadow);
     }
 }
