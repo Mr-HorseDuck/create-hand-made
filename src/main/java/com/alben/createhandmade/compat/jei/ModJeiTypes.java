@@ -1,5 +1,6 @@
 package com.alben.createhandmade.compat.jei;
 
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
@@ -23,6 +24,11 @@ public class ModJeiTypes {
 
     public static final RecipeType<CuttingRecipe> HAND_SAW_CUTTING =
             RecipeType.create("create_hand_made", "hand_saw_cutting", CuttingRecipe.class);
+
+    /** ★ 手锯 · 切石（condensed，一页最多 15 个产物） */
+    public static final RecipeType<CondensedBlockCuttingRecipe> HAND_SAW_STONECUTTING =
+            RecipeType.create("create_hand_made", "hand_saw_stonecutting",
+                    CondensedBlockCuttingRecipe.class);
 
     /** 冲压锤 · 置物台 / 传送带 */
     public static final RecipeType<PressingRecipe> HAND_PRESS_DEPOT =

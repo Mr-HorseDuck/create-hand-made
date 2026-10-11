@@ -10,16 +10,21 @@ import com.alben.createhandmade.compat.jei.category.HandInfusionGunCategory;
 import com.alben.createhandmade.compat.jei.category.HandPressBasinCategory;
 import com.alben.createhandmade.compat.jei.category.HandPressDepotCategory;
 import com.alben.createhandmade.compat.jei.category.HandSawCategory;
+import com.alben.createhandmade.compat.jei.category.HandSawStonecuttingCategory;
 import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.compat.jei.CreateJEI;
 import com.simibubi.create.compat.jei.DoubleItemIcon;
 import com.simibubi.create.compat.jei.EmptyBackground;
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory;
+import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.compat.jei.category.SpoutCategory;
 import com.simibubi.create.content.fluids.potion.PotionMixingRecipes;
@@ -84,6 +89,20 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.HAND_SAW.get()))
         );
         allCategories.add(new HandSawCategory(handSawInfo));
+
+        // ==================== 手锯切石 ====================
+        CreateRecipeCategory.Info<CondensedBlockCuttingRecipe> handSawStonecuttingInfo =
+                new CreateRecipeCategory.Info<>(
+                        ModJeiTypes.HAND_SAW_STONECUTTING,
+                        Component.translatable("jei.create_hand_made.hand_saw_stonecutting"),
+                        new EmptyBackground(177, 70),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.HAND_SAW.get()),
+                                () -> new ItemStack(Items.STONECUTTER)),
+                        CreateHandMadeJEI::collectHandSawStonecuttingRecipes,
+                        List.of(() -> new ItemStack(ModItems.HAND_SAW.get()))
+                );
+        allCategories.add(new HandSawStonecuttingCategory(handSawStonecuttingInfo));
 
         // ==================== 冲压锤 · 置物台 ====================
         CreateRecipeCategory.Info<PressingRecipe> handPressDepotInfo = new CreateRecipeCategory.Info<>(
@@ -296,6 +315,30 @@ public class CreateHandMadeJEI implements IModPlugin {
         return result;
     }
 
+    /**
+     * ★ 手锯切石：原版 minecraft:stonecutting + L3 独占切石。
+     * 走 HandMadeRecipePool 的 L3 收集，与游戏内工具同源；
+     * L1 用 CreateJEI.getTypedRecipes(RecipeType.STONECUTTING) 拿。
+     * 交给 Create 的 BlockCuttingCategory.condenseRecipes 折叠。
+     */
+
+private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecipes() {
+        List<Recipe<?>> recipes = new ArrayList<>();
+
+        // L1：原版切石
+        for (Recipe<?> r : CreateJEI.getTypedRecipes(RecipeType.STONECUTTING)) {
+            if (r instanceof StonecutterRecipe) recipes.add(r);
+        }
+
+        // L3：独占切石（从 CUSTOM_MAP 拿）
+        for (Recipe<?> r : HandMadeRecipePool.getAllCustomRecipes(
+                ToolType.HAND_SAW_STONECUTTING)) {
+            if (r instanceof StonecutterRecipe) recipes.add(r);
+        }
+
+        return BlockCuttingCategory.condenseRecipes(recipes);
+    }
+
     private static List<PressingRecipe> collectPressingRecipes() {
         List<PressingRecipe> result = new ArrayList<>();
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.PRESSING.getType())) {
@@ -345,19 +388,12 @@ public class CreateHandMadeJEI implements IModPlugin {
         return result;
     }
 
-    /**
-     * ★ 碾钵配方：同时收集粉碎（主）和研磨（备选）
-     *   匹配工具的实际行为——碾钵会先尝试粉碎，失败则退化为研磨
-     */
     private static List<ProcessingRecipe<RecipeWrapper>> collectCrushingRecipes() {
         List<ProcessingRecipe<RecipeWrapper>> result = new ArrayList<>();
 
-        // 主配方：粉碎（CRUSHING）
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.CRUSHING.getType())) {
             if (r instanceof CrushingRecipe c) result.add(c);
         }
-
-        // 备选配方：研磨（MILLING）——与工具实际行为对齐
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.MILLING.getType())) {
             if (r instanceof MillingRecipe m) result.add(m);
         }
@@ -388,11 +424,6 @@ public class CreateHandMadeJEI implements IModPlugin {
         return result;
     }
 
-    /**
-     * ★ 1.20.1：自动酿造配方收集
-     *   PotionMixingRecipes.ALL 是静态字段，包含所有酿造配方
-     *   MixingRecipe 是 BasinRecipe 的子类，可以直接加入
-     */
     private static List<BasinRecipe> collectAutoBrewingRecipes() {
         List<BasinRecipe> result = new ArrayList<>();
         if (!AllConfigs.server().recipes.allowBrewingInMixer.get()) return result;
