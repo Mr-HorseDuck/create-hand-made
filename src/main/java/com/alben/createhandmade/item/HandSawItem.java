@@ -25,6 +25,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -34,6 +35,7 @@ import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
@@ -465,13 +467,23 @@ public class HandSawItem extends Item {
 
     // ================= 三层配方查询 =================
 
+    /**
+     * 手锯三段式查询：
+     *   1. L3 独占切削 → 命中就用
+     *   2. L1 序列组装 + 切削 → 命中就用
+     *   3. ★ 切石回退 → 前两段完全没命中时才走这里
+     *
+     * 每段各自走自己的 L2 过滤（切削走 HAND_SAW，切石走 HAND_SAW_STONECUTTING）。
+     */
     public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
         if (input.isEmpty()) return List.of();
 
+        // ---- 段 1：L3 独占切削 ----
         List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
                 ToolType.HAND_SAW, level, input);
         if (!custom.isEmpty()) return custom;
 
+        // ---- 段 2：L1 序列组装 + 切削 ----
         List<Recipe<?>> result = new ArrayList<>();
 
         Optional<CuttingRecipe> assembly = SequencedAssemblyRecipe.getRecipe(
@@ -493,7 +505,67 @@ public class HandSawItem extends Item {
             }
         }
 
-        return HandMadeRecipePool.applyFilter(ToolType.HAND_SAW, level, result);
+        // 切削有结果 → 走 HAND_SAW 过滤返回
+        if (!result.isEmpty()) {
+            return HandMadeRecipePool.applyFilter(ToolType.HAND_SAW, level, result);
+        }
+
+        // ---- 段 3：★ 切石回退 ----
+        List<Recipe<?>> stonecutting = getStonecuttingRecipes(level, input);
+        return HandMadeRecipePool.applyFilter(
+                ToolType.HAND_SAW_STONECUTTING, level, stonecutting);
+    }
+
+    /**
+     * ★ 切石候选：原版 minecraft:stonecutting + L3 独占切石。
+     *
+     * 用 SimpleContainer 匹配（StonecutterRecipe 走 vanilla Container 接口，
+     * 与切削用的 RecipeWrapper 不是一个体系）。
+     *
+     * 门控跟随 Create 的 allowStonecuttingOnSaw。
+     */
+    private static List<Recipe<?>> getStonecuttingRecipes(Level level, ItemStack input) {
+        if (!allowsStonecutting()) return List.of();
+
+        List<Recipe<?>> result = new ArrayList<>();
+
+        SimpleContainer container = new SimpleContainer(1);
+        container.setItem(0, input.copyWithCount(1));
+
+        // L1：原版切石
+        for (StonecutterRecipe recipe : level.getRecipeManager()
+                .getAllRecipesFor(RecipeType.STONECUTTING)) {
+            if (recipe.matches(container, level)) {
+                result.add(recipe);
+            }
+        }
+
+        // L3：独占切石（getAllCustomRecipes 不做匹配，这里自己用 SimpleContainer 匹配）
+        for (Recipe<?> r : HandMadeRecipePool.getAllCustomRecipes(
+                ToolType.HAND_SAW_STONECUTTING)) {
+            if (!(r instanceof StonecutterRecipe stonecutting)) continue;
+            if (stonecutting.matches(container, level)) {
+                result.add(r);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * ★ Create 的 recipes.allowStonecuttingOnSaw 是否开启。
+     *
+     * 读不到（Create config 未加载）时降级为允许，避免异常冒到调用方。
+     * 每次调用实时读值，支持配置热重载。
+     */
+    private static boolean allowsStonecutting() {
+        try {
+            var server = com.simibubi.create.infrastructure.config.AllConfigs.server();
+            if (server == null) return true;
+            return server.recipes.allowStonecuttingOnSaw.get();
+        } catch (Throwable t) {
+            return true;
+        }
     }
 
     // ================= 整树砍伐 =================
