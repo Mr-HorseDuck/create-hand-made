@@ -7,6 +7,8 @@ import javax.annotation.Nullable;
  */
 public enum ToolType {
     HAND_SAW("hand_saw"),
+    /** ★ 独立 L2 过滤层：手锯的切石候选，与锯木分开 */
+    HAND_SAW_STONECUTTING("hand_saw_stonecutting"),
     MORTAR("mortar"),
     CRUSHER_MORTAR("crusher_mortar"),
     STIRRING_STAFF("stirring_staff"),
