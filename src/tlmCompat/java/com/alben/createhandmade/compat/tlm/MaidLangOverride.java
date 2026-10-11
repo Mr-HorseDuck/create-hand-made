@@ -30,7 +30,9 @@ public class MaidLangOverride {
     }
 
     private static void onReload(ResourceManager rm) {
-        if (!ModList.get().isLoaded("maidassemblyline")) return;
+        // ★ 条件反转：只有"未装 maidassemblyline 且装了车万女仆"时才应用 lang_2 覆盖
+        if (ModList.get().isLoaded("maidassemblyline")) return;
+        if (!ModList.get().isLoaded("touhou_little_maid")) return;
 
         String code = Minecraft.getInstance().getLanguageManager().getSelected();
         applyOverride(rm, code);

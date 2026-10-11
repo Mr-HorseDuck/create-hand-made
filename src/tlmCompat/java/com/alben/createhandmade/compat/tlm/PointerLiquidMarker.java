@@ -45,7 +45,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidInput(player, level, pos);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
+            sendHighlight(level, pos, PointerColors.INPUT);
             MaidDebug.log("LiquidMarker.doMark: set INPUT");
         } else if (outputPos == null) {
             if (!isBasin && !isDepot) {
@@ -53,7 +53,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidOutput(player, level, pos);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_OUTPUT);
+            sendHighlight(level, pos, PointerColors.OUTPUT);
             MaidDebug.log("LiquidMarker.doMark: set OUTPUT");
         } else if (overflowPos == null) {
             if (!isBasin) {
@@ -61,7 +61,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidOverflow(player, level, pos);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_OUTPUT);
+            sendHighlight(level, pos, PointerColors.OUTPUT);
             MaidDebug.log("LiquidMarker.doMark: set OVERFLOW");
         } else {
             if (!isBasin) {
@@ -70,7 +70,7 @@ public class PointerLiquidMarker {
             }
             PointerDataHelper.setLiquidInput(player, level, pos);
             PointerDataHelper.clearLiquidPartial(player);
-            sendHighlight(level, pos, HighlightBlockPacket.COLOR_INPUT);
+            sendHighlight(level, pos, PointerColors.INPUT);
             MaidDebug.log("LiquidMarker.doMark: reset to INPUT");
         }
 

@@ -2,7 +2,6 @@ package com.alben.createhandmade.compat.tlm;
 
 import com.alben.createhandmade.client.PointerHighlightClient;
 import com.alben.createhandmade.item.PointerItem;
-import com.alben.createhandmade.network.HighlightBlockPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
@@ -37,35 +36,40 @@ public class PointerHudRenderer {
         }
     }
 
-    // ================= MODE_MARK（原逻辑不变） =================
+    // ================= MODE_MARK =================
 
     private static void renderMarkMode(GuiGraphics graphics, Minecraft mc,
                                         int screenWidth, int startY, int lineHeight) {
         renderLine(graphics, mc, screenWidth, startY,
-                "工作方块", HighlightBlockPacket.COLOR_WORK, true);
+                "工作方块", PointerColors.WORK, true);
         renderLine(graphics, mc, screenWidth, startY + lineHeight,
-                "输入", HighlightBlockPacket.COLOR_INPUT, true);
+                "输入", PointerColors.INPUT, true);
         renderLine(graphics, mc, screenWidth, startY + lineHeight * 2,
-                "输出", HighlightBlockPacket.COLOR_OUTPUT, true);
+                "输出", PointerColors.OUTPUT, true);
     }
 
-    // ================= MODE_LIQUID（新增） =================
+    // ================= MODE_LIQUID =================
 
     private static void renderLiquidMode(GuiGraphics graphics, Minecraft mc,
                                           int screenWidth, int startY, int lineHeight) {
         renderPosLine(graphics, mc, screenWidth, startY,
-                "液体输入", PointerModeHandler.getClientLiquidInput(), 0xFF4FC3F7, true);
+                "液体输入",
+                PointerModeHandler.getClientLiquidInput(),
+                0xFF000000 | PointerColors.INPUT, true);
+
         renderPosLine(graphics, mc, screenWidth, startY + lineHeight,
-                "液体输出", PointerModeHandler.getClientLiquidOutput(), 0xFF66BB6A, true);
+                "液体输出",
+                PointerModeHandler.getClientLiquidOutput(),
+                0xFF000000 | PointerColors.OUTPUT, true);
+
         renderPosLine(graphics, mc, screenWidth, startY + lineHeight * 2,
-                "过剩输出", PointerModeHandler.getClientLiquidOverflow(), 0xFFFFA726, true);
+                "过剩输出",
+                PointerModeHandler.getClientLiquidOverflow(),
+                0xFF000000 | PointerColors.OVERFLOW, true);
     }
 
     // ================= 通用渲染 =================
 
-    /**
-     * 通过颜色键从 PointerHighlightClient 读坐标（MODE_MARK 用）。
-     */
     private static void renderLine(GuiGraphics graphics, Minecraft mc,
                                     int screenWidth, int y,
                                     String label, int colorKey, boolean shadow) {
@@ -73,9 +77,6 @@ public class PointerHudRenderer {
         drawLine(graphics, mc, screenWidth, y, label, pos, 0xFF000000 | colorKey, shadow);
     }
 
-    /**
-     * 直接传坐标渲染（MODE_LIQUID 用）。
-     */
     private static void renderPosLine(GuiGraphics graphics, Minecraft mc,
                                        int screenWidth, int y,
                                        String label, BlockPos pos,
