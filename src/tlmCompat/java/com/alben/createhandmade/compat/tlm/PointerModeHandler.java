@@ -3,7 +3,6 @@ package com.alben.createhandmade.compat.tlm;
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.client.PointerHighlightClient;
 import com.alben.createhandmade.item.PointerItem;
-import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
@@ -183,7 +182,7 @@ public class PointerModeHandler {
 
         PointerHighlightClient.setHighlight(color, pos);
 
-        CreateHandMade.LOGGER.info("[HandMade] Marker client: pos={}, color={}", pos, Integer.toHexString(color));
+        MaidDebug.log("Marker client: pos={}, color={}", pos, Integer.toHexString(color));
 
         MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
     }
@@ -231,9 +230,10 @@ public class PointerModeHandler {
 
         PointerHighlightClient.setHighlight(color, pos);
 
-        CreateHandMade.LOGGER.info(
-                "[HandMade] Liquid marker client: pos={}, color={}",
-                pos, Integer.toHexString(color));
+        // ★ 调试日志：观察三个字段的实际值
+        MaidDebug.log("Liquid marker client: pos={}, color={}", pos, Integer.toHexString(color));
+        MaidDebug.log("liquid fields now: input={}, output={}, overflow={}",
+                clientLiquidInput, clientLiquidOutput, clientLiquidOverflow);
 
         MaidNetwork.CHANNEL.sendToServer(new PointerLiquidMarkerPacket(pos));
     }

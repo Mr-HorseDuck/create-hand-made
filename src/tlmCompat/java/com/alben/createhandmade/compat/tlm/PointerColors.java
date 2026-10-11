@@ -9,15 +9,15 @@ public final class PointerColors {
 
     private PointerColors() {}
 
-    /** 工作方块（MODE_MARK） */
-    public static final int WORK = 0xff00;
+    /** 工作方块（MODE_MARK）—— 黄 */
+    public static final int WORK = 0xFFFF00;
 
-    /** 输入（MODE_MARK / MODE_LIQUID 共用） */
-    public static final int INPUT = 0x80ff;
+    /** 输入（MODE_MARK / MODE_LIQUID 共用）—— 绿 */
+    public static final int INPUT = 0x00FF00;
 
-    /** 输出（MODE_MARK / MODE_LIQUID 共用） */
-    public static final int OUTPUT = 0x0080ff;
+    /** 输出（MODE_MARK / MODE_LIQUID 共用）—— 蓝 */
+    public static final int OUTPUT = 0x0080FF;
 
-    /** ★ 过剩输出（MODE_LIQUID 专用，独立颜色键避免覆盖 OUTPUT） */
-    public static final int OVERFLOW = 0xff8000;
+    /** ★ 过剩输出（MODE_LIQUID 专用，独立颜色键避免覆盖 OUTPUT）—— 橙 */
+    public static final int OVERFLOW = 0xFF8000;
 }
