@@ -92,5 +92,46 @@
   "jei.create_hand_made.bellows_splashing": "风箱洗涤",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
-  "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树"
+  "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树",
+
+  "create_hand_made.configuration.tools": "工具",
+  "create_hand_made.configuration.tools.tooltip": "各工具的时间参数与开关（服务端权威，连接时同步）",
+
+  "create_hand_made.configuration.tools.hand_saw": "手锯",
+  "create_hand_made.configuration.tools.hand_saw.tooltip": "连锁砍树开关、起手与切削时长",
+  "create_hand_made.configuration.tools.hand_saw.windup_ticks": "手锯起手时长（tick）",
+  "create_hand_made.configuration.tools.hand_saw.vibrate_ticks": "手锯加工时长（tick）",
+
+  "create_hand_made.configuration.tools.mortar": "研钵",
+  "create_hand_made.configuration.tools.mortar.tooltip": "研钵的起手、捶捣周期与加工时长",
+  "create_hand_made.configuration.tools.mortar.windup_ticks": "研钵起手时长（tick）",
+  "create_hand_made.configuration.tools.mortar.pound_cycle_ticks": "研钵捶捣周期（tick）",
+  "create_hand_made.configuration.tools.mortar.duration_multiplier": "研钵加工时长系数",
+  "create_hand_made.configuration.tools.mortar.default_duration": "研钵默认加工时长（tick）",
+
+  "create_hand_made.configuration.tools.crusher_mortar": "碾钵",
+  "create_hand_made.configuration.tools.crusher_mortar.tooltip": "碾钵的起手、捶捣周期与加工时长",
+  "create_hand_made.configuration.tools.crusher_mortar.windup_ticks": "碾钵起手时长（tick）",
+  "create_hand_made.configuration.tools.crusher_mortar.pound_cycle_ticks": "碾钵捶捣周期（tick）",
+  "create_hand_made.configuration.tools.crusher_mortar.duration_multiplier": "碾钵加工时长系数",
+  "create_hand_made.configuration.tools.crusher_mortar.default_duration": "碾钵默认加工时长（tick）",
+
+  "create_hand_made.configuration.tools.stirring_staff": "搅拌杖",
+  "create_hand_made.configuration.tools.stirring_staff.tooltip": "搅拌杖的起手与加工时长",
+  "create_hand_made.configuration.tools.stirring_staff.windup_ticks": "搅拌杖起手时长（tick）",
+  "create_hand_made.configuration.tools.stirring_staff.processing_ticks": "搅拌杖加工时长（tick）",
+
+  "create_hand_made.configuration.tools.press_hammer": "冲压锤",
+  "create_hand_made.configuration.tools.press_hammer.tooltip": "冲压锤的蓄力门槛与命中窗口",
+  "create_hand_made.configuration.tools.press_hammer.charge_ticks": "冲压锤蓄力时长（tick）",
+  "create_hand_made.configuration.tools.press_hammer.charge_window_ticks": "冲压锤蓄力命中窗口（tick）",
+
+  "create_hand_made.configuration.tools.bellows": "风箱",
+  "create_hand_made.configuration.tools.bellows.tooltip": "风箱的蓄力门槛",
+  "create_hand_made.configuration.tools.bellows.charge_ticks": "风箱蓄力时长（tick）",
+
+  "create_hand_made.configuration.tools.infusion_gun": "灌注枪",
+  "create_hand_made.configuration.tools.infusion_gun.tooltip": "灌注枪的长按门槛与抽取节奏",
+  "create_hand_made.configuration.tools.infusion_gun.long_press_threshold": "灌注枪长按门槛（tick）",
+  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "灌注枪抽取间隔（tick）"
 }

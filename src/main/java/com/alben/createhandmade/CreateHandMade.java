@@ -46,7 +46,9 @@ public class CreateHandMade {
 
         NeoForge.EVENT_BUS.register(this);
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        // 服务端权威配置：所有工具的时间参数与开关（连接时由服务端同步给客户端，见 ServerConfig 类注释）
+        // 注：原先的 COMMON 配置（Config）已并入本文件，Config.java 已删除。
+        modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

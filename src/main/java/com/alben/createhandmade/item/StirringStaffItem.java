@@ -1,10 +1,13 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.network.StirringStatePacket;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
+import com.alben.createhandmade.util.CycleSoundWindow;
+import com.alben.createhandmade.util.StickyUseSession;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.fluids.potion.PotionMixingRecipes;
 import com.simibubi.create.content.kinetics.mixer.MixingRecipe;
@@ -52,8 +55,8 @@ import java.util.function.Consumer;
 @EventBusSubscriber
 public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
-    private static final int STIR_DURATION = 60;   // 3 秒
-    private static final int WINDUP_TICKS = 8;   // 起手 1 秒不处理
+    // 起手 / 加工时长已移到 ServerConfig（tools.stirring_staff.windup_ticks / processing_ticks），
+    // 运行时读 —— 见 getUseDuration() 与 onUseTick()。
 
     public StirringStaffItem(Properties properties) {
         super(properties);
@@ -131,6 +134,11 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
+        // ★ b2.6：总时长在这里定下（会话首次 = 起手 + 加工，同一次长按的续用 = 只有加工），
+        //   vanilla 的 startUsingItem 会立刻调 getUseDuration() 读回它。
+        StickyUseSession.beginUse(player, stack, hand, StickyUseSession.DEFAULT_STICKY_TICKS,
+                ServerConfig.INSTANCE.stirringStaffWindupTicks.get(),
+                Math.max(1, ServerConfig.INSTANCE.stirringStaffProcessingTicks.get()));
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
     }
@@ -139,7 +147,17 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public int getUseDuration(ItemStack stack, LivingEntity entity) {
-        return STIR_DURATION;
+        // 起手 / 加工都读 SERVER 配置（运行时读，不能进静态字段）
+        int windupTicks = ServerConfig.INSTANCE.stirringStaffWindupTicks.get();
+        int processingTicks = Math.max(1, ServerConfig.INSTANCE.stirringStaffProcessingTicks.get());
+        int firstUse = windupTicks + processingTicks;
+        // ★ b2.6：总使用时长由 use() 里的 StickyUseSession.beginUse 定下、在这里读回 ——
+        //   会话首次 = 起手 + 加工，同一次长按的续用 = 只有加工（起手一个会话只付一次）。
+        //   本方法每帧都会被调用（渲染器问 getTicksUsingItem()），一次使用内必须恒定。
+        if (entity instanceof Player player) {
+            return StickyUseSession.currentUseDuration(player, stack, firstUse);
+        }
+        return firstUse;
     }
 
     // ================= 完成 =================
@@ -148,6 +166,15 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
         if (level.isClientSide) return stack;
+
+        // ★ b2.7c：完成音"保底"要用的两个量先取好 ——
+        //   phase = 本件最后一个 tick 的会话加工相位，duration = 本次使用总时长（b2.6 起是定值）。
+        //   注意：搅拌音的周期门限之外还要求"正看着一个非空工作盆"（下面才做那组判定），
+        //   本窗口判定按"全程都在搅"近似；中途扭头/盆空会导致周期音少响，那时可能不补这一声（可接受）。
+        int windupTicks = ServerConfig.INSTANCE.stirringStaffWindupTicks.get();
+        int phase = StickyUseSession.processingElapsedTicks(player, stack, entity.getUsedItemHand(),
+                StickyUseSession.DEFAULT_STICKY_TICKS, windupTicks);
+        int duration = getUseDuration(stack, entity);
 
         BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);
         if (hit.getType() != HitResult.Type.BLOCK) return stack;
@@ -161,6 +188,15 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             if (BasinRecipe.apply(basin, recipe.value())) {
                 basin.notifyChangeOfContents();
                 stack.hurtAndBreak(1, entity, LivingEntity.getSlotForHand(entity.getUsedItemHand()));
+                // ★ b2.7c 完成音"保底"（取代 b2.7 的"无条件补"）：
+                //   本件窗口 = [phase - (duration - 1), phase]，最后一个 tick 已被 onUseTick 让位给这一声
+                //   ⇒ 只统计到 phase - 1。窗口里一次 4t 搅拌音都没真的响过才补
+                //   （音效/音量/音调/位置都与周期音完全一致）。
+                boolean cycleSoundPlayed = phase >= 0
+                        && CycleSoundWindow.hasCycleTick(phase - (duration - 1), phase - 1, 4, 0);
+                if (!cycleSoundPlayed) {
+                    AllSoundEvents.MIXING.playOnServer(level, pos, 3.0f, 2f);
+                }
             }
         }
         return stack;
@@ -172,8 +208,13 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
 
-        int usedTicks = getUseDuration(stack, entity) - remainingTicks;
-        if (usedTicks < WINDUP_TICKS) return;
+        // ★ b2.6：相位改用「会话加工 tick」= 会话 tick − 起手。
+        //   会话首次使用时与旧的 usedTicks - 起手 完全等价；续用时继续累加 ⇒
+        //   不再"每搅完一件就静止一个起手时长"，音效/粒子相位也跨续用连续。
+        int windupTicks = ServerConfig.INSTANCE.stirringStaffWindupTicks.get();
+        int stirTicks = StickyUseSession.processingElapsedTicks(player, stack, entity.getUsedItemHand(),
+                StickyUseSession.DEFAULT_STICKY_TICKS, windupTicks);
+        if (stirTicks < 0) return;   // 还在起手期内（或不在会话里）
 
         BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);
         if (hit.getType() != HitResult.Type.BLOCK) return;
@@ -183,7 +224,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         if (basin.isEmpty()) return;
 
         // ★ 服务端广播：音效 + 搅拌状态 + 粒子，全部同步给附近玩家
-        if (!level.isClientSide && usedTicks % 4 == 0) {
+        if (!level.isClientSide && stirTicks % 4 == 0) {
             if (level instanceof ServerLevel serverLevel) {
                 StirringStatePacket packet = new StirringStatePacket(pos);
                 double rangeSq = 64.0 * 64.0;
@@ -193,7 +234,12 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
                     }
                 }
 
-                AllSoundEvents.MIXING.playOnServer(level, pos, 3.0f, 2f);
+                // ★ b2.7c 让位：本次使用的最后一个 tick（remainingTicks == 1）就是产出 tick ——
+                //   finishUsingItem 会在同一 tick 播"完成音"，所以那一 tick 的搅拌音让位；
+                //   状态包与粒子照旧（让位的只是声音）。
+                if (remainingTicks > 1) {
+                    AllSoundEvents.MIXING.playOnServer(level, pos, 3.0f, 2f);
+                }
                 broadcastStirParticles(level, pos, basin);
             }
         }
@@ -275,11 +321,32 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     // ================= 动画 / 音效屏蔽 =================
 
+    /**
+     * 使用姿势交给 {@link UseAnim#NONE}（<b>b2.6 起从 EAT 改过来</b>，与研钵 / 碾钵 / 灌注枪统一）：
+     * 只保留手臂的基础持握姿态，不再叠加原版 EAT 那套「随剩余使用时间往嘴边抬」的位移与旋转。
+     *
+     * <p>搅拌的视觉效果全部由 {@code StirringStaffRenderer} 用模型位移实现（起手 + 加工振动两阶段），
+     * 所以这里必须是 NONE，否则手臂/物品会同时做出啃食动作、与自写动画打架。</p>
+     *
+     * <p><b>副作用（b2.6 待实测）</b>：EAT 分支在 {@code ItemInHandRenderer} 里本身会施加一段
+     * 随 {@code getUseItemRemainingTicks()} 变化的位移，而 {@code StirringStaffRenderer} 的坐标是
+     * <b>在这段位移之上</b>标定的 —— 改成 NONE 后那段位移消失，搅拌杖在手里的<b>绝对位置会整体变一次</b>。
+     * 若实测发现位置不对（大概率是"整体上/前移了一点"），在 {@code StirringStaffRenderer} 的
+     * 位移三项里补常量即可（与 {@code VIBRATE_*} 一样属于待实测常量）。</p>
+     *
+     * <p>副作用（T9 已核实、可接受）：{@code UseAnim} 不参与第三人称手臂姿态
+     * （{@code PlayerRenderer.getArmPose} 对 EAT/NONE 一律返回 {@code ArmPose.ITEM}），
+     * 所以这个改动只影响第一人称。</p>
+     */
     @Override
     public UseAnim getUseAnimation(ItemStack stack) {
-        return UseAnim.EAT;
+        return UseAnim.NONE;
     }
 
+    /**
+     * 保留：{@code UseAnim} 不再是 EAT，这个覆写已经不会被原版音效路径读到（等价的"屏蔽"），
+     * 但删掉它对本批次没有任何收益、反而会让"搅拌杖不发出进食声"这件事失去显式声明，故按保守策略留下。
+     */
     @Override
     public SoundEvent getEatingSound() {
         return SoundEvents.EMPTY;

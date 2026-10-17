@@ -1,10 +1,12 @@
 package com.alben.createhandmade.item;
 
-import com.alben.createhandmade.Config;
+import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
+import com.alben.createhandmade.util.CycleSoundWindow;
+import com.alben.createhandmade.util.StickyUseSession;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.kinetics.saw.SawBlockEntity;
@@ -70,9 +72,8 @@ import java.util.function.Consumer;
 @EventBusSubscriber
 public class HandSawItem extends Item {
 
-    private static final int CUT_MOVE_TICKS = 10;
-    private static final int CUT_VIBRATE_TICKS = 20;
-    private static final int CUT_DURATION = CUT_MOVE_TICKS + CUT_VIBRATE_TICKS;
+    // 切削的起手 / 加工时长已移到 ServerConfig（tools.hand_saw.windup_ticks / vibrate_ticks），
+    // 运行时读 —— 见 onUseTick。这里只保留纯音效节奏。
 
     /** 砍树循环音效间隔（tick） */
     private static final int FELL_SOUND_INTERVAL = 4;
@@ -111,7 +112,7 @@ public class HandSawItem extends Item {
 
     @Override
     public int getUseDuration(ItemStack stack, LivingEntity entity) {
-        // ★ 连续切削：使用时长恒为"无限"（72000），真正的结算周期由 onUseTick 按 CUT_DURATION 控制，
+        // ★ 连续切削：使用时长恒为"无限"（72000），真正的结算周期由 onUseTick 按「起手 + 加工」控制，
         //   直到副手没料或玩家松手。
         //   必须是常量：LivingEntity.getTicksUsingItem() = getUseDuration() - useItemRemaining，
         //   渲染器（HandSawItemRenderer）依赖它算一阶段/二阶段进度。
@@ -151,7 +152,7 @@ public class HandSawItem extends Item {
         if (event.getAction() == PlayerInteractEvent.LeftClickBlock.Action.START) {
             // ★ 配置开关：关闭时完全不进入「待砍」状态 —— 不记录候选、不播锯木音效，
             //   潜行左键原木等同普通挖掘。与 fellTreeFromBroken 里的判定保持一致。
-            if (!Config.INSTANCE.enableTreeFelling.get()) return;
+            if (!ServerConfig.INSTANCE.enableTreeFelling.get()) return;
 
             if (!player.isShiftKeyDown()) return;
 
@@ -295,12 +296,36 @@ public class HandSawItem extends Item {
             return;
         }
 
-        int usedTicks = getUseDuration(stack, entity) - remainingTicks;
+        // 起手 / 加工时长：读 SERVER 配置（运行时读 —— SERVER 配置只在进入世界后加载，
+        // 放进静态字段或构造器会抛 checkState）
+        int windupTicks = Math.max(0, ServerConfig.INSTANCE.handSawWindupTicks.get());
+        int processingTicks = Math.max(1, ServerConfig.INSTANCE.handSawVibrateTicks.get());
 
-        // ★ 连续切削：每 CUT_DURATION tick 结算一份
-        if (usedTicks > 0 && usedTicks % CUT_DURATION == 0) {
+        // ★ b2.6：相位改用「会话加工 tick」= 会话 tick − 起手。
+        //   会话首次使用时它与旧的 usedTicks - 起手 完全等价（第一份仍在"起手 + 加工"那一刻结算），
+        //   续用时相位继续累加 ⇒ 结算周期从（起手 + 加工）变成纯加工，起手不会每份都算一遍。
+        //   客户端渲染器（HandSawItemRenderer）用的是同一个会话 tick，所以动画与结算同相位。
+        int cutTicks = StickyUseSession.processingElapsedTicks(player, stack, entity.getUsedItemHand(),
+                StickyUseSession.DEFAULT_STICKY_TICKS, windupTicks);
+        if (cutTicks < 0) return;   // 还在起手期内：不出声、不结算（与旧行为一致）
+
+        // ★ 连续切削：每「加工时长」tick 结算一份
+        //   （b2.7c：提成变量 settlement —— 结算 tick 的周期音要"让位"给完成音）
+        boolean settlement = cutTicks > 0 && cutTicks % processingTicks == 0;
+        if (settlement) {
             if (!level.isClientSide) {
                 executeCut(level, player, stack);
+                // ★ b2.7c 完成音"保底"（取代 b2.7 的"无条件补"）：
+                //   本件窗口 = 结算 tick 之前的 processingTicks 个 tick，即 [cutTicks - P, cutTicks - 1]；
+                //   左端点若 > 0，它就是上一次的结算 tick（b2.7c 已让位、没播周期音）⇒ 从窗口里去掉。
+                //   窗口里一次 4t 切削音都没真的响过才补这一声 —— 每件至少一声、且不与周期音同 tick。
+                int windowLo = cutTicks - processingTicks;
+                boolean cycleSoundPlayed = CycleSoundWindow.hasCycleTick(
+                        windowLo > 0 ? windowLo + 1 : windowLo, cutTicks - 1, 4, 0);
+                if (!cycleSoundPlayed) {
+                    level.playSound(null, player.blockPosition(), SoundEvents.UI_STONECUTTER_TAKE_RESULT,
+                            SoundSource.PLAYERS, 0.8f, 1.4f + level.random.nextFloat() * 0.2f);
+                }
             }
             // 切完这一份后，副手没料 / 已无配方 → 两端停止使用
             ItemStack offAfterCut = player.getOffhandItem();
@@ -311,17 +336,20 @@ public class HandSawItem extends Item {
             }
         }
 
-        if (usedTicks < CUT_MOVE_TICKS) return;
-        if (usedTicks % 4 != 0) return;
+        // 音效/粒子保持 4t 的锯木节奏；相位同样取自会话 ⇒ 跨续用连续，不会每份断一下
+        if (cutTicks % 4 != 0) return;
 
         ItemStack off = player.getOffhandItem();
         if (off.isEmpty()) return;
 
         // ★ 服务端：音效 + 粒子广播给附近玩家
         if (!level.isClientSide) {
-            level.playSound(null, player.blockPosition(), SoundEvents.UI_STONECUTTER_TAKE_RESULT,
-                    SoundSource.PLAYERS, 0.8f,
-                    1.4f + level.random.nextFloat() * 0.2f);
+            // ★ b2.7c 让位：结算 tick 的这一声已由上面的完成音接管（粒子照旧）⇒ 避免同 tick 双响
+            if (!settlement) {
+                level.playSound(null, player.blockPosition(), SoundEvents.UI_STONECUTTER_TAKE_RESULT,
+                        SoundSource.PLAYERS, 0.8f,
+                        1.4f + level.random.nextFloat() * 0.2f);
+            }
 
             if (level instanceof ServerLevel serverLevel) {
                 Vec3 eye = entity.getEyePosition(1f);
@@ -350,7 +378,7 @@ public class HandSawItem extends Item {
 
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
-        // ★ 结算已移到 onUseTick（按 CUT_DURATION 周期）。getUseDuration() = 72000 后这里基本不会
+        // ★ 结算已移到 onUseTick（按「起手 + 加工」周期）。getUseDuration() = 72000 后这里基本不会
         //   自然触发（原版只在 useItemRemaining 归零时调用，且仅服务端），保留清理只为安全。
         if (!(entity instanceof Player player)) return stack;
 
@@ -488,7 +516,7 @@ public class HandSawItem extends Item {
                                            BlockPos pos, BlockState brokenState) {
         // ★ 配置开关：关闭时只破坏当前方块（原版行为）。
         //   放在任何整树扫描之前早退，零开销；不影响切削配方 / 剥皮 / 刮铜 / 去蜡。
-        if (!Config.INSTANCE.enableTreeFelling.get()) return;
+        if (!ServerConfig.INSTANCE.enableTreeFelling.get()) return;
 
         if (!(level instanceof ServerLevel)) return;
         if (!SawBlockEntity.isSawable(brokenState)) return;

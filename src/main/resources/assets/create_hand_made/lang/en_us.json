@@ -91,5 +91,46 @@
   "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
-  "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling"
+  "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling",
+
+  "create_hand_made.configuration.tools": "Tools",
+  "create_hand_made.configuration.tools.tooltip": "Per-tool timing and switches (server-authoritative, synced on connect)",
+
+  "create_hand_made.configuration.tools.hand_saw": "Hand Saw",
+  "create_hand_made.configuration.tools.hand_saw.tooltip": "Tree felling switch, wind-up and cutting duration",
+  "create_hand_made.configuration.tools.hand_saw.windup_ticks": "Hand Saw wind-up duration (ticks)",
+  "create_hand_made.configuration.tools.hand_saw.vibrate_ticks": "Hand Saw cutting duration (ticks)",
+
+  "create_hand_made.configuration.tools.mortar": "Mortar",
+  "create_hand_made.configuration.tools.mortar.tooltip": "Mortar wind-up, pounding cycle and processing time",
+  "create_hand_made.configuration.tools.mortar.windup_ticks": "Mortar wind-up duration (ticks)",
+  "create_hand_made.configuration.tools.mortar.pound_cycle_ticks": "Mortar pounding cycle (ticks)",
+  "create_hand_made.configuration.tools.mortar.duration_multiplier": "Mortar processing time multiplier",
+  "create_hand_made.configuration.tools.mortar.default_duration": "Mortar default processing time (ticks)",
+
+  "create_hand_made.configuration.tools.crusher_mortar": "Crusher Mortar",
+  "create_hand_made.configuration.tools.crusher_mortar.tooltip": "Crusher Mortar wind-up, pounding cycle and processing time",
+  "create_hand_made.configuration.tools.crusher_mortar.windup_ticks": "Crusher Mortar wind-up duration (ticks)",
+  "create_hand_made.configuration.tools.crusher_mortar.pound_cycle_ticks": "Crusher Mortar pounding cycle (ticks)",
+  "create_hand_made.configuration.tools.crusher_mortar.duration_multiplier": "Crusher Mortar processing time multiplier",
+  "create_hand_made.configuration.tools.crusher_mortar.default_duration": "Crusher Mortar default processing time (ticks)",
+
+  "create_hand_made.configuration.tools.stirring_staff": "Stirring Staff",
+  "create_hand_made.configuration.tools.stirring_staff.tooltip": "Stirring Staff wind-up and processing time",
+  "create_hand_made.configuration.tools.stirring_staff.windup_ticks": "Stirring Staff wind-up duration (ticks)",
+  "create_hand_made.configuration.tools.stirring_staff.processing_ticks": "Stirring Staff processing duration (ticks)",
+
+  "create_hand_made.configuration.tools.press_hammer": "Press Hammer",
+  "create_hand_made.configuration.tools.press_hammer.tooltip": "Press Hammer charge time and charged-hit window",
+  "create_hand_made.configuration.tools.press_hammer.charge_ticks": "Press Hammer charge time (ticks)",
+  "create_hand_made.configuration.tools.press_hammer.charge_window_ticks": "Press Hammer charged-hit window (ticks)",
+
+  "create_hand_made.configuration.tools.bellows": "Bellows",
+  "create_hand_made.configuration.tools.bellows.tooltip": "Bellows charge time",
+  "create_hand_made.configuration.tools.bellows.charge_ticks": "Bellows charge time (ticks)",
+
+  "create_hand_made.configuration.tools.infusion_gun": "Infusion Gun",
+  "create_hand_made.configuration.tools.infusion_gun.tooltip": "Infusion Gun long-press threshold and extraction cadence",
+  "create_hand_made.configuration.tools.infusion_gun.long_press_threshold": "Infusion Gun long-press threshold (ticks)",
+  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "Infusion Gun extraction interval (ticks)"
 }

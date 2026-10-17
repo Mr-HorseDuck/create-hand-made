@@ -4,6 +4,8 @@ import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
+import com.alben.createhandmade.util.CycleSoundWindow;
+import com.alben.createhandmade.util.StickyUseSession;
 import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.foundation.item.CustomUseEffectsItem;
@@ -37,12 +39,6 @@ import java.util.function.Consumer;
 
 public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
-    /** 强制所有配方的加工时长（tick）。EAT 动画起手约占 20%，故起手为 20 tick。 */
-    private static final int FORCED_DURATION = 100;
-
-    /** 起手阶段长度 */
-    private static final int WINDUP_TICKS = FORCED_DURATION / 5;
-
     public CrusherMortarItem(Properties properties) {
         super(properties);
     }
@@ -58,7 +54,11 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
 
-        if (stack.has(ModDataComponents.MORTAR_CONTENTS.get())) {
+        MortarContents loaded = stack.get(ModDataComponents.MORTAR_CONTENTS.get());
+        if (loaded != null) {
+            // ★ b2.6：必须在 startUsingItem 之前定下"本次使用的总时长"（见 MortarItem 同处注释）
+            StickyUseSession.beginUse(player, stack, hand, StickyUseSession.DEFAULT_STICKY_TICKS,
+                    MortarItem.windupTicks(true), MortarItem.processingTicks(loaded, true));
             player.startUsingItem(hand);
             return InteractionResultHolder.consume(stack);
         }
@@ -76,24 +76,40 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
+        // 加工时长在这里定死（不含起手）：getUseDuration 每帧都会被调用，不能在那里查配方。
+        // 用碾钵那一套配置键（系数 / 默认时长 / 上限逻辑与研钵共用实现）。
+        int duration = MortarItem.resolveDuration(recipe, true);
+
         ItemStack toGrind = input.copyWithCount(1);
         if (!level.isClientSide) {
             input.shrink(1);
             player.setItemInHand(otherHand, input);
         }
-        stack.set(ModDataComponents.MORTAR_CONTENTS.get(), new MortarContents(toGrind));
+        stack.set(ModDataComponents.MORTAR_CONTENTS.get(), new MortarContents(toGrind, duration));
 
+        // ★ b2.6：装料这一次也算"会话首次使用"（紧接上一次松手 5t 内的换料视为续磨）
+        StickyUseSession.beginUse(player, stack, hand, StickyUseSession.DEFAULT_STICKY_TICKS,
+                MortarItem.windupTicks(true), duration);
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
     }
 
-    // ================= 使用时长：固定 100 =================
+    // ================= 使用时长：起手 + 加工时长 =================
 
     @Override
     public int getUseDuration(ItemStack stack, LivingEntity entity) {
         MortarContents contents = stack.get(ModDataComponents.MORTAR_CONTENTS.get());
         if (contents == null || contents.stack().isEmpty()) return 0;
-        return FORCED_DURATION;
+        // 与 MortarItem 同一套规则，只是读碾钵那一套配置键。
+        // processingTicks 里含"旧数据（没有 duration_ticks）回退到默认时长"的兜底。
+        int processing = MortarItem.processingTicks(contents, true);
+        int firstUse = MortarItem.windupTicks(true) + processing;
+        // ★ b2.6：总时长由 use() 里的 beginUse 定下、这里读回：会话首次 = 起手 + 加工，
+        //   同一次长按的续用 = 只有加工。本方法每帧都会被调用，一次使用内必须恒定。
+        if (entity instanceof Player player) {
+            return StickyUseSession.currentUseDuration(player, stack, firstUse);
+        }
+        return firstUse;
     }
 
     // ================= 完成：产出结果 =================
@@ -108,6 +124,14 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         // ★ 客户端提前返回：产出、数据组件清除、耐久消耗全部交给服务端权威执行
         if (level.isClientSide) return stack;
 
+        // ★ b2.7c：完成音"保底"要用的两个量必须在这里先取（getUseDuration 依赖数据组件，
+        //   而下面会清掉它）。phase = 本件最后一个 tick 的会话加工相位；duration = 本次使用总时长。
+        int windup = MortarItem.windupTicks(true);
+        int cycle = MortarItem.poundCycleTicks(true);
+        int phase = StickyUseSession.processingElapsedTicks(player, stack, entity.getUsedItemHand(),
+                StickyUseSession.DEFAULT_STICKY_TICKS, windup);
+        int duration = getUseDuration(stack, entity);
+
         RecipeHolder<?> recipe = findRecipe(level, contents.stack());
         if (recipe != null && recipe.value() instanceof com.simibubi.create.content.processing.recipe.ProcessingRecipe<?, ?> pr) {
             List<ItemStack> results = pr.rollResults(level.random);
@@ -120,6 +144,16 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
         stack.remove(ModDataComponents.MORTAR_CONTENTS.get());
         stack.hurtAndBreak(1, entity, LivingEntity.getSlotForHand(entity.getUsedItemHand()));
+
+        // ★ b2.7c 完成音"保底"（取代 b2.7 的"无条件补"）：本件窗口 = [phase-(duration-1), phase]，
+        //   最后一个 tick 已被 onUseTick 让位给这一声 ⇒ 只统计到 phase - 1。
+        //   本件一次捶捣音都没真的响过才补（音效/音量/音调与周期音完全一致）。
+        boolean cycleSoundPlayed = phase >= 0 && CycleSoundWindow.hasCycleTick(
+                phase - (duration - 1), phase - 1, cycle, MortarItem.slamTick(cycle));
+        if (!cycleSoundPlayed) {
+            level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
+                    SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+        }
         return stack;
     }
 
@@ -144,9 +178,14 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 动画 / 音效屏蔽 =================
 
+    /**
+     * 与 {@code MortarItem} 一致：使用姿势交给 {@link UseAnim#NONE}，只保留手臂的基础持握姿态，
+     * 不再叠加 EAT/DRINK 那套「往嘴边抬」的位移与旋转 —— 否则手臂会同时做出啃食动作、
+     * 与渲染器的钵/杵动画打架。
+     */
     @Override
     public UseAnim getUseAnimation(ItemStack stack) {
-        return UseAnim.EAT;
+        return UseAnim.NONE;
     }
 
     @Override
@@ -161,16 +200,30 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         MortarContents contents = stack.get(ModDataComponents.MORTAR_CONTENTS.get());
         if (contents == null || contents.stack().isEmpty()) return;
         ItemStack input = contents.stack();
+        if (!(entity instanceof Player player)) return;
 
-        int totalDuration = getUseDuration(stack, entity);
-        int usedTicks = totalDuration - remainingTicks;
+        // 与 MortarItem 完全一致的节奏（区别只是读碾钵那一套配置键）：
+        // 1) 起手门槛 = 配置值（两端同值 ⇒ "服务端开始出声"与客户端起手同步）；
+        // 2) 音效/粒子每「一个捶捣周期」一次，并对齐「砸到底」那一 tick
+        //    （相位常量由 MortarItem.SLAM_PHASE 统一提供）。
+        // ★ b2.6：相位改用「会话加工 tick」（见 MortarItem 同处注释）——
+        //   首次使用与旧行为等价，续用不再每件静止一个起手时长。
+        int windup = MortarItem.windupTicks(true);
+        int cycle = MortarItem.poundCycleTicks(true);
 
-        if (usedTicks < WINDUP_TICKS || usedTicks % 4 != 0) return;
+        int poundTicks = StickyUseSession.processingElapsedTicks(player, stack, entity.getUsedItemHand(),
+                StickyUseSession.DEFAULT_STICKY_TICKS, windup);
+        if (poundTicks < 0) return;   // 还在起手期内（或不在会话里）
+        if (poundTicks % cycle != MortarItem.slamTick(cycle)) return;
 
         // ★ 服务端：音效 + 粒子广播给附近玩家
         if (!level.isClientSide) {
-            level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
-                    SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+            // ★ b2.7c 让位：本次使用的最后一个 tick（remainingTicks == 1）就是产出 tick ——
+            //   finishUsingItem 会在同一 tick 播"完成音"，所以那一 tick 的周期音让位（粒子照旧）。
+            if (remainingTicks > 1) {
+                level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
+                        SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+            }
 
             if (level instanceof ServerLevel serverLevel) {
                 Vec3 eye = entity.getEyePosition(1f);
