@@ -78,8 +78,14 @@ public class StirringStaffMixingCategory extends BasinCategory {
         // 烈焰燃烧器
         HeatCondition requiredHeat = recipe.getRequiredHeat();
         if (requiredHeat != HeatCondition.NONE) {
+            // ★ 图层修复：AnimatedBlazeBurner#draw 内部固定 z = 200，而工作盆画在 z = 100
+            //   ⇒ 燃烧室会盖住工作盆。先往屏幕内部推 -150（有效 z = 50）即可排到工作盆后面。
+            //   （GUI 里 3D 元素的前后由 z 决定，调换调用顺序无效。）
+            ms.pushPose();
+            ms.translate(0f, 0f, -150f);
             heater.withHeat(requiredHeat.visualizeAsBlazeBurner())
                     .draw(graphics, getBackground().getWidth() / 2 + 3, 55);
+            ms.popPose();
         }
 
         // 搅拌杖：上下摇晃

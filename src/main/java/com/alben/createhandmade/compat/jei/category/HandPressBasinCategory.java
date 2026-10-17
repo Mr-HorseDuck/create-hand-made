@@ -118,8 +118,16 @@ public class HandPressBasinCategory extends BasinCategory {
         // 烈焰燃烧器（配方需要加热时才画）
         HeatCondition requiredHeat = recipe.getRequiredHeat();
         if (requiredHeat != HeatCondition.NONE) {
+            // ★ 图层修复：Create 的 AnimatedBlazeBurner#draw 内部固定 translate(..., z = 200)，
+            //   而工作盆我们画在 z = 100 ⇒ 燃烧室会盖在工作盆前面（GUI 里 3D 元素的先后由 z 决定，
+            //   不是调用顺序，所以调换两段代码的顺序没用）。
+            //   这里先把 PoseStack 往屏幕内部推 -150（燃烧室实际落在 z = 50），
+            //   它就在工作盆后面、同时仍在 2D 背景（z ≈ 0）之上。
+            ms.pushPose();
+            ms.translate(0f, 0f, -150f);
             heater.withHeat(requiredHeat.visualizeAsBlazeBurner())
                     .draw(graphics, getBackground().getWidth() / 2 + 3, 55);
+            ms.popPose();
         }
 
         // 锤子：上下砸击动画
