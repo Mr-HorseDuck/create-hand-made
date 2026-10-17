@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -18,7 +19,8 @@ import net.minecraft.world.item.ItemStack;
 
 public class BellowsItemRenderer extends CustomRenderedItemModelRenderer {
 
-    private static final int CHARGE_TICKS = 10;
+    // ★ 蓄力时长不再写死：与 BellowsItem 读同一份 SERVER 配置（tools.bellows.charge_ticks），
+    //   在 render() 里运行时读（SERVER 配置只在进入世界后加载，静态字段会抛 checkState）。
 
     /** 副手最终位置（主手物品局部空间） */
     private static final float TARGET_X = -0.5f;
@@ -66,7 +68,8 @@ public class BellowsItemRenderer extends CustomRenderedItemModelRenderer {
                 if (resolved != null) {
                     showOffhand = true;
                     progress = Math.min(1f,
-                            player.getTicksUsingItem() / (float) CHARGE_TICKS);
+                            player.getTicksUsingItem()
+                                    / (float) Math.max(1, ServerConfig.INSTANCE.bellowsChargeTicks.get()));
                 }
             }
         }

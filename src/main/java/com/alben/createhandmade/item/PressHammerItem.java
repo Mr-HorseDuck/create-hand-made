@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadePressingRecipe;
@@ -64,8 +65,8 @@ import java.util.UUID;
 @EventBusSubscriber
 public class PressHammerItem extends Item {
 
-    private static final int CHARGE_TICKS = 15;
-    private static final int CHARGE_WINDOW_TICKS = 20;
+    // 蓄力门槛 / 蓄力命中窗口已移到 ServerConfig（tools.press_hammer.*），运行时读 ——
+    // 见 releaseUsing() 与电荷窗口判定。不能进静态字段：SERVER 配置只在进入世界后加载。
 
     private static final Map<UUID, Long> CHARGE_SWING = new HashMap<>();
     private static final Map<UUID, Long> CHARGE_TARGET = new HashMap<>();
@@ -108,6 +109,27 @@ public class PressHammerItem extends Item {
 
     // ================= 蓄力 =================
 
+    /**
+     * 蓄力期间的反馈：<b>蓄力完成的那一刻</b>播一声轻提示（本地播，个人反馈，不广播）。
+     *
+     * <p>本类此前完全没有 {@code onUseTick} ⇒ 蓄力期间没有任何进行中反馈（只有 {@code UseAnim.BOW}
+     * 的抬手姿势）。这里用 {@code usedTicks == chargeTicks} <b>精确触发一次</b> ——
+     * 若写 {@code % chargeTicks} 会每 15/16 tick 重复响。</p>
+     *
+     * <p>音效选 Create 自带的 {@code AllSoundEvents.CONFIRM}（副标题就是 "Affirmative ding"，
+     * 语义是"就绪"提示）{@code player.playSound(...)} 在客户端调用即本地播放 ✓。</p>
+     */
+    @Override
+    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
+        if (!(entity instanceof Player player)) return;
+
+        int usedTicks = getUseDuration(stack, entity) - remainingTicks;
+        int chargeTicks = ServerConfig.INSTANCE.pressHammerChargeTicks.get();
+        if (usedTicks == chargeTicks && level.isClientSide) {
+            player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1f, 1.0f);
+        }
+    }
+
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
@@ -130,7 +152,8 @@ public class PressHammerItem extends Item {
         if (!(entity instanceof Player player)) return;
 
         int usedTicks = getUseDuration(stack, entity) - timeLeft;
-        if (usedTicks < CHARGE_TICKS) return;
+        // 蓄力门槛读 SERVER 配置（运行时读）
+        if (usedTicks < ServerConfig.INSTANCE.pressHammerChargeTicks.get()) return;
         if (level.isClientSide) return;
 
         long gameTime = level.getGameTime();
@@ -226,7 +249,7 @@ public class PressHammerItem extends Item {
         if (swingTime == null) return;
 
         long elapsed = player.level().getGameTime() - swingTime;
-        if (elapsed > CHARGE_WINDOW_TICKS) {
+        if (elapsed > ServerConfig.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_SWING.remove(player.getUUID());
             return;
         }
@@ -244,7 +267,7 @@ public class PressHammerItem extends Item {
         if (targetTime == null) return;
 
         long elapsed = target.level().getGameTime() - targetTime;
-        if (elapsed > CHARGE_WINDOW_TICKS) {
+        if (elapsed > ServerConfig.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_TARGET.remove(target.getUUID());
             return;
         }

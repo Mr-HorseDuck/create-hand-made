@@ -1,10 +1,12 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.network.BellowsBlastPacket;
 import com.alben.createhandmade.recipe.FanType;
 import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.api.registry.CreateBuiltInRegistries;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
@@ -64,7 +66,8 @@ import java.util.function.Consumer;
 @EventBusSubscriber
 public class BellowsItem extends Item {
 
-    private static final int CHARGE_TICKS = 10;  // 0.5 秒
+    // 蓄力门槛已移到 ServerConfig（tools.bellows.charge_ticks），运行时读 —— 见 releaseUsing()。
+    // 不能进静态字段：SERVER 配置只在进入世界后加载，静态读取会抛 checkState。
 
     /** 熔炼：着火时长（比烟熏长，参考鼓风 10 秒略缩短） */
     private static final int BLASTING_FIRE_TICKS = 120; // 6 秒
@@ -154,6 +157,26 @@ public class BellowsItem extends Item {
         return 72000;
     }
 
+    // ================= 蓄力刚满：提示音 =================
+
+    /**
+     * 蓄力刚满那一刻（{@code usedTicks == tools.bellows.charge_ticks}）播一声提示音，
+     * 与冲压锤 {@code PressHammerItem#onUseTick} 同一套做法、同一个音效
+     * （{@link AllSoundEvents#CONFIRM}，
+     *
+     * <p>只在客户端播：这是给操作者本人的即时反馈，而服务端的 {@code playSound(null, …)} 是广播，
+     * 会让附近所有人都听到 —— 蓄力提示音不该如此。风箱在此之前没有每 tick 逻辑，本方法只做这件事。</p>
+     */
+    @Override
+    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
+        if (!(entity instanceof Player player)) return;
+        int usedTicks = getUseDuration(stack, entity) - remainingTicks;
+        int chargeTicks = ServerConfig.INSTANCE.bellowsChargeTicks.get();
+        if (usedTicks == chargeTicks && level.isClientSide) {
+            player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
+        }
+    }
+
     // ================= 松手 =================
 
     @Override
@@ -161,7 +184,8 @@ public class BellowsItem extends Item {
         if (!(entity instanceof Player player)) return;
 
         int usedTicks = getUseDuration(stack, entity) - timeLeft;
-        if (usedTicks < CHARGE_TICKS) return;
+        // 蓄力门槛读 SERVER 配置（运行时读 —— SERVER 配置只在进入世界后加载）
+        if (usedTicks < ServerConfig.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
         // 副手介质
