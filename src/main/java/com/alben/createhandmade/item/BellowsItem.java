@@ -187,13 +187,15 @@ public class BellowsItem extends Item {
         if (usedTicks < ServerConfig.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
-        // 副手介质：先解析出「鼓风类型 id」，再从 Create 的类型注册表动态取类型对象。
-        // （T11 批次 1：不再转成本模组的 4 值枚举，任何注册进 Create 的第三方类型都能用）
+        // 副手介质：解析出「候选类型 id 列表」（T11 B2：可能不止一个 —— 装了多个鼓风扩展时，
+        // 同一介质会同时关联到 dndesires:sanding / create_processing:sanding 等）。
+        // 真正选哪个由 applyToTarget 按"能不能加工这一件 + getPriority()"决定；
+        // 这里的 type 只服务于两件不需要具体物品的事：实体效果、广播里的类型名。
         ItemStack media = player.getOffhandItem();
-        ResourceLocation fanTypeId = media.isEmpty() ? null : BellowsMediaRegistry.resolve(media);
-        FanProcessingType type = fanTypeId == null
-                ? null
-                : CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(fanTypeId);
+        List<ResourceLocation> candidateIds = media.isEmpty()
+                ? List.of()
+                : BellowsMediaRegistry.resolveAll(media);
+        FanProcessingType type = pickHighestPriority(candidateIds);
         String typeId = getTypeId(type);
 
         // 视线基础量
@@ -228,7 +230,7 @@ public class BellowsItem extends Item {
 
         boolean processed = false;
         if (pos != null && !particleItems.isEmpty() && type != null) {
-            processed = applyToTarget(level, pos, type, fanTypeId);
+            processed = applyToTarget(level, pos, candidateIds);
         }
 
         // ---- 路径 2：射线（独立计算终点） ----
@@ -469,8 +471,58 @@ public class BellowsItem extends Item {
         return null;
     }
 
-    private static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type,
-                                         ResourceLocation fanTypeId) {
+    /**
+     * 从候选类型 id 里挑一个"能吃下这一件"的<b>最高优先级</b>类型（T11 B2 的去重核心）。
+     *
+     * <p><b>顺序很重要</b>：先判断"这一件到底能不能被它加工"，再比 {@code getPriority()} ——
+     * 否则一个优先极高但吃不下该物品的类型会占着坑，把本可以加工的类型挡掉。</p>
+     *
+     * <p>"能不能加工" = <b>L3 独占配方命中</b> 或 <b>L1 {@code canProcess} 为真</b>。
+     * 必须把 L3 也算进去：只写了 L3 配方、没有对应 L1 配方的物品，{@code canProcess} 会是 false，
+     * 只按 canProcess 过滤就会把它漏掉。</p>
+     *
+     * @return 选中的 {@code (类型对象, 类型 id, 命中的 L3 配方)}；候选都吃不下则 null
+     */
+    @Nullable
+    private static BestMediaType selectBestType(Level level, ItemStack single, List<ResourceLocation> candidateIds) {
+        BestMediaType best = null;
+        for (ResourceLocation id : candidateIds) {
+            FanProcessingType candidate = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(id);
+            if (candidate == null) continue;
+
+            RecipeHolder<HandMadeBellowsRecipe> l3 = findL3BellowsRecipe(level, single, id);
+            boolean acceptable = l3 != null || candidate.canProcess(single, level);
+            if (!acceptable) continue;
+
+            if (best == null || candidate.getPriority() > best.type().getPriority()) {
+                best = new BestMediaType(candidate, id, l3);
+            }
+        }
+        return best;
+    }
+
+    /** {@link #selectBestType} 的结果：类型对象 + 类型 id + 命中的 L3 配方（可能为 null）。 */
+    private record BestMediaType(FanProcessingType type, ResourceLocation id,
+                                 @Nullable RecipeHolder<HandMadeBellowsRecipe> l3Recipe) {}
+
+    /**
+     * 只需要"一个类型"、没有具体物品可判定的场合（实体效果 / 广播的类型名）用：
+     * 直接取候选里优先级最高的可解析类型。实体没有"配方能不能吃"这一说，所以不筛 canProcess。
+     */
+    @Nullable
+    private static FanProcessingType pickHighestPriority(List<ResourceLocation> candidateIds) {
+        FanProcessingType best = null;
+        for (ResourceLocation id : candidateIds) {
+            FanProcessingType candidate = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(id);
+            if (candidate == null) continue;
+            if (best == null || candidate.getPriority() > best.getPriority()) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private static boolean applyToTarget(Level level, BlockPos pos, List<ResourceLocation> candidateIds) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -484,31 +536,28 @@ public class BellowsItem extends Item {
 
             ItemStack single = stack.copyWithCount(1);
 
-            // ★ L3 优先：独占配方（create_hand_made:bellows_recipe）只替换"物品加工"这一步。
-            //   命中条件 = 副手介质解析出的鼓风类型（fanType）与配方的 fan_type 相同。
-            //   未命中（含"没拿介质"：此时 type 为 null，本方法根本不会被调用）时，
-            //   原样回落到 Create 的鼓风逻辑（L1）—— 即 type.canProcess / type.process。
+            // ★ T11 B2：这一件物品可能同时被多个类型"认领"（沙子：dndesires:sanding /
+            //   create_processing:sanding / create_more_catalysts:sand_blow …）。
+            //   先筛"能不能加工这一件"，再取优先级最高的那个 —— 同一时间只触发一个类型。
             //
+            //   选定后仍是 L3 优先：独占配方（create_hand_made:bellows_recipe）只替换"物品加工"这一步；
+            //   L3 不存在时回落到 L1 的 type.process()。
             //   介质不消耗：与 L1 一致，本方法从不减少副手物品；
             //   加工成功只扣风箱自身 1 点耐久（见 releaseUsing 末尾）。
+            BestMediaType best = selectBestType(level, single, candidateIds);
+            if (best == null) return TransportedResult.doNothing();
+
             List<ItemStack> results = null;
-            // ★ 用介质解析出的「类型 id」匹配 L3 配方的 fan_type（两边都是 ResourceLocation）
-            if (fanTypeId != null) {
-                RecipeHolder<HandMadeBellowsRecipe> l3 = findL3BellowsRecipe(level, single, fanTypeId);
-                if (l3 != null) {
-                    // 与 L1 的 haunting / splashing 一样带 returnProcessingRemainder=true
-                    // （Create 的 blasting / smoking 传 false，那两族的 L1 配方是 vanilla cooking recipe，
-                    //  本模组的 L3 一律是 ProcessingRecipe，按后者口径统一）。
-                    results = RecipeApplier.applyRecipeOn(level, single, l3.value(), true);
-                }
+            if (best.l3Recipe() != null) {
+                // 与 L1 的 haunting / splashing 一样带 returnProcessingRemainder=true
+                // （Create 的 blasting / smoking 传 false，那两族的 L1 配方是 vanilla cooking recipe，
+                //  本模组的 L3 一律是 ProcessingRecipe，按后者口径统一）。
+                results = RecipeApplier.applyRecipeOn(level, single, best.l3Recipe().value(), true);
             }
 
-            // L1 回落：真正的"能不能加工"仍由 Create 的 FanProcessingType 决定
+            // L1：真正的"能不能加工"已由 selectBestType 用 canProcess 判过
             if (results == null) {
-                if (!type.canProcess(single, level)) return TransportedResult.doNothing();
-
-                results = type.process(single, level);
-
+                results = best.type().process(single, level);
                 if (results == null) return TransportedResult.doNothing();
             }
 
@@ -524,7 +573,7 @@ public class BellowsItem extends Item {
                 outputs.add(copy);
             }
 
-            type.spawnProcessingParticles(level, handler.getWorldPositionOf(item));
+            best.type().spawnProcessingParticles(level, handler.getWorldPositionOf(item));
 
             if (outputs.isEmpty()) {
                 if (left.isEmpty()) return TransportedResult.removeItem();

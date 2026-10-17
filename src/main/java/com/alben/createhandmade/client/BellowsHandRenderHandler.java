@@ -48,7 +48,7 @@ public class BellowsHandRenderHandler {
         // 介质必须存在且是合法介质（与渲染器绘制预览的条件严格对应）。
         ItemStack media = player.getItemInHand(mediaHand);
         if (media.isEmpty()) return;
-        if (BellowsMediaRegistry.resolve(media) == null) return;
+        if (!BellowsMediaRegistry.isMedia(media)) return;
 
         event.setCanceled(true);
     }

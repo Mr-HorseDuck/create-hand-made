@@ -59,13 +59,11 @@ public class BellowsItemRenderer extends CustomRenderedItemModelRenderer {
 
             if (player.getUsedItemHand() == myHand
                     && player.getItemInHand(myHand).getItem() instanceof BellowsItem) {
-                // 介质始终放在"另一只手"（T11 批次 1：resolve 返回的是类型 id，不是类型对象）
+                // 介质始终放在"另一只手"（T11 B2：介质判定 = 至少能触发一个类型；
+                // resolveAll 可能返回多个候选，这里只关心"有没有"）
                 off = player.getItemInHand(myHand == InteractionHand.MAIN_HAND
                         ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
-                ResourceLocation resolved = off.isEmpty()
-                        ? null
-                        : BellowsMediaRegistry.resolve(off);
-                if (resolved != null) {
+                if (BellowsMediaRegistry.isMedia(off)) {
                     showOffhand = true;
                     progress = Math.min(1f,
                             player.getTicksUsingItem()
