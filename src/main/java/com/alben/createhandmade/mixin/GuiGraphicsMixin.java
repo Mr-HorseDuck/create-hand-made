@@ -32,11 +32,25 @@ public class GuiGraphicsMixin {
 
     private static final int TEXTURE_SIZE = 16;
 
+    /**
+     * 注入<b>5 参数</b>重载（不是 3 参数）。
+     *
+     * <p>原因（T10 排查结论）：`GuiGraphics` 有两个重载，而 3 参数那个只是把
+     * {@code text = null} 转调 5 参数版本 ——</p>
+     * <pre>
+     * renderItemDecorations(Font, ItemStack, int, int)            // aconst_null → 转调下面那个
+     * renderItemDecorations(Font, ItemStack, int, int, String)    // 真正画数量/耐久的地方
+     * </pre>
+     * <p>快捷栏 HUD 走 3 参数（所以一直能显示液体 ✓），而物品栏/容器槽位
+     * （{@code AbstractContainerScreen#renderSlot}）会带数量字符串<b>直接</b>调 5 参数 ⇒
+     * 原来只注入 3 参数时物品栏里根本不触发 ✗。改成注入 5 参数即可两头都覆盖
+     * （3 参数的调用会转调进来），且不会重复绘制。</p>
+     */
     @Inject(
-            method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;II)V",
+            method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
             at = @At("HEAD")
     )
-    private void createHandMade$fluidUnderlay(Font font, ItemStack stack, int x, int y, CallbackInfo ci) {
+    private void createHandMade$fluidUnderlay(Font font, ItemStack stack, int x, int y, String text, CallbackInfo ci) {
         if (!(stack.getItem() instanceof InfusionGunItem)) return;
 
         FluidStack fluid = InfusionGunItem.getContents(stack).fluid();
