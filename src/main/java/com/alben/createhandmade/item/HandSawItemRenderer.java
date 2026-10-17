@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.ServerConfig;
+import com.alben.createhandmade.util.StickyUseSession;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
@@ -19,13 +21,11 @@ import java.util.UUID;
 
 public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
 
-    /** 砍树姿态：从 0 到 1 的伸出过程所需 tick */
+    /** 砍树姿态：从 0 到 1 的伸出过程所需 tick（渲染器独有，不进 config） */
     private static final float FELL_WINDUP = 5f;
 
-    /** ★ 切削起手阶段：位移 0.5 秒 */
-    private static final float CUT_MOVE_TICKS = 10f;
-    /** ★ 切削振动阶段：1 秒 */
-    private static final float CUT_VIBRATE_TICKS = 20f;
+    // ★ 切削的起手时长不再在这里写死：与 HandSawItem 读同一份 SERVER 配置，
+    //   在 render() 里运行时读（SERVER 配置只在进入世界后加载，静态字段会抛 checkState）。
 
     /** 每个玩家"开始砍树姿态"时的 tickCount，用于做渐进 */
     private static final Map<UUID, Integer> FELL_START_TICK = new HashMap<>();
@@ -79,12 +79,16 @@ public class HandSawItemRenderer extends CustomRenderedItemModelRenderer {
 
             if (rightUsing) {
                 cutting = true;
-                int usedTicks = player.getTicksUsingItem();
 
-                // ★ 阶段 1：位移进度（0 → 1，持续 CUT_MOVE_TICKS）
-                moveProgress = Math.min(1f, usedTicks / CUT_MOVE_TICKS);
+                // ★ 阶段 1：位移进度（0 → 1，持续 windupTicks）
+                // 会话计时（连续切削只在第一次起手）：起手时长读 SERVER 配置（运行时读）
+                int elapsed = StickyUseSession.elapsedTicks(player, stack, InteractionHand.MAIN_HAND,
+                        StickyUseSession.DEFAULT_STICKY_TICKS);
+                if (elapsed < 0) elapsed = player.getTicksUsingItem();   // 兜底（上面的判定理论上已保证在会话内）
+                float windupTicks = Math.max(1, ServerConfig.INSTANCE.handSawWindupTicks.get());
+                moveProgress = Math.min(1f, elapsed / windupTicks);
                 // ★ 阶段 2：振动渐入包络（3 tick 内进入满幅，之后保持满幅）
-                float afterMove = Math.max(0f, usedTicks - CUT_MOVE_TICKS);
+                float afterMove = Math.max(0f, elapsed - windupTicks);
                 vibrateProgress = Math.min(1f, afterMove / 3f);
 
                 // 原料固定在副手槽（手锯不设计成副手可用，见 HandSawItem.use()）
