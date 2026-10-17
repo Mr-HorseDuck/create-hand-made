@@ -15,7 +15,6 @@ import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.item.ModItems;
-import com.alben.createhandmade.recipe.FanType;
 import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
@@ -29,6 +28,7 @@ import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.AllRecipeTypes;
+import com.simibubi.create.api.registry.CreateBuiltInRegistries;
 import com.simibubi.create.compat.jei.CreateJEI;
 import com.simibubi.create.compat.jei.DoubleItemIcon;
 import com.simibubi.create.compat.jei.EmptyBackground;
@@ -41,6 +41,7 @@ import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.AllFanProcessingTypes;
+import com.simibubi.create.content.kinetics.fan.processing.FanProcessingType;
 import com.simibubi.create.content.kinetics.fan.processing.HauntingRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.SplashingRecipe;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
@@ -259,7 +260,7 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
         );
         allCategories.add(new BellowsCookingCategory(bellowsBlastingInfo,
-                () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.BLASTING)));
+                () -> BellowsMediaRegistry.getMediaFor(fanTypeId(AllFanProcessingTypes.BLASTING))));
 
         // ==================== 风箱 · 烟熏 ====================
         CreateRecipeCategory.Info<AbstractCookingRecipe> bellowsSmokingInfo = new CreateRecipeCategory.Info<>(
@@ -273,7 +274,7 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
         );
         allCategories.add(new BellowsCookingCategory(bellowsSmokingInfo,
-                () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SMOKING)));
+                () -> BellowsMediaRegistry.getMediaFor(fanTypeId(AllFanProcessingTypes.SMOKING))));
 
         // ==================== 风箱 · 缠魂 ====================
         CreateRecipeCategory.Info<HauntingRecipe> bellowsHauntingInfo = new CreateRecipeCategory.Info<>(
@@ -287,7 +288,7 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
         );
         allCategories.add(new BellowsHauntingCategory(bellowsHauntingInfo,
-                () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.HAUNTING)));
+                () -> BellowsMediaRegistry.getMediaFor(fanTypeId(AllFanProcessingTypes.HAUNTING))));
 
         // ==================== 风箱 · 洗涤 ====================
         CreateRecipeCategory.Info<SplashingRecipe> bellowsSplashingInfo = new CreateRecipeCategory.Info<>(
@@ -301,7 +302,7 @@ public class CreateHandMadeJEI implements IModPlugin {
                 List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
         );
         allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
-                () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SPLASHING)));
+                () -> BellowsMediaRegistry.getMediaFor(fanTypeId(AllFanProcessingTypes.SPLASHING))));
 
         registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
     }
@@ -661,7 +662,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         // 6. 追加 L3 独占配方（create_hand_made:bellows_recipe, fan_type=blasting）。
         //    刻意放在最后：它只按 fan_type 归类，不参与上面那几步 L1 去重 / 自动化过滤
         //    （独占配方本来就是"手搓"语义，不该被 _manual_only 那套规则挡住）。
-        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.BLASTING)) {
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(fanTypeId(AllFanProcessingTypes.BLASTING))) {
             AbstractCookingRecipe proxy = asBellowsCookingProxy(h.value(), true);
             if (proxy != null) {
                 result.add(new RecipeHolder<>(h.id(), proxy));
@@ -691,7 +692,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         result.removeIf(AllRecipeTypes.CAN_BE_AUTOMATED.negate());
 
         // L3 独占配方（fan_type=smoking）；位置与理由同 blasting
-        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.SMOKING)) {
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(fanTypeId(AllFanProcessingTypes.SMOKING))) {
             AbstractCookingRecipe proxy = asBellowsCookingProxy(h.value(), false);
             if (proxy != null) {
                 result.add(new RecipeHolder<>(h.id(), proxy));
@@ -711,7 +712,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         }
 
         // L3 独占配方（fan_type=haunting）：包成 HauntingRecipe 后混进同一类别
-        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.HAUNTING)) {
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(fanTypeId(AllFanProcessingTypes.HAUNTING))) {
             HauntingRecipe proxy = asBellowsProcessingProxy(HauntingRecipe::new, h.id(), h.value());
             if (proxy != null) {
                 result.add(new RecipeHolder<>(h.id(), proxy));
@@ -731,7 +732,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         }
 
         // L3 独占配方（fan_type=splashing）：同上
-        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(FanType.SPLASHING)) {
+        for (RecipeHolder<HandMadeBellowsRecipe> h : collectBellowsExclusive(fanTypeId(AllFanProcessingTypes.SPLASHING))) {
             SplashingRecipe proxy = asBellowsProcessingProxy(SplashingRecipe::new, h.id(), h.value());
             if (proxy != null) {
                 result.add(new RecipeHolder<>(h.id(), proxy));
@@ -754,7 +755,7 @@ public class CreateHandMadeJEI implements IModPlugin {
      * <p>只做 {@code fan_type} 过滤；"这条配方是否匹配某个物品"由配方自己的 {@code matches}
      * 在游戏内判定（JEI 类别只负责展示）。</p>
      */
-    private static List<RecipeHolder<HandMadeBellowsRecipe>> collectBellowsExclusive(FanType fanType) {
+    private static List<RecipeHolder<HandMadeBellowsRecipe>> collectBellowsExclusive(ResourceLocation fanTypeId) {
         List<RecipeHolder<HandMadeBellowsRecipe>> result = new ArrayList<>();
         Level level = Minecraft.getInstance().level;
         if (level == null) return result;
@@ -762,10 +763,21 @@ public class CreateHandMadeJEI implements IModPlugin {
         for (RecipeHolder<?> holder : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
             if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
-            if (recipe.getFanType() != fanType) continue;
+            if (!fanTypeId.equals(recipe.getFanTypeId())) continue;
             result.add(new RecipeHolder<>(holder.id(), recipe));
         }
         return result;
+    }
+
+    /**
+     * Create 内置鼓风类型 → 类型 id（{@code create:blasting} 等）。
+     *
+     * <p>T11 批次 1 起 {@code fan_type} 是 {@link ResourceLocation}，JEI 这边按 id 分组；
+     * 用注册表反查而不是写死字符串，Create 若改 id 这里会跟着变。</p>
+     */
+    private static ResourceLocation fanTypeId(FanProcessingType type) {
+        ResourceLocation id = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.getKey(type);
+        return id != null ? id : ResourceLocation.fromNamespaceAndPath("create", "blasting");
     }
 
     /**

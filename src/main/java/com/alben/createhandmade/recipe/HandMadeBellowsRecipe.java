@@ -2,6 +2,7 @@ package com.alben.createhandmade.recipe;
 
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
 import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -17,9 +18,10 @@ import org.jetbrains.annotations.Nullable;
  * （{@code StandardProcessingRecipe.java:18}），于是 {@code getType()} 返回
  * {@code create_hand_made:bellows_recipe} —— Create 的机器与鼓风机都查不到。</p>
  *
- * <p><b>{@link #fanType} 不在 params 里：</b>{@code ProcessingRecipeParams} 的字段是
+ * <p><b>{@link #fanTypeId} 不在 params 里：</b>{@code ProcessingRecipeParams} 的字段是
  * {@code protected}（{@code ProcessingRecipeParams.java:27-32}），外部包读不到；
- * 所以它由 {@link HandMadeBellowsRecipeSerializer} 自己从 JSON 读 {@code fan_type} 后写入。</p>
+ * 所以它由 {@link HandMadeBellowsRecipeSerializer} 自己从 JSON 读 {@code fan_type} 后写入。
+ * T11 批次 1 起它是<b>鼓风类型的 id</b>（{@code create:blasting} 等），不再是本模组的 4 值枚举。</p>
  *
  * <p><b>上限的取值依据：</b></p>
  * <ul>
@@ -35,9 +37,12 @@ import org.jetbrains.annotations.Nullable;
  */
 public class HandMadeBellowsRecipe extends StandardProcessingRecipe<RecipeInput> {
 
-    /** 这条独占配方属于哪种鼓风；由 {@link HandMadeBellowsRecipeSerializer} 在 decode 后写入。 */
+    /**
+     * 这条独占配方属于哪种鼓风（类型 id，如 {@code create:blasting}）；
+     * 由 {@link HandMadeBellowsRecipeSerializer} 在 decode 后写入。
+     */
     @Nullable
-    private FanType fanType;
+    private ResourceLocation fanTypeId;
 
     public HandMadeBellowsRecipe(ProcessingRecipeParams params) {
         super(HandMadeRecipeTypes.BELLOWS_RECIPE, params);
@@ -93,11 +98,11 @@ public class HandMadeBellowsRecipe extends StandardProcessingRecipe<RecipeInput>
     }
 
     @Nullable
-    public FanType getFanType() {
-        return fanType;
+    public ResourceLocation getFanTypeId() {
+        return fanTypeId;
     }
 
-    public void setFanType(@Nullable FanType fanType) {
-        this.fanType = fanType;
+    public void setFanTypeId(@Nullable ResourceLocation fanTypeId) {
+        this.fanTypeId = fanTypeId;
     }
 }

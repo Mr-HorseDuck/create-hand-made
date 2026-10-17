@@ -4,7 +4,7 @@ import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.simibubi.create.content.kinetics.fan.processing.FanProcessingType;
+import net.minecraft.resources.ResourceLocation;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModelRenderer;
 import com.simibubi.create.foundation.item.render.PartialItemModelRenderer;
@@ -59,10 +59,10 @@ public class BellowsItemRenderer extends CustomRenderedItemModelRenderer {
 
             if (player.getUsedItemHand() == myHand
                     && player.getItemInHand(myHand).getItem() instanceof BellowsItem) {
-                // 介质始终放在"另一只手"
+                // 介质始终放在"另一只手"（T11 批次 1：resolve 返回的是类型 id，不是类型对象）
                 off = player.getItemInHand(myHand == InteractionHand.MAIN_HAND
                         ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
-                FanProcessingType resolved = off.isEmpty()
+                ResourceLocation resolved = off.isEmpty()
                         ? null
                         : BellowsMediaRegistry.resolve(off);
                 if (resolved != null) {

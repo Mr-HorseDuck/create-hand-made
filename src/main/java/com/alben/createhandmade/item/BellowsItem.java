@@ -3,7 +3,6 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.network.BellowsBlastPacket;
-import com.alben.createhandmade.recipe.FanType;
 import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
@@ -188,9 +187,13 @@ public class BellowsItem extends Item {
         if (usedTicks < ServerConfig.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
-        // 副手介质
+        // 副手介质：先解析出「鼓风类型 id」，再从 Create 的类型注册表动态取类型对象。
+        // （T11 批次 1：不再转成本模组的 4 值枚举，任何注册进 Create 的第三方类型都能用）
         ItemStack media = player.getOffhandItem();
-        FanProcessingType type = media.isEmpty() ? null : BellowsMediaRegistry.resolve(media);
+        ResourceLocation fanTypeId = media.isEmpty() ? null : BellowsMediaRegistry.resolve(media);
+        FanProcessingType type = fanTypeId == null
+                ? null
+                : CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(fanTypeId);
         String typeId = getTypeId(type);
 
         // 视线基础量
@@ -225,7 +228,7 @@ public class BellowsItem extends Item {
 
         boolean processed = false;
         if (pos != null && !particleItems.isEmpty() && type != null) {
-            processed = applyToTarget(level, pos, type);
+            processed = applyToTarget(level, pos, type, fanTypeId);
         }
 
         // ---- 路径 2：射线（独立计算终点） ----
@@ -438,31 +441,6 @@ public class BellowsItem extends Item {
     // ================= 加工 =================
 
     /**
-     * 把 Create 的鼓风类型映射成本模组配方层的 {@link FanType}。
-     *
-     * <p><b>为什么放在这里（而不是 {@code BellowsMediaRegistry} 或 {@code FanType} 里）：</b></p>
-     * <ul>
-     *   <li>放在 {@link FanType} 会让 {@code recipe} 包 import Create 的风扇实现类
-     *       （{@code AllFanProcessingTypes}），而批次 1 的 {@code FanType} 注释明确说了
-     *       "刻意不引用 Create 的类型对象" —— 这条边界要守住；</li>
-     *   <li>放在 {@link BellowsMediaRegistry} 更"对称"（它已经拥有"介质 → Create 类型"的正向映射），
-     *       但目前只有本类这一个调用点，而批次 1 的 {@code FanType} 注释已经写明
-     *       "与 Create 类型的映射放在使用方（BellowsItem）"。等将来 JEI / L2 也需要反查时
-     *       再把它挪进 registry 包即可。</li>
-     * </ul>
-     *
-     * @return 对应的 {@link FanType}；未知类型（理论上不会发生）返回 null
-     */
-    @Nullable
-    private static FanType toFanType(FanProcessingType createType) {
-        if (createType == AllFanProcessingTypes.BLASTING) return FanType.BLASTING;
-        if (createType == AllFanProcessingTypes.SMOKING) return FanType.SMOKING;
-        if (createType == AllFanProcessingTypes.HAUNTING) return FanType.HAUNTING;
-        if (createType == AllFanProcessingTypes.SPLASHING) return FanType.SPLASHING;
-        return null;
-    }
-
-    /**
      * 查一条能加工 {@code item} 的 L3 独占配方（{@code create_hand_made:bellows_recipe}）。
      *
      * <p><b>刻意不走 {@link com.alben.createhandmade.recipe.HandMadeRecipePool}：</b>
@@ -478,19 +456,21 @@ public class BellowsItem extends Item {
      */
     @Nullable
     private static RecipeHolder<HandMadeBellowsRecipe> findL3BellowsRecipe(Level level, ItemStack item,
-                                                                          FanType fanType) {
+                                                                          ResourceLocation fanTypeId) {
         SingleRecipeInput input = new SingleRecipeInput(item);
         for (RecipeHolder<?> holder : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
             if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
-            if (recipe.getFanType() != fanType) continue;
+            // 两边都是类型 id（create:blasting 等）；配方侧 null 视为不匹配
+            if (!fanTypeId.equals(recipe.getFanTypeId())) continue;
             if (!recipe.matches(input, level)) continue;
             return new RecipeHolder<>(holder.id(), recipe);
         }
         return null;
     }
 
-    private static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
+    private static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type,
+                                         ResourceLocation fanTypeId) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -512,9 +492,9 @@ public class BellowsItem extends Item {
             //   介质不消耗：与 L1 一致，本方法从不减少副手物品；
             //   加工成功只扣风箱自身 1 点耐久（见 releaseUsing 末尾）。
             List<ItemStack> results = null;
-            FanType fanType = toFanType(type);
-            if (fanType != null) {
-                RecipeHolder<HandMadeBellowsRecipe> l3 = findL3BellowsRecipe(level, single, fanType);
+            // ★ 用介质解析出的「类型 id」匹配 L3 配方的 fan_type（两边都是 ResourceLocation）
+            if (fanTypeId != null) {
+                RecipeHolder<HandMadeBellowsRecipe> l3 = findL3BellowsRecipe(level, single, fanTypeId);
                 if (l3 != null) {
                     // 与 L1 的 haunting / splashing 一样带 returnProcessingRemainder=true
                     // （Create 的 blasting / smoking 传 false，那两族的 L1 配方是 vanilla cooking recipe，
