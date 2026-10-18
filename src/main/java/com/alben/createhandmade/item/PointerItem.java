@@ -4,7 +4,9 @@ import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
+import com.alben.createhandmade.recipe.type.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -13,6 +15,7 @@ import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.recipe.RecipeApplier;
@@ -111,20 +114,20 @@ public class PointerItem extends Item {
         if (held.isEmpty()) return;
 
         Recipe<?> found = findRecipe(level, held, tool);
-        if (!(found instanceof ItemApplicationRecipe recipe)) return;
+        if (!isApplicationRecipe(found)) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
 
         if (!level.isClientSide) {
-            executeDepotProcess(player, level, pos, tool, held, recipe, depot);
+            executeDepotProcess(player, level, pos, tool, held, found, depot);
         }
     }
 
     // ================= 置物台加工 =================
 
     private static void executeDepotProcess(Player player, Level level, BlockPos pos,
-                                            ItemStack tool, ItemStack held, ItemApplicationRecipe recipe,
+                                            ItemStack tool, ItemStack held, Recipe<?> recipe,
                                             DepotBlockEntity depot) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
@@ -233,17 +236,17 @@ public class PointerItem extends Item {
             if (held.isEmpty()) return TransportedResult.doNothing();
 
             Recipe<?> found = findRecipe(level, held, tool);
-            if (!(found instanceof ItemApplicationRecipe recipe)) {
+            if (!isApplicationRecipe(found)) {
                 return TransportedResult.doNothing();
             }
 
             List<ItemStack> results = RecipeApplier.applyRecipeOn(
-                    level, held.copyWithCount(1), recipe, true);
+                    level, held.copyWithCount(1), found, true);
 
             success[0] = true;
             particleItem[0] = held.copy();
 
-            consumeTool(player, tool, recipe);
+            consumeTool(player, tool, found);
 
             ItemStack left = held.copy();
             left.shrink(1);
@@ -285,18 +288,31 @@ public class PointerItem extends Item {
 
     // ================= 三层配方查询 =================
 
+    /**
+     * 三层查询：L3 独立 type → L1 序列组装 → L1 DEPLOYING / ITEM_APPLICATION。
+     *
+     * 返回类型是 Recipe<?>，因为 HandMadeApplicationRecipe 不是
+     * ItemApplicationRecipe 的子类。
+     */
     @Nullable
     private static Recipe<?> findRecipe(Level level, ItemStack target, ItemStack tool) {
         if (target.isEmpty()) return null;
 
-        List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
-                ToolType.POINTER, level, target);
-        for (Recipe<?> r : custom) {
-            if (r instanceof ItemApplicationRecipe) {
-                return r;
-            }
+        // ---- 段 1：L3 独立 type ----
+        ItemStackHandler l3Handler = new ItemStackHandler(2);
+        l3Handler.setStackInSlot(0, target.copyWithCount(1));
+        l3Handler.setStackInSlot(1, tool.copyWithCount(1));
+        RecipeWrapper l3Wrapper = new RecipeWrapper(l3Handler);
+
+        for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(r instanceof HandMadeApplicationRecipe har)) continue;
+            if (har.getTool() != ToolType.POINTER) continue;
+            if (!har.matches(l3Wrapper, level)) continue;
+            return har;
         }
 
+        // ---- 段 2 + 3：L1 ----
         ItemStackHandler tempInv = new ItemStackHandler(2);
         tempInv.setStackInSlot(0, target);
         tempInv.setStackInSlot(1, tool);
@@ -332,10 +348,21 @@ public class PointerItem extends Item {
 
     // ================= 辅助 =================
 
-    private static void consumeTool(Player player, ItemStack tool, ItemApplicationRecipe recipe) {
-        if (recipe.shouldKeepHeldItem()) {
-            return;
+    /** 判断是否是应用家族的配方——同时接受 Create 的 ItemApplicationRecipe 和本模组的 L3 类。 */
+    private static boolean isApplicationRecipe(@Nullable Recipe<?> recipe) {
+        return recipe instanceof ItemApplicationRecipe
+                || recipe instanceof HandMadeApplicationRecipe;
+    }
+
+    private static void consumeTool(Player player, ItemStack tool, Recipe<?> recipe) {
+        boolean keep = false;
+        if (recipe instanceof ItemApplicationRecipe iar) {
+            keep = iar.shouldKeepHeldItem();
+        } else if (recipe instanceof HandMadeApplicationRecipe har) {
+            keep = har.shouldKeepHeldItem();
         }
+        if (keep) return;
+
         if (tool.getMaxDamage() > 0) {
             tool.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.OFFHAND));
         } else {

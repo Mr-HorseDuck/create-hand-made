@@ -1,7 +1,12 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.enchantment.BatchCraftingHelper;
+import com.alben.createhandmade.item.contents.MortarContents;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.Config;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
@@ -41,8 +46,11 @@ import java.util.function.Consumer;
 
 public class MortarItem extends Item implements CustomUseEffectsItem {
 
-    public static final int FORCED_DURATION = 100;
-    private static final int WINDUP_TICKS = FORCED_DURATION / 5;
+    int windupTicks = Config.INSTANCE.mortarWindupTicks.get();   // 碾钵用 crusherMortarWindupTicks
+    int processingTicks = Config.INSTANCE.mortarProcessingTicks.get();   // 碾钵用 crusherMortarProcessingTicks
+
+    /** ★ 保底音标记：本次加工是否已经播过常规研磨音 */
+    private static final String NBT_SOUND_PLAYED = "HandMadeGrindSoundPlayed";
 
     public MortarItem(Properties properties) {
         super(properties);
@@ -55,6 +63,10 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 右键：副手取物，开始研磨 =================
 
+    /**
+     * ★ 批量加工：读附魔等级，从副手一次性取 N 份塞进 MortarContents。
+     *   实际取数受副手数量限制。
+     */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
@@ -75,12 +87,20 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
-        ItemStack toGrind = input.copyWithCount(1);
+        // ★ 批量：读附魔等级，受副手数量限制
+        int batchSize = BatchCraftingHelper.getBatchSize(stack);
+        int take = BatchCraftingHelper.clampToAvailable(batchSize, input.getCount());
+        if (take <= 0) take = 1;
+
+        ItemStack toGrind = input.copyWithCount(take);
         if (!level.isClientSide) {
-            input.shrink(1);
+            input.shrink(take);
             player.setItemInHand(otherHand, input);
         }
         new MortarContents(toGrind).writeToStack(stack);
+
+        // ★ 重置保底音标记：新一轮加工开始
+        stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, false);
 
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
@@ -90,13 +110,20 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public int getUseDuration(ItemStack stack) {
-        MortarContents contents = MortarContents.fromStack(stack);
-        if (contents == null || contents.stack().isEmpty()) return 0;
-        return FORCED_DURATION;
+    MortarContents contents = MortarContents.fromStack(stack);
+    if (contents == null || contents.stack().isEmpty()) return 0;
+    int windupTicks = Config.INSTANCE.mortarWindupTicks.get();
+    int processingTicks = Config.INSTANCE.mortarProcessingTicks.get();
+    return windupTicks + processingTicks;
     }
 
     // ================= 完成：产出研磨结果 =================
 
+    /**
+     * ★ 批量加工：MortarContents 里的数量即实际加工份数，产物 × count。
+     * ★ 保底音：如果本次加工 onUseTick 一次都没播过研磨音（加工时间极短时可能发生），
+     *   在这里补一声。
+     */
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
@@ -106,17 +133,38 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
         if (level.isClientSide) return stack;
 
+        // ★ 批量：以 MortarContents 里的数量为准（1 级=2, 2级=4, 3级=8，受副手限制）
+        int count = contents.stack().getCount();
+        if (count <= 0) count = 1;
+
+        boolean produced = false;
         Recipe<?> recipe = findRecipe(level, contents.stack());
         if (recipe instanceof ProcessingRecipe<?> pr) {
-            List<ItemStack> results = pr.rollResults();
-            for (ItemStack result : results) {
-                if (!result.isEmpty()) {
-                    player.getInventory().placeItemBackInInventory(result);
+            List<ItemStack> singleResults = pr.rollResults();
+            // 产物 × count，按 maxStackSize 拆分发放
+            for (ItemStack single : singleResults) {
+                if (single.isEmpty()) continue;
+                produced = true;
+                int total = single.getCount() * count;
+                int max = single.getMaxStackSize();
+                while (total > 0) {
+                    int give = Math.min(total, max);
+                    ItemStack copy = single.copy();
+                    copy.setCount(give);
+                    player.getInventory().placeItemBackInInventory(copy);
+                    total -= give;
                 }
             }
         }
 
+        // ★ 保底音：加工确实产出了东西，但常规音效一次都没播
+        if (produced && !stack.getOrCreateTag().getBoolean(NBT_SOUND_PLAYED)) {
+            level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
+                    SoundSource.PLAYERS, 0.8f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+        }
+
         MortarContents.clearFromStack(stack);
+        stack.removeTagKey(NBT_SOUND_PLAYED);
 
         EquipmentSlot slot = entity.getUsedItemHand() == InteractionHand.MAIN_HAND
                 ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
@@ -126,6 +174,9 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 中途松手：退还物品 =================
 
+    /**
+     * ★ 批量：contents.stack() 已经是 take 份的整栈，整个退回去即可。
+     */
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
@@ -139,33 +190,33 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
             player.getInventory().placeItemBackInInventory(input);
         }
         MortarContents.clearFromStack(stack);
+        stack.removeTagKey(NBT_SOUND_PLAYED);
     }
 
     // ================= 三层配方查询 =================
 
-    /**
-     * ★ 三层模型：
-     *   L3 独占配方（命中直接返回）
-     *   L1 原有 Create 配方
-     *   L2 数据包过滤
-     *
-     * ★ 女仆兼容：改为 public static
-     */
     @Nullable
     public static Recipe<?> findRecipe(Level level, ItemStack input) {
         if (input.isEmpty()) return null;
-
-        List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
-                ToolType.MORTAR, level, input);
-        if (!custom.isEmpty()) return custom.get(0);
 
         ItemStackHandler handler = new ItemStackHandler(1);
         handler.setStackInSlot(0, input.copyWithCount(1));
         RecipeWrapper wrapper = new RecipeWrapper(handler);
 
+        // ---- 段 1：L3 独立 type ----
+        for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+            if (like.getTool() != ToolType.MORTAR) continue;
+            if (!r.matches(wrapper, level)) continue;
+            return r;
+        }
+
+        // ---- 段 2：L1 Create 的 MILLING ----
         Optional<MillingRecipe> recipeOpt = AllRecipeTypes.MILLING.find(wrapper, level);
         if (recipeOpt.isEmpty()) return null;
 
+        // ---- L2 过滤 ----
         List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                 ToolType.MORTAR, level, List.of(recipeOpt.get()));
         return filtered.isEmpty() ? null : filtered.get(0);
@@ -173,10 +224,6 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 女仆一次性研磨辅助 =================
 
-    /**
-     * ★ 女仆一次性研磨。
-     *   副手优先，副手空则从 inputInv 取；产物进 outputInv，失败退女仆背包。
-     */
     public static boolean tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
                                         @Nullable IItemHandler inputInv,
                                         @Nullable IItemHandler outputInv,
@@ -316,7 +363,7 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public UseAnim getUseAnimation(ItemStack stack) {
-        return UseAnim.EAT;
+        return UseAnim.NONE;
     }
 
     @Override
@@ -326,6 +373,9 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 每 tick：音效 + 粒子 =================
 
+    /**
+     * ★ 播了常规研磨音后，标记 NBT_SOUND_PLAYED = true，供 finishUsingItem 判断是否需要保底音。
+     */
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         MortarContents contents = MortarContents.fromStack(stack);
@@ -335,11 +385,14 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
         int totalDuration = getUseDuration(stack);
         int usedTicks = totalDuration - remainingTicks;
 
-        if (usedTicks < WINDUP_TICKS || usedTicks % 4 != 0) return;
+        if (usedTicks < Config.INSTANCE.mortarWindupTicks.get() || usedTicks % 4 != 0) return;
 
         if (!level.isClientSide) {
             level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
                     SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
+
+            // ★ 标记：本次加工已经播过常规音
+            stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, true);
 
             if (level instanceof ServerLevel serverLevel) {
                 Vec3 eye = entity.getEyePosition(1f);

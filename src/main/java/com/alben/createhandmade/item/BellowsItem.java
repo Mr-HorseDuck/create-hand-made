@@ -3,6 +3,8 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.network.BellowsBlastPacket;
 import com.alben.createhandmade.network.ModNetwork;
+import com.alben.createhandmade.Config;
+import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
 import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
@@ -57,7 +59,7 @@ import java.util.function.Consumer;
 @Mod.EventBusSubscriber
 public class BellowsItem extends Item {
 
-    private static final int CHARGE_TICKS = 10;
+    int chargeTicks = Config.INSTANCE.bellowsChargeTicks.get();
 
     private static final int BLASTING_FIRE_TICKS = 120;
     private static final int SMOKING_FIRE_TICKS = 40;
@@ -136,6 +138,28 @@ public class BellowsItem extends Item {
         return 72000;
     }
 
+    // ================= 蓄力刚满：提示音 =================
+
+    /**
+     * 蓄力刚满那一刻（usedTicks == CHARGE_TICKS）播一声提示音。
+     *
+     * <p>与冲压锤同一套做法、同一个音效 {@link AllSoundEvents#CONFIRM}（Create 自带的
+     * "确认叮"，语义是"就绪"）。只在客户端播：这是给操作者本人的即时反馈，
+     * 服务端 {@code playSound(null, …)} 会广播给附近所有人，蓄力提示音不该如此。</p>
+     *
+     * <p>用 {@code usedTicks == CHARGE_TICKS} 精确触发一次 —— 若写
+     * {@code usedTicks % CHARGE_TICKS} 会每 10 tick 重复响。</p>
+     */
+    @Override
+    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
+    if (!(entity instanceof Player player)) return;
+    int usedTicks = getUseDuration(stack) - remainingTicks;
+    int chargeTicks = Config.INSTANCE.bellowsChargeTicks.get();
+    if (usedTicks == chargeTicks && level.isClientSide) {
+        player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
+    }
+    }
+
     // ================= 松手 =================
 
     @Override
@@ -146,7 +170,7 @@ public class BellowsItem extends Item {
         if (player.getUsedItemHand() != InteractionHand.MAIN_HAND) return;
 
         int usedTicks = getUseDuration(stack) - timeLeft;
-        if (usedTicks < CHARGE_TICKS) return;
+        if (usedTicks < Config.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
         ItemStack media = player.getOffhandItem();

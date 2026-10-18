@@ -1,6 +1,11 @@
 package com.alben.createhandmade.recipe;
 
 import com.alben.createhandmade.CreateHandMade;
+import com.alben.createhandmade.recipe.serializer.HandMadeBellowsRecipeSerializer;
+import com.alben.createhandmade.recipe.serializer.HandMadeStonecuttingRecipeSerializer;
+import com.alben.createhandmade.recipe.serializer.HandMadeToolRecipeSerializer;
+import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.recipe.IRecipeTypeInfo;
 import net.minecraft.core.registries.Registries;

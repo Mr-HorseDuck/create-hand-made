@@ -1,8 +1,13 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.Config;
+import com.alben.createhandmade.enchantment.BatchCraftingHelper;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.kinetics.saw.SawBlockEntity;
@@ -74,9 +79,8 @@ import java.util.function.Consumer;
 @Mod.EventBusSubscriber
 public class HandSawItem extends Item {
 
-    private static final int CUT_MOVE_TICKS = 10;
-    private static final int CUT_VIBRATE_TICKS = 20;
-    private static final int CUT_DURATION = CUT_MOVE_TICKS + CUT_VIBRATE_TICKS;
+    int windupTicks = Config.INSTANCE.handSawWindupTicks.get();
+    int cutTicks = Config.INSTANCE.handSawCutTicks.get();
     private static final int FELL_SOUND_INTERVAL = 4;
 
     public static final String NBT_RECIPE_INDEX = "HandSawRecipeIndex";
@@ -130,12 +134,6 @@ public class HandSawItem extends Item {
         return UseAnim.BOW;
     }
 
-    /**
-     * ★ 连续切削：使用时长恒为"无限"（72000），真正的结算周期由 onUseTick 按 CUT_DURATION 控制，
-     *   直到副手没料或玩家松手。
-     *   必须是常量：LivingEntity.getTicksUsingItem() = getUseDuration() - useItemRemaining，
-     *   渲染器（HandSawItemRenderer）依赖它算一阶段/二阶段进度。
-     */
     @Override
     public int getUseDuration(ItemStack stack) {
         return 72000;
@@ -309,7 +307,6 @@ public class HandSawItem extends Item {
         if (!(entity instanceof Player player)) return;
         if (!CUTTING_PLAYERS.contains(player.getUUID())) return;
 
-        // ★ 耐久耗尽：主动停止
         if (stack.isEmpty()) {
             player.stopUsingItem();
             CUTTING_PLAYERS.remove(player.getUUID());
@@ -318,22 +315,22 @@ public class HandSawItem extends Item {
 
         int usedTicks = getUseDuration(stack) - remainingTicks;
 
-        // ★ 连续切削：每 CUT_DURATION tick 结算一份
-        if (usedTicks > 0 && usedTicks % CUT_DURATION == 0) {
-            if (!level.isClientSide) {
-                executeCut(level, player, stack, null);
-            }
-            // 切完这一份后，副手没料 / 已无配方 → 两端停止使用
-            ItemStack offAfterCut = player.getOffhandItem();
-            if (offAfterCut.isEmpty() || getCuttingRecipes(level, offAfterCut).isEmpty()) {
-                player.stopUsingItem();
-                CUTTING_PLAYERS.remove(player.getUUID());
-                return;
-            }
-        }
+        // ★ 第一次含起手：CUT_MOVE_TICKS + CUT_VIBRATE_TICKS
+        //   后续只算加工：每 CUT_VIBRATE_TICKS 一次，不再重复起手
+        if (usedTicks >= windupTicks + cutTicks
+        && (usedTicks - windupTicks) % cutTicks == 0) {
+        if (!level.isClientSide) {
+        executeCut(level, player, stack, null);
+    }
+    ItemStack offAfterCut = player.getOffhandItem();
+    if (offAfterCut.isEmpty() || getCuttingRecipes(level, offAfterCut).isEmpty()) {
+        player.stopUsingItem();
+        CUTTING_PLAYERS.remove(player.getUUID());
+        return;
+    }
+    }
 
-        // 振动阶段：音效 + 粒子（每 4 tick 一次）
-        if (usedTicks < CUT_MOVE_TICKS) return;
+        if (usedTicks < Config.INSTANCE.handSawWindupTicks.get()) return;
         if (usedTicks % 4 != 0) return;
 
         ItemStack off = player.getOffhandItem();
@@ -376,8 +373,6 @@ public class HandSawItem extends Item {
         return stack;
     }
 
-    // ================= releaseUsing：切削取消 =================
-
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
@@ -386,6 +381,15 @@ public class HandSawItem extends Item {
 
     // ================= 切削执行 =================
 
+    /**
+     * 切削执行（支持批量加工附魔）。
+     *
+     * 批量逻辑：
+     *   - 读手锯上的 Batch Crafting 等级 → 1/2/4/8 份
+     *   - 受副手物品数量限制
+     *   - 一次消耗 N 份原料，产物 × N
+     *   - 耐久只扣 1 点（批量是附魔收益）
+     */
     public static boolean executeCut(Level level, LivingEntity entity, ItemStack saw,
                                      @Nullable FilterItemStack filter) {
         if (saw.isEmpty()) return false;
@@ -396,20 +400,28 @@ public class HandSawItem extends Item {
         List<Recipe<?>> recipes = getCuttingRecipes(level, off);
         if (recipes.isEmpty()) return false;
 
+        // ★ 批量：读附魔等级，受副手数量限制
+        int batchSize = BatchCraftingHelper.getBatchSize(saw);
+        int actual = BatchCraftingHelper.clampToAvailable(batchSize, off.getCount());
+        if (actual <= 0) return false;
+
+        // ---- 选配方（一次选，应用 N 次） ----
         Recipe<?> recipe = null;
-        List<ItemStack> results = new ArrayList<>();
+        List<ItemStack> singleResults = new ArrayList<>();
 
         if (filter != null) {
             for (Recipe<?> candidate : recipes) {
                 List<ItemStack> candidateResults = new ArrayList<>();
                 if (candidate instanceof CuttingRecipe cr) {
                     candidateResults = cr.rollResults();
+                } else if (candidate instanceof ProcessingRecipe<?> pr) {
+                    candidateResults = pr.rollResults();
                 } else {
                     candidateResults.add(candidate.getResultItem(level.registryAccess()).copy());
                 }
                 if (resultsPassFilter(level, candidateResults, filter)) {
                     recipe = candidate;
-                    results = candidateResults;
+                    singleResults = candidateResults;
                     break;
                 }
             }
@@ -420,26 +432,38 @@ public class HandSawItem extends Item {
             recipe = recipes.get(index);
 
             if (recipe instanceof CuttingRecipe cr) {
-                results = cr.rollResults();
+                singleResults = cr.rollResults();
+            } else if (recipe instanceof ProcessingRecipe<?> pr) {
+                singleResults = pr.rollResults();
             } else {
-                results.add(recipe.getResultItem(level.registryAccess()).copy());
+                singleResults.add(recipe.getResultItem(level.registryAccess()).copy());
             }
         }
 
-        off.shrink(1);
+        // ★ 一次消耗 actual 份原料
+        off.shrink(actual);
 
-        for (ItemStack result : results) {
-            if (result.isEmpty()) continue;
-
-            if (entity instanceof Player player) {
-                if (!player.getInventory().add(result.copy())) {
-                    player.drop(result.copy(), false);
+        // ★ 产物 × actual，按 maxStackSize 拆分发放
+        for (ItemStack single : singleResults) {
+            if (single.isEmpty()) continue;
+            int total = single.getCount() * actual;
+            int max = single.getMaxStackSize();
+            while (total > 0) {
+                int give = Math.min(total, max);
+                ItemStack copy = single.copy();
+                copy.setCount(give);
+                if (entity instanceof Player player) {
+                    if (!player.getInventory().add(copy)) {
+                        player.drop(copy, false);
+                    }
+                } else {
+                    entity.spawnAtLocation(copy);
                 }
-            } else {
-                entity.spawnAtLocation(result.copy());
+                total -= give;
             }
         }
 
+        // ★ 耐久：批量只扣 1 点
         if (entity instanceof Player player) {
             EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
                     ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
@@ -467,20 +491,22 @@ public class HandSawItem extends Item {
 
     // ================= 三层配方查询 =================
 
-    /**
-     * 手锯三段式查询：
-     *   1. L3 独占切削 → 命中就用
-     *   2. L1 序列组装 + 切削 → 命中就用
-     *   3. ★ 切石回退 → 前两段完全没命中时才走这里
-     *
-     * 每段各自走自己的 L2 过滤（切削走 HAND_SAW，切石走 HAND_SAW_STONECUTTING）。
-     */
     public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
         if (input.isEmpty()) return List.of();
 
-        // ---- 段 1：L3 独占切削 ----
-        List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
-                ToolType.HAND_SAW, level, input);
+        // ---- 段 1：L3 独占切削（独立 type） ----
+        List<Recipe<?>> custom = new ArrayList<>();
+        ItemStackHandler customHandler = new ItemStackHandler(1);
+        customHandler.setStackInSlot(0, input.copyWithCount(1));
+        RecipeWrapper customWrapper = new RecipeWrapper(customHandler);
+
+        for (ProcessingRecipe<RecipeWrapper> recipe : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(recipe instanceof HandMadeToolRecipeLike like)) continue;
+            if (like.getTool() != ToolType.HAND_SAW) continue;
+            if (!recipe.matches(customWrapper, level)) continue;
+            custom.add(recipe);
+        }
         if (!custom.isEmpty()) return custom;
 
         // ---- 段 2：L1 序列组装 + 切削 ----
@@ -505,25 +531,16 @@ public class HandSawItem extends Item {
             }
         }
 
-        // 切削有结果 → 走 HAND_SAW 过滤返回
         if (!result.isEmpty()) {
             return HandMadeRecipePool.applyFilter(ToolType.HAND_SAW, level, result);
         }
 
-        // ---- 段 3：★ 切石回退 ----
+        // ---- 段 3：切石回退 ----
         List<Recipe<?>> stonecutting = getStonecuttingRecipes(level, input);
         return HandMadeRecipePool.applyFilter(
                 ToolType.HAND_SAW_STONECUTTING, level, stonecutting);
     }
 
-    /**
-     * ★ 切石候选：原版 minecraft:stonecutting + L3 独占切石。
-     *
-     * 用 SimpleContainer 匹配（StonecutterRecipe 走 vanilla Container 接口，
-     * 与切削用的 RecipeWrapper 不是一个体系）。
-     *
-     * 门控跟随 Create 的 allowStonecuttingOnSaw。
-     */
     private static List<Recipe<?>> getStonecuttingRecipes(Level level, ItemStack input) {
         if (!allowsStonecutting()) return List.of();
 
@@ -532,7 +549,6 @@ public class HandSawItem extends Item {
         SimpleContainer container = new SimpleContainer(1);
         container.setItem(0, input.copyWithCount(1));
 
-        // L1：原版切石
         for (StonecutterRecipe recipe : level.getRecipeManager()
                 .getAllRecipesFor(RecipeType.STONECUTTING)) {
             if (recipe.matches(container, level)) {
@@ -540,24 +556,16 @@ public class HandSawItem extends Item {
             }
         }
 
-        // L3：独占切石（getAllCustomRecipes 不做匹配，这里自己用 SimpleContainer 匹配）
-        for (Recipe<?> r : HandMadeRecipePool.getAllCustomRecipes(
-                ToolType.HAND_SAW_STONECUTTING)) {
-            if (!(r instanceof StonecutterRecipe stonecutting)) continue;
-            if (stonecutting.matches(container, level)) {
-                result.add(r);
+        for (HandMadeStonecuttingRecipe recipe : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.STONECUTTING_RECIPE.get())) {
+            if (recipe.matches(container, level)) {
+                result.add(recipe);
             }
         }
 
         return result;
     }
 
-    /**
-     * ★ Create 的 recipes.allowStonecuttingOnSaw 是否开启。
-     *
-     * 读不到（Create config 未加载）时降级为允许，避免异常冒到调用方。
-     * 每次调用实时读值，支持配置热重载。
-     */
     private static boolean allowsStonecutting() {
         try {
             var server = com.simibubi.create.infrastructure.config.AllConfigs.server();

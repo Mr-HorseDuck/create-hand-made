@@ -1,9 +1,14 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.recipe.type.HandMadeFillingRecipe;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
+import com.simibubi.create.foundation.fluid.FluidIngredient;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.fluids.transfer.GenericItemFilling;
@@ -409,19 +414,28 @@ public class InfusionGunItem extends Item {
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
 
-            FillingRecipe recipe = findFillingRecipe(level, stack, contents.fluid());
+                        Recipe<?> recipe = findFillingRecipe(level, stack, contents.fluid());
             if (recipe != null) {
-                List<FluidStack> matching = recipe.getRequiredFluid().getMatchingFluidStacks();
-                int required = matching.isEmpty() ? 0 : matching.get(0).getAmount();
-                if (contents.fluid().getAmount() < required) return TransportedResult.doNothing();
+                FluidIngredient required = getRequiredFluidOf(recipe);
+                if (required == null) return TransportedResult.doNothing();
 
-                List<ItemStack> results = recipe.rollResults();
+                List<FluidStack> matching = required.getMatchingFluidStacks();
+                int requiredAmount = matching.isEmpty() ? 0 : matching.get(0).getAmount();
+                if (contents.fluid().getAmount() < requiredAmount) return TransportedResult.doNothing();
+
+                List<ItemStack> results;
+                if (recipe instanceof ProcessingRecipe<?> pr) {
+                    results = pr.rollResults();
+                } else {
+                    results = new ArrayList<>();
+                    results.add(recipe.getResultItem(level.registryAccess()).copy());
+                }
 
                 // ★ 过滤产物
                 if (!resultsPassFilter(level, results, filter)) return TransportedResult.doNothing();
 
                 success[0] = true;
-                setContents(gun, contents.withDrain(required));
+                setContents(gun, contents.withDrain(requiredAmount));
                 broadcastFluidParticles(level, pos, contents.fluid());
 
                 return finishInject(item, stack, results);
@@ -551,24 +565,31 @@ public class InfusionGunItem extends Item {
         return found[0];
     }
 
-    // ================= 三层配方查询 =================
-
+        /**
+     * 三层查询：L3 独立 type → L1 序列组装 → L1 FILLING。
+     *
+     * ★ 返回类型从 FillingRecipe 放宽到 Recipe<?>，
+     *   因为 HandMadeFillingRecipe 不是 FillingRecipe 的子类。
+     */
     @Nullable
-    private static FillingRecipe findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
+    private static Recipe<?> findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
         if (target.isEmpty()) return null;
-
-        List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
-                ToolType.INFUSION_GUN, level, target);
-        for (Recipe<?> r : custom) {
-            if (!(r instanceof FillingRecipe fr)) continue;
-            if (!fr.getRequiredFluid().test(fluid)) continue;
-            return fr;
-        }
 
         ItemStackHandler handler = new ItemStackHandler(1);
         handler.setStackInSlot(0, target.copyWithCount(1));
         RecipeWrapper wrapper = new RecipeWrapper(handler);
 
+        // ---- 段 1：L3 独立 type ----
+        for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(r instanceof HandMadeFillingRecipe hfr)) continue;
+            if (hfr.getTool() != ToolType.INFUSION_GUN) continue;
+            if (!hfr.matches(wrapper, level)) continue;
+            if (!hfr.getRequiredFluid().test(fluid)) continue;
+            return hfr;
+        }
+
+        // ---- 段 2：L1 序列组装 ----
         FillingRecipe result = null;
 
         Optional<FillingRecipe> sequenced = SequencedAssemblyRecipe.getRecipe(
@@ -590,7 +611,14 @@ public class InfusionGunItem extends Item {
 
         List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
                 ToolType.INFUSION_GUN, level, List.of(result));
-        return filtered.isEmpty() ? null : (FillingRecipe) filtered.get(0);
+        return filtered.isEmpty() ? null : filtered.get(0);
+    }
+        /** 统一取 FillingRecipe / HandMadeFillingRecipe 的流体要求。 */
+    @Nullable
+    private static FluidIngredient getRequiredFluidOf(Recipe<?> recipe) {
+        if (recipe instanceof FillingRecipe fr) return fr.getRequiredFluid();
+        if (recipe instanceof HandMadeFillingRecipe hfr) return hfr.getRequiredFluid();
+        return null;
     }
 
     // ================= 数据组件 =================

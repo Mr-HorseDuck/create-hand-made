@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.Config;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
@@ -12,10 +13,36 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
+/**
+ * 搅拌杖第一人称渲染：起手 + 环绕画圈。
+ * 照 1.21 思路：不做逆旋转，直接在 item/handheld 的局部坐标系里调。
+ *
+ * <p>局部轴换算成视图方向（右手）：
+ * <ul>
+ *   <li>局部 −X = 往前伸（略往下）</li>
+ *   <li>局部 +Y = 往上前</li>
+ *   <li>局部 +Z = 往左，右手要乘 modifier</li>
+ * </ul>
+ */
 public class StirringStaffRenderer extends CustomRenderedItemModelRenderer {
 
-    /** 起手过渡时长（tick），和 StirringStaffItem.WINDUP_TICKS 保持一致 */
-    private static final float WINDUP = 8f;
+    // ================= 加工位（起手终点）——1.21 实机定稿 =================
+
+    /** 前伸量（局部 −X = 往前下）。 */
+    private static final float POS_X = -0.8f;
+
+    /** 高度（局部 +Y = 往上前）。 */
+    private static final float POS_Y = 0.80f;
+
+    /** 左右居中量（乘 modifier）。 */
+    private static final float POS_Z = 0.8f;
+
+    // ================= 搅拌圆 =================
+
+    private static final float STIR_CIRCLE_RADIUS = 0.1f;
+    private static final float STIR_CIRCLE_TARGET_TICKS = 20f;
+    private static final float STIR_CIRCLE_MIN_PERIOD_TICKS = 5f;
+    private static final float STIR_CIRCLE_FADE_IN_TICKS = 3f;
 
     @Override
     protected void render(ItemStack stack, CustomRenderedItemModel model, PartialItemModelRenderer renderer,
@@ -27,35 +54,50 @@ public class StirringStaffRenderer extends CustomRenderedItemModelRenderer {
         boolean leftHand = transformType == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         boolean firstPerson = leftHand || transformType == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
 
-        // 判断玩家是否正在使用这把搅拌杖
         boolean using = false;
         float progress = 0f;
-        if (firstPerson && player != null && player.isUsingItem()) {
-            ItemStack useItem = player.getUseItem();
-            if (useItem == stack) {
-                using = true;
-                int usedTicks = player.getTicksUsingItem();
-                // 起手 8 tick 内从 0 平滑过渡到 1
-                progress = Math.min(1f, usedTicks / WINDUP);
-            }
+        int stirTicks = -1;
+        float stirProgress = 0f;
+        int processingTicks = 1;
+
+        if (firstPerson && player != null && player.isUsingItem()
+                && ItemStack.isSameItemSameTags(player.getUseItem(), stack)) {
+            using = true;
+            int windupTicks = Math.max(1, Config.INSTANCE.stirringStaffWindupTicks.get());
+            processingTicks = Math.max(1, Config.INSTANCE.stirringStaffProcessingTicks.get());
+
+            int usedTicks = player.getTicksUsingItem();
+            progress = Math.min(1f, usedTicks / (float) windupTicks);
+            stirTicks = usedTicks - windupTicks;
+            stirProgress = stirTicks <= 0 ? 0f : Math.min(1f, stirTicks / STIR_CIRCLE_FADE_IN_TICKS);
         }
 
         ms.pushPose();
 
-        // 只有使用中才应用搅拌姿势，且随 progress 做插值
         if (using && progress > 0f) {
             int modifier = leftHand ? -1 : 1;
 
-            // 位移：无位移 → 搅拌位置
-            // 实测定稿：X 不镜像、Y 不镜像、Z 镜像
-            ms.translate(0.1f * progress,
-                    -0.15f * progress,
-                    modifier * -1f * progress);
+            // 搅拌圆：整数圈/件
+            float revolutions = Math.max(1f, Math.round(processingTicks / STIR_CIRCLE_TARGET_TICKS));
+            float circlePeriod = Math.max(STIR_CIRCLE_MIN_PERIOD_TICKS, processingTicks / revolutions);
+            float circlePhase = (stirTicks % circlePeriod) / circlePeriod;
+            float circleAngle = circlePhase * (float) (Math.PI * 2.0);
+            float circleX = (float) Math.sin(circleAngle) * STIR_CIRCLE_RADIUS * stirProgress;
+            float circleZ = (float) Math.cos(circleAngle) * STIR_CIRCLE_RADIUS * stirProgress * modifier;
 
-            // 旋转：0° → 90°/180°，乘 progress 做起手插值
-            // 实测定稿：XP 乘 modifier、ZP 不乘
-            ms.mulPose(Axis.XP.rotationDegrees(90f * modifier * progress));
-            ms.mulPose(Axis.ZP.rotationDegrees(180f * progress));
+            // 位移：1.21 定稿的镜像规则
+            ms.translate(POS_X * progress + circleX * (-modifier),
+                    POS_Y * progress,
+                    modifier * POS_Z * progress + circleZ);
+
+            // 6 次 mulPose：三明治自转 + XP/ZP/YP 收尾
+            ms.mulPose(Axis.ZP.rotationDegrees(45f * progress));
+            ms.mulPose(Axis.YP.rotationDegrees(-90f * modifier * progress));
+            ms.mulPose(Axis.ZP.rotationDegrees(-45f * progress));
+
+            ms.mulPose(Axis.XP.rotationDegrees(-90f * modifier * progress));
+            ms.mulPose(Axis.ZP.rotationDegrees(135f * progress));
+            ms.mulPose(Axis.YP.rotationDegrees(-90f * modifier * progress));
         }
 
         itemRenderer.render(stack, ItemDisplayContext.NONE, false, ms, buffer, light, overlay,

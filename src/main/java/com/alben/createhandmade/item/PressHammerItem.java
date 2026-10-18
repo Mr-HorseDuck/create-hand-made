@@ -1,10 +1,15 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.enchantment.BatchCraftingHelper;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.type.HandMadeToolRecipe;
+import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.Config;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -17,6 +22,7 @@ import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlock;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.item.ItemHelper;
@@ -76,9 +82,9 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class PressHammerItem extends Item {
 
-    private static final int CHARGE_TICKS = 15;
+    int chargeTicks = Config.INSTANCE.pressHammerChargeTicks.get();
     private static final Object COMPACTING_RECIPE_KEY = new Object();
-    private static final int CHARGE_WINDOW_TICKS = 20;
+    int chargeWindowTicks = Config.INSTANCE.pressHammerChargeWindowTicks.get();
 
     private static final float CHARGED_CRIT_MULTIPLIER = 1.5F;
 
@@ -140,12 +146,34 @@ public class PressHammerItem extends Item {
         return 72000;
     }
 
+    // ================= 蓄力刚满：提示音 =================
+
+    /**
+     * 蓄力刚满那一刻（usedTicks == CHARGE_TICKS）播一声提示音。
+     *
+     * <p>与风箱同一套做法、同一个音效 {@link AllSoundEvents#CONFIRM}（Create 自带的
+     * "确认叮"，语义是"就绪"）。只在客户端播：这是给操作者本人的即时反馈，
+     * 服务端 {@code playSound(null, …)} 会广播给附近所有人，蓄力提示音不该如此。</p>
+     *
+     * <p>用 {@code usedTicks == CHARGE_TICKS} 精确触发一次 —— 若写
+     * {@code usedTicks % CHARGE_TICKS} 会每 15 tick 重复响。</p>
+     */
+    @Override
+    public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
+    if (!(entity instanceof Player player)) return;
+    int usedTicks = getUseDuration(stack) - remainingTicks;
+    int chargeTicks = Config.INSTANCE.pressHammerChargeTicks.get();
+    if (usedTicks == chargeTicks && level.isClientSide) {
+        player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
+    }
+}
+
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
 
         int usedTicks = getUseDuration(stack) - timeLeft;
-        if (usedTicks < CHARGE_TICKS) return;
+        if (usedTicks < Config.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
         long gameTime = level.getGameTime();
@@ -176,30 +204,31 @@ public class PressHammerItem extends Item {
             BlockPos pos = hit.getBlockPos();
             List<ItemStack> particleItems = findTargetItems(level, pos);
 
+            // ★ 批量：读附魔等级
+            int batchSize = BatchCraftingHelper.getBatchSize(stack);
+
             tryPressBasin(level, pos, null);
-            tryPressTransported(level, pos, null);
+            tryPressTransported(level, pos, null, batchSize);
 
             if (!particleItems.isEmpty()) {
                 broadcastParticles(level, pos, particleItems);
             }
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(level, pos, 1f, 0.8f);
 
-            // ★ 蓄力挥击本身消耗耐久，无论是否真的压到东西
             stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         } else {
             Vec3 soundPos = eye.add(look.scale(1.0));
             level.playSound(null, BlockPos.containing(soundPos),
                     SoundEvents.PLAYER_ATTACK_STRONG,
                     SoundSource.PLAYERS, 0.6f, 0.9f);
-            // ★ 空挥也扣耐久
             stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         }
     }
 
     @Override
     public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
-    if (enchantment == Enchantments.SHARPNESS) return true;
-    return super.canApplyAtEnchantingTable(stack, enchantment);
+        if (enchantment == Enchantments.SHARPNESS) return true;
+        return super.canApplyAtEnchantingTable(stack, enchantment);
     }
 
     @Nullable
@@ -231,7 +260,7 @@ public class PressHammerItem extends Item {
         // 保留原逻辑，TOOL 组件自动扣耐久
     }
 
-    // ================= 蓄力暴击（1.20.1 版：用 LivingHurtEvent） =================
+    // ================= 蓄力暴击 =================
 
     @SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent event) {
@@ -242,7 +271,7 @@ public class PressHammerItem extends Item {
         if (targetTime == null) return;
 
         long elapsed = target.level().getGameTime() - targetTime;
-        if (elapsed > CHARGE_WINDOW_TICKS) {
+        if (elapsed > Config.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_TARGET.remove(target.getUUID());
             return;
         }
@@ -275,7 +304,7 @@ public class PressHammerItem extends Item {
         if (targetTime == null) return;
 
         long elapsed = target.level().getGameTime() - targetTime;
-        if (elapsed > CHARGE_WINDOW_TICKS) {
+        if (elapsed > Config.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_TARGET.remove(target.getUUID());
             return;
         }
@@ -331,29 +360,33 @@ public class PressHammerItem extends Item {
         }
     }
 
-    // ================= 工作盆 =================
+    // ================= 工作盆（basin 家族） =================
 
     public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
         if (basin.isEmpty()) return false;
 
-        List<Recipe<?>> custom = HandMadeRecipePool.getAllCustomRecipes(ToolType.PRESS_HAMMER);
-        for (Recipe<?> r : custom) {
-            if (!BasinRecipe.match(basin, r)) continue;
-            if (!resultsPassFilter(level, r, filter)) continue;
-            if (BasinRecipe.apply(basin, r)) {
+        // L3：独立 type + tool=press_hammer_basin
+        for (Recipe<?> r : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(r instanceof HandMadeToolRecipe htr)) continue;
+            if (htr.getTool() != ToolType.PRESS_HAMMER_BASIN) continue;
+            if (!BasinRecipe.match(basin, htr)) continue;
+            if (!resultsPassFilter(level, htr, filter)) continue;
+            if (BasinRecipe.apply(basin, htr)) {
                 basin.notifyChangeOfContents();
                 return true;
             }
         }
 
+        // L1：RecipeFinder
         try {
             for (Recipe<?> recipe : RecipeFinder.get(COMPACTING_RECIPE_KEY, level,
                     PressHammerItem::matchStaticFilters)) {
                 if (!BasinRecipe.match(basin, recipe)) continue;
 
                 List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                        ToolType.PRESS_HAMMER, level, List.of(recipe));
+                        ToolType.PRESS_HAMMER_BASIN, level, List.of(recipe));
                 if (filtered.isEmpty()) continue;
 
                 if (!resultsPassFilter(level, recipe, filter)) continue;
@@ -386,20 +419,26 @@ public class PressHammerItem extends Item {
                 && ItemHelper.matchAllIngredients(ingredients);
     }
 
-    // ================= 置物台 / 传送带 =================
+    // ================= 置物台 / 传送带（depot 家族） =================
 
     @Nullable
     public static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
         if (stack.isEmpty()) return null;
 
-        List<Recipe<?>> custom = HandMadeRecipePool.getCustomRecipes(
-                ToolType.PRESS_HAMMER, level, stack);
-        for (Recipe<?> r : custom) {
-            if (r instanceof PressingRecipe) {
-                return r;
-            }
+        // ---- 段 1：L3 独立 type ----
+        ItemStackHandler l3Handler = new ItemStackHandler(1);
+        l3Handler.setStackInSlot(0, stack.copyWithCount(1));
+        RecipeWrapper l3Wrapper = new RecipeWrapper(l3Handler);
+
+        for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+            if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+            if (like.getTool() != ToolType.PRESS_HAMMER_DEPOT) continue;
+            if (!r.matches(l3Wrapper, level)) continue;
+            return r;
         }
 
+        // ---- 段 2 + 3：L1 序列组装 / PRESSING ----
         Recipe<?> result = null;
 
         Optional<PressingRecipe> sequenced =
@@ -421,39 +460,65 @@ public class PressHammerItem extends Item {
         if (result == null) return null;
 
         List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.PRESS_HAMMER, level, List.of(result));
+                ToolType.PRESS_HAMMER_DEPOT, level, List.of(result));
         return filtered.isEmpty() ? null : filtered.get(0);
     }
 
+    /** 旧签名（女仆行为等调用方用），batchSize = 1。 */
     public static boolean tryPressTransported(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
+        return tryPressTransported(level, pos, filter, 1);
+    }
+
+    /**
+     * 批量加工版本。
+     *
+     * @param batchSize 本次最多处理多少份。由调用方从工具栈上的 Batch Crafting 附魔读出。
+     *                  处理 N 份 = 从物品堆叠里拆 N 个，逐个应用配方，产物累加。
+     */
+    public static boolean tryPressTransported(Level level, BlockPos pos,
+                                              @Nullable FilterItemStack filter, int batchSize) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
 
-        boolean[] success = {false};
+        if (batchSize < 1) batchSize = 1;
+
+        int[] processed = {0};   // 已处理的份数（跨所有 item 累计）
+        final int maxBatch = batchSize;
 
         handler.handleProcessingOnAllItems(item -> {
-            if (success[0]) return TransportedResult.doNothing();
+            if (processed[0] >= maxBatch) return TransportedResult.doNothing();
+
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
 
             Recipe<?> recipe = findPressingRecipe(level, stack);
             if (recipe == null) return TransportedResult.doNothing();
 
-            List<ItemStack> results = RecipeApplier.applyRecipeOn(
-                    level, stack.copyWithCount(1), recipe, true);
+            // ★ 本次从这个堆叠里拆出多少份（受剩余批量和堆叠数量双重限制）
+            int toProcess = Math.min(maxBatch - processed[0], stack.getCount());
+            if (toProcess <= 0) return TransportedResult.doNothing();
 
-            if (!resultsPassFilter(level, results, filter)) {
+            // ★ 循环 toProcess 次，每次处理 1 个，累加产物
+            List<ItemStack> allResults = new ArrayList<>();
+            for (int i = 0; i < toProcess; i++) {
+                List<ItemStack> one = RecipeApplier.applyRecipeOn(
+                        level, stack.copyWithCount(1), recipe, true);
+                allResults.addAll(one);
+            }
+
+            if (!resultsPassFilter(level, allResults, filter)) {
                 return TransportedResult.doNothing();
             }
 
-            success[0] = true;
+            processed[0] += toProcess;
 
+            // 堆叠剩余
             ItemStack left = stack.copy();
-            left.shrink(1);
+            left.shrink(toProcess);
 
             List<TransportedItemStack> outputs = new ArrayList<>();
-            for (ItemStack result : results) {
+            for (ItemStack result : allResults) {
                 if (result.isEmpty()) continue;
                 TransportedItemStack copy = item.copy();
                 copy.stack = result;
@@ -476,7 +541,7 @@ public class PressHammerItem extends Item {
             }
         });
 
-        return success[0];
+        return processed[0] > 0;
     }
 
     // ================= 过滤器辅助 =================
