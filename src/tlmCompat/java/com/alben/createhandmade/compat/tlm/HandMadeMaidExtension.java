@@ -31,16 +31,17 @@ public class HandMadeMaidExtension implements ILittleMaid {
         FMLJavaModLoadingContext.get().getModEventBus().register(MaidNetwork.class);
 
         // 客户端专属
+        // ★ MaidLangOverride 已挪到 CreateHandMade 构造器里提前注册，
+        //   因为 RegisterClientReloadListenersEvent 在 addMaidTask 之前已经触发过了
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
             MinecraftForge.EVENT_BUS.register(PointerModeHandler.class);
             MinecraftForge.EVENT_BUS.register(PointerHudRenderer.class);
-            FMLJavaModLoadingContext.get().getModEventBus().register(MaidLangOverride.class);
         });
 
         CreateHandMade.LOGGER.info("[HandMade] Maid compatibility initialized");
     }
 
-        private static boolean isBlockedByMod() {
+    private static boolean isBlockedByMod() {
         try {
             var list = MaidConfig.INSTANCE.blockedMods.get();
             CreateHandMade.LOGGER.info(

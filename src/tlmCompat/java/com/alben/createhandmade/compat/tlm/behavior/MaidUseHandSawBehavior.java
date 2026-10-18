@@ -53,6 +53,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
 
     @Override
     public boolean tryStart(ServerLevel level, EntityMaid maid, long gameTime) {
+        MaidLookHelper.lookAtWork(maid, level);
         if (cooldown > 0) {
             cooldown--;
             status = Behavior.Status.STOPPED;
@@ -68,8 +69,15 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
+        // ★ 批量加工附魔 → 拒绝
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
         // 读指杆标记
         BlockPos workPos = PointerDataHelper.getWork(maid, level);
+        MaidLookHelper.lookAtBlock(maid, workPos);
         BlockPos inputPos = PointerDataHelper.getInput(maid, level);
         BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
 

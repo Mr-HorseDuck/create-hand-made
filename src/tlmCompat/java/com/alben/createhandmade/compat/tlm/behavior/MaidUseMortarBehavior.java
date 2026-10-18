@@ -2,6 +2,7 @@ package com.alben.createhandmade.compat.tlm.behavior;
 
 import com.alben.createhandmade.item.MortarItem;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
+import com.alben.createhandmade.Config;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import net.minecraft.core.BlockPos;
@@ -48,6 +49,12 @@ public class MaidUseMortarBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
+        // ★ 批量加工附魔 → 拒绝
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
         BlockPos inputPos = PointerDataHelper.getInput(maid, level);
         BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
 
@@ -57,7 +64,8 @@ public class MaidUseMortarBehavior implements BehaviorControl<EntityMaid> {
         FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
 
         if (MortarItem.tryGrindOnce(level, maid, tool, inputInv, outputInv, filter)) {
-            cooldown = MortarItem.FORCED_DURATION;
+            cooldown = Config.INSTANCE.mortarWindupTicks.get()
+        + Config.INSTANCE.mortarProcessingTicks.get();
             status = Behavior.Status.RUNNING;
             return true;
         }

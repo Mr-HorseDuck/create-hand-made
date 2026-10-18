@@ -57,8 +57,15 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
             return false;
         }
 
-        // 读液体模式的输出坐标
+        // ★ 批量加工附魔 → 拒绝
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
+        // 读液体模式的输出坐标 + 注视
         BlockPos outputPos = PointerDataHelper.getLiquidOutput(maid, level);
+        MaidLookHelper.lookAtBlock(maid, outputPos);
         if (outputPos == null) {
             status = Behavior.Status.STOPPED;
             return false;

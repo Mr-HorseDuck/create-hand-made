@@ -8,7 +8,7 @@ import com.alben.createhandmade.compat.tlm.behavior.MaidUseMortarBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUsePointerBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUsePressHammerBehavior;
 import com.alben.createhandmade.compat.tlm.behavior.MaidUseStirringStaffBehavior;
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.google.common.collect.Lists;

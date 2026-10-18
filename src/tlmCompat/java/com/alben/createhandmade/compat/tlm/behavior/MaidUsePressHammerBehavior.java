@@ -46,22 +46,36 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
+        // ★ 批量加工附魔 → 拒绝
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
         FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
 
         BlockPos basinPos = findNearbyBasin(level, maid);
-        if (basinPos != null && PressHammerItem.tryPressBasin(level, basinPos, filter)) {
-            tool.hurtAndBreak(1, maid, e -> {});
-            cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
-            status = Behavior.Status.RUNNING;
-            return true;
+        if (basinPos != null) {
+            // ★ 注视即将操作的工作盆
+            MaidLookHelper.lookAtBlock(maid, basinPos);
+            if (PressHammerItem.tryPressBasin(level, basinPos, filter)) {
+                tool.hurtAndBreak(1, maid, e -> {});
+                cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                status = Behavior.Status.RUNNING;
+                return true;
+            }
         }
 
         BlockPos depotPos = findNearbyDepot(level, maid);
-        if (depotPos != null && PressHammerItem.tryPressTransported(level, depotPos, filter)) {
-            tool.hurtAndBreak(1, maid, e -> {});
-            cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
-            status = Behavior.Status.RUNNING;
-            return true;
+        if (depotPos != null) {
+            // ★ 注视即将操作的置物台
+            MaidLookHelper.lookAtBlock(maid, depotPos);
+            if (PressHammerItem.tryPressTransported(level, depotPos, filter)) {
+                tool.hurtAndBreak(1, maid, e -> {});
+                cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                status = Behavior.Status.RUNNING;
+                return true;
+            }
         }
 
         status = Behavior.Status.STOPPED;

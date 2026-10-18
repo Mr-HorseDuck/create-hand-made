@@ -2,7 +2,7 @@ package com.alben.createhandmade.compat.tlm.behavior;
 
 import com.alben.createhandmade.compat.tlm.MaidConfig;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
-import com.alben.createhandmade.item.InfusionGunContents;
+import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.InfusionGunItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
@@ -96,6 +96,9 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
         }
 
         InfusionGunContents contents = InfusionGunItem.getContents(gun);
+
+        // ★ 按阶段注视：枪空看输入盆，枪有液看输出
+        MaidLookHelper.lookAtBlock(maid, contents.isEmpty() ? inputPos : outputPos);
 
         // ---- 枪空：从输入盆抽液 ----
         if (contents.isEmpty()) {

@@ -1,7 +1,7 @@
 package com.alben.createhandmade.compat.tlm.behavior;
 
 import com.alben.createhandmade.compat.tlm.MaidConfig;
-import com.alben.createhandmade.item.InfusionGunContents;
+import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.InfusionGunItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
@@ -48,6 +48,12 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
+        // ★ 批量加工附魔 → 拒绝（灌注枪不在附魔类别，恒为 false，防御性保留）
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
         InfusionGunContents contents = InfusionGunItem.getContents(tool);
         if (contents.isEmpty()) {
             status = Behavior.Status.STOPPED;
@@ -57,14 +63,20 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
         FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
 
         BlockPos depotPos = findNearbyDepot(level, maid);
-        if (depotPos != null && InfusionGunItem.tryInjectItems(level, depotPos, maid, tool, filter)) {
-            cooldown = MaidConfig.INSTANCE.maidInfusionGunCooldown.get();
-            status = Behavior.Status.RUNNING;
-            return true;
+        if (depotPos != null) {
+            // ★ 注视即将注入的置物台
+            MaidLookHelper.lookAtBlock(maid, depotPos);
+            if (InfusionGunItem.tryInjectItems(level, depotPos, maid, tool, filter)) {
+                cooldown = MaidConfig.INSTANCE.maidInfusionGunCooldown.get();
+                status = Behavior.Status.RUNNING;
+                return true;
+            }
         }
 
         BlockPos basinPos = findNearbyBasin(level, maid);
         if (basinPos != null) {
+            // ★ 注视即将注入的工作盆
+            MaidLookHelper.lookAtBlock(maid, basinPos);
             IFluidHandler handler = InfusionGunItem.getFluidHandler(level, basinPos);
             if (handler != null && InfusionGunItem.tryStoreFluid(level, basinPos, maid, tool)) {
                 cooldown = MaidConfig.INSTANCE.maidInfusionGunCooldown.get();

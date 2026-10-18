@@ -63,8 +63,15 @@ public class MaidUsePointerBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        // 读标记
+        // ★ 批量加工附魔 → 拒绝
+        if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
+        // 读标记 + 注视工作方块
         BlockPos workPos = PointerDataHelper.getWork(maid, level);
+        MaidLookHelper.lookAtBlock(maid, workPos);
         BlockPos inputPos = PointerDataHelper.getInput(maid, level);
         BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
 
