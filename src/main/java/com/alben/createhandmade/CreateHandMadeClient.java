@@ -1,9 +1,12 @@
 package com.alben.createhandmade;
 
+import com.alben.createhandmade.client.InfusionGunFluidDecorator;
+import com.alben.createhandmade.registry.ModItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
+import net.minecraftforge.client.event.RegisterItemDecorationsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -29,6 +32,21 @@ public class CreateHandMadeClient {
 
         // ★ 注册 Cloth Config 配置界面（可选依赖）
         registerConfigScreen();
+    }
+
+    /**
+     * ★ 注册灌注枪液体背景装饰器。
+     *
+     * <p>IItemDecorator 由 {@code GuiGraphics.renderItemDecorations} 在所有物品渲染位置
+     * 统一调用——快捷栏、物品栏、箱子、JEI 全部覆盖。</p>
+     *
+     * <p>RegisterItemDecorationsEvent 是 IModBusEvent，本类已声明 bus = MOD，
+     * 所以 @SubscribeEvent 会自动挂到 modEventBus，不需要手动 addListener。</p>
+     */
+    @SubscribeEvent
+    public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
+        event.register(ModItems.INFUSION_GUN.get(), new InfusionGunFluidDecorator());
+        CreateHandMade.LOGGER.info("[HandMade] Infusion gun fluid decorator registered.");
     }
 
     /**

@@ -37,10 +37,7 @@ public class HandMadeCommands {
     private static int reload(CommandSourceStack source) {
         try {
             // 重新加载 COMMON 配置（Config 和 MaidConfig 都在这个类型下）
-            ConfigTracker.INSTANCE.loadConfigs(
-                    ModConfig.Type.COMMON,
-                    FMLPaths.CONFIGDIR.get()
-            );
+            ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.SERVER, FMLPaths.CONFIGDIR.get());
             CreateHandMade.LOGGER.info("[HandMade] Common configs reloaded from disk.");
         } catch (Throwable t) {
             CreateHandMade.LOGGER.error("[HandMade] Config reload failed", t);
