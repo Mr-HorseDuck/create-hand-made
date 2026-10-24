@@ -4,12 +4,15 @@ import com.alben.createhandmade.compat.tlm.MaidConfig;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
 import com.alben.createhandmade.item.HandSawItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
+import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
+import com.simibubi.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
+import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import com.simibubi.create.foundation.recipe.RecipeApplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.behavior.Behavior;
@@ -22,21 +25,19 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 女仆按指杆标记进行手锯流转（置物台 + 手锯）：
- *   置物台空 → 从输入容器补 1 个原料
- *   置物台有原料 → 手锯切削，产物入输出容器
- *   置物台有产物 → 移入输出容器
+ * 女仆手锯行为。
  *
- * 单次最多处理 1 个，冷却由 MaidConfig.maidHandSawCooldown 控制。
- * ★ 结构与 MaidUsePointerBehavior 完全一致，只是把冲压换成切削。
- * ★ 产物计算走 MaidCutHelper（tlmCompat 内部），main 侧 HandSawItem 无改动。
+ * <p>只从指杆标记读坐标，支持两种工作方块：
+ * <ul>
+ *   <li><b>Depot</b>：完整物流——空则从输入取 1 个原料放上去；有原料则切削；有产物则移到输出。</li>
+ *   <li><b>Belt</b>：只切削传送带上已有的物品，不取料、不输出，产物留在传送带。</li>
+ * </ul>
  */
 public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
-
-    private static final int MAX_OPERATIONS_PER_ROUND = 1;
 
     private Behavior.Status status = Behavior.Status.STOPPED;
     private int cooldown = 0;
@@ -53,90 +54,196 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
 
     @Override
     public boolean tryStart(ServerLevel level, EntityMaid maid, long gameTime) {
-        MaidLookHelper.lookAtWork(maid, level);
         if (cooldown > 0) {
             cooldown--;
             status = Behavior.Status.STOPPED;
             return false;
         }
-        // ★ 从配置读冷却
-        cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
 
-        // ★ 强转 LivingEntity，避免 TLM 版本间方法签名变化导致 NoSuchMethodError
         ItemStack tool = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
         if (!(tool.getItem() instanceof HandSawItem)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // ★ 批量加工附魔 → 拒绝
         if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // 读指杆标记
         BlockPos workPos = PointerDataHelper.getWork(maid, level);
-        MaidLookHelper.lookAtBlock(maid, workPos);
-        BlockPos inputPos = PointerDataHelper.getInput(maid, level);
-        BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
-
-        if (workPos == null || inputPos == null || outputPos == null) {
+        if (workPos == null) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // ★ 交互距离校验
-        if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+        if (!MaidRangeHelper.isWithinRange(maid, workPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // 工作方块必须是置物台
         BlockEntity be = level.getBlockEntity(workPos);
-        if (!(be instanceof DepotBlockEntity depot)) {
-            status = Behavior.Status.STOPPED;
-            return false;
-        }
 
-        // 输入输出容器
-        IItemHandler inputInv = getItemHandler(level, inputPos);
-        IItemHandler outputInv = getItemHandler(level, outputPos);
-        if (inputInv == null || outputInv == null) {
-            status = Behavior.Status.STOPPED;
-            return false;
-        }
+        // ---- Depot：完整物流 ----
+        if (be instanceof DepotBlockEntity depot) {
+            BlockPos inputPos = PointerDataHelper.getInput(maid, level);
+            BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
+            if (inputPos == null || outputPos == null) {
+                status = Behavior.Status.STOPPED;
+                return false;
+            }
+            if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+                status = Behavior.Status.STOPPED;
+                return false;
+            }
 
-        FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            IItemHandler inputInv = getItemHandler(level, inputPos);
+            IItemHandler outputInv = getItemHandler(level, outputPos);
+            if (inputInv == null || outputInv == null) {
+                status = Behavior.Status.STOPPED;
+                return false;
+            }
 
-        // 一轮内循环：补 1 → 切削 1 → 移出 1
-        for (int n = 0; n < MAX_OPERATIONS_PER_ROUND; n++) {
+            MaidLookHelper.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+
             ItemStack held = depot.getHeldItem();
 
             if (held.isEmpty()) {
-                if (!fillDepotOne(level, depot, inputInv)) break;
-                continue;
+                if (fillDepotOne(level, depot, inputInv)) {
+                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    status = Behavior.Status.RUNNING;
+                    return true;
+                }
+                status = Behavior.Status.STOPPED;
+                return false;
             }
 
             List<Recipe<?>> recipes = HandSawItem.getCuttingRecipes(level, held);
-            if (recipes.isEmpty()) {
-                // 无切削配方 → 视为产物 → 移出
-                if (!moveToOutput(depot, outputInv)) break;
-                continue;
+            if (!recipes.isEmpty()) {
+                if (cutDepotItem(level, depot, outputInv, tool, maid, filter)) {
+                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    status = Behavior.Status.RUNNING;
+                    return true;
+                }
+            } else {
+                if (moveToOutput(depot, outputInv)) {
+                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    status = Behavior.Status.RUNNING;
+                    return true;
+                }
             }
 
-            // 有配方 → 切削，产物入输出容器
-            if (!cutDepotItem(level, depot, outputInv, tool, maid, filter)) break;
+            status = Behavior.Status.STOPPED;
+            return false;
+        }
+
+        // ---- Belt：只切削，不取料不输出 ----
+        if (BlockEntityBehaviour.get(level, workPos,
+                TransportedItemStackHandlerBehaviour.TYPE) != null) {
+            MaidLookHelper.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            if (cutBeltItems(level, workPos, tool, maid, filter)) {
+                cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                status = Behavior.Status.RUNNING;
+                return true;
+            }
+            status = Behavior.Status.STOPPED;
+            return false;
         }
 
         status = Behavior.Status.STOPPED;
         return false;
     }
 
-    /**
-     * 从输入容器取 1 个"有切削配方"的物品放入置物台。
-     * ★ 只取 1 个，避免剩余原料卡住。
-     */
+    // ================= Belt 切削 =================
+
+    private static boolean cutBeltItems(ServerLevel level, BlockPos pos,
+                                        ItemStack saw, EntityMaid maid, FilterItemStack filter) {
+        TransportedItemStackHandlerBehaviour handler =
+                BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
+        if (handler == null) return false;
+
+        boolean[] success = {false};
+        ItemStack[] particleItem = {ItemStack.EMPTY};
+
+        handler.handleProcessingOnAllItems(item -> {
+            if (success[0]) return TransportedResult.doNothing();
+            ItemStack stack = item.stack;
+            if (stack.isEmpty()) return TransportedResult.doNothing();
+
+            List<Recipe<?>> recipes = HandSawItem.getCuttingRecipes(level, stack);
+            if (recipes.isEmpty()) return TransportedResult.doNothing();
+
+            List<ItemStack> results = applyCut(level, stack, recipes, filter);
+            if (results.isEmpty()) return TransportedResult.doNothing();
+
+            success[0] = true;
+            particleItem[0] = stack.copy();
+
+            List<TransportedItemStack> outputs = new ArrayList<>();
+            for (ItemStack result : results) {
+                if (result.isEmpty()) continue;
+                TransportedItemStack copy = item.copy();
+                copy.stack = result;
+                outputs.add(copy);
+            }
+
+            ItemStack left = stack.copy();
+            left.shrink(1);
+
+            if (outputs.isEmpty()) {
+                if (left.isEmpty()) return TransportedResult.removeItem();
+                TransportedItemStack leftStack = item.copy();
+                leftStack.stack = left;
+                return TransportedResult.convertTo(leftStack);
+            }
+
+            if (left.isEmpty()) {
+                return TransportedResult.convertTo(outputs);
+            }
+            TransportedItemStack leftStack = item.copy();
+            leftStack.stack = left;
+            return TransportedResult.convertToAndLeaveHeld(outputs, leftStack);
+        });
+
+        if (success[0]) {
+            saw.hurtAndBreak(1, maid, e -> {});
+            MaidFeedback.cutSound(level, pos);
+            MaidFeedback.itemParticles(level, pos, particleItem[0], 8);
+        }
+        return success[0];
+    }
+
+    private static List<ItemStack> applyCut(ServerLevel level, ItemStack input,
+                                            List<Recipe<?>> recipes, @Nullable FilterItemStack filter) {
+        for (Recipe<?> recipe : recipes) {
+            List<ItemStack> results = RecipeApplier.applyRecipeOn(
+                    level, input.copyWithCount(1), recipe, true);
+            if (results == null || results.isEmpty()) continue;
+
+            if (filter != null) {
+                boolean pass = false;
+                for (ItemStack r : results) {
+                    if (!r.isEmpty() && filter.test(level, r)) {
+                        pass = true;
+                        break;
+                    }
+                }
+                if (!pass) continue;
+            }
+
+            List<ItemStack> nonEmpty = new ArrayList<>();
+            for (ItemStack r : results) {
+                if (!r.isEmpty()) nonEmpty.add(r);
+            }
+            if (!nonEmpty.isEmpty()) return nonEmpty;
+        }
+        return List.of();
+    }
+
+    // ================= Depot 物流辅助 =================
+
     private static boolean fillDepotOne(ServerLevel level, DepotBlockEntity depot, IItemHandler inputInv) {
         for (int i = 0; i < inputInv.getSlots(); i++) {
             ItemStack slot = inputInv.getStackInSlot(i);
@@ -144,7 +251,6 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
 
             ItemStack simulated = inputInv.extractItem(i, 1, true);
             if (simulated.isEmpty()) continue;
-
             if (HandSawItem.getCuttingRecipes(level, simulated).isEmpty()) continue;
 
             ItemStack actual = inputInv.extractItem(i, 1, false);
@@ -158,26 +264,31 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         return false;
     }
 
-    /**
-     * 切削置物台上的物品，产物放入输出容器。
-     * ★ 产物计算走 MaidCutHelper，main 侧无改动。
-     */
     private static boolean cutDepotItem(ServerLevel level, DepotBlockEntity depot,
                                          IItemHandler outputInv, ItemStack saw,
                                          EntityMaid maid, FilterItemStack filter) {
         ItemStack held = depot.getHeldItem();
         if (held.isEmpty()) return false;
 
-        List<ItemStack> results = MaidCutHelper.computeCutResults(level, saw, held, filter);
+        List<Recipe<?>> recipes = HandSawItem.getCuttingRecipes(level, held);
+        if (recipes.isEmpty()) return false;
+
+        List<ItemStack> results = applyCut(level, held, recipes, filter);
         if (results.isEmpty()) return false;
 
-        // 清空 depot，产物逐个插入输出容器
-        depot.setHeldItem(ItemStack.EMPTY);
+        // 只减 1 个，不是清空整组
+        ItemStack remainingHeld = held.copy();
+        remainingHeld.shrink(1);
+        if (remainingHeld.isEmpty()) {
+            depot.setHeldItem(ItemStack.EMPTY);
+        } else {
+            depot.setHeldItem(remainingHeld);
+        }
 
         ItemStack leftover = ItemStack.EMPTY;
         for (ItemStack result : results) {
             if (result.isEmpty()) continue;
-            ItemStack remaining = insertAll(outputInv, result, false);
+            ItemStack remaining = insertAll(outputInv, result);
             if (!remaining.isEmpty()) {
                 leftover = remaining;
                 break;
@@ -185,40 +296,40 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         }
 
         if (!leftover.isEmpty()) {
-            depot.setHeldItem(leftover);
+            ItemStack current = depot.getHeldItem();
+            if (current.isEmpty()) {
+                depot.setHeldItem(leftover);
+            } else {
+                depot.notifyUpdate();
+                depot.sendData();
+                saw.hurtAndBreak(1, maid, e -> {});
+                MaidFeedback.cutSound(level, depot.getBlockPos());
+                MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);
+                net.minecraft.world.Containers.dropItemStack(level,
+                        depot.getBlockPos().getX(),
+                        depot.getBlockPos().getY() + 1,
+                        depot.getBlockPos().getZ(),
+                        leftover);
+                return false;
+            }
         }
+
         depot.notifyUpdate();
         depot.sendData();
 
-        // 切削成功，扣耐久
         saw.hurtAndBreak(1, maid, e -> {});
 
-        level.playSound(null, depot.getBlockPos(), SoundEvents.WOOD_BREAK,
-                SoundSource.BLOCKS, 0.7f, 1.2f);
+        MaidFeedback.cutSound(level, depot.getBlockPos());
+        MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);
 
         return leftover.isEmpty();
     }
 
-    /**
-     * 依次尝试所有槽，返回未被插入的部分。
-     */
-    private static ItemStack insertAll(IItemHandler inv, ItemStack stack, boolean simulate) {
-        ItemStack remaining = stack.copy();
-        for (int i = 0; i < inv.getSlots() && !remaining.isEmpty(); i++) {
-            remaining = inv.insertItem(i, remaining, simulate);
-        }
-        return remaining;
-    }
-
-    /**
-     * 把置物台上的物品移入输出容器。
-     */
     private static boolean moveToOutput(DepotBlockEntity depot, IItemHandler outputInv) {
         ItemStack held = depot.getHeldItem();
         if (held.isEmpty()) return false;
 
-        ItemStack remaining = insertAll(outputInv, held, false);
-
+        ItemStack remaining = insertAll(outputInv, held);
         if (!remaining.isEmpty()) {
             depot.setHeldItem(remaining);
             depot.notifyUpdate();
@@ -229,6 +340,14 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         depot.notifyUpdate();
         depot.sendData();
         return true;
+    }
+
+    private static ItemStack insertAll(IItemHandler inv, ItemStack stack) {
+        ItemStack remaining = stack.copy();
+        for (int i = 0; i < inv.getSlots() && !remaining.isEmpty(); i++) {
+            remaining = inv.insertItem(i, remaining, false);
+        }
+        return remaining;
     }
 
     @Nullable

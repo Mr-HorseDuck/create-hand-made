@@ -4,6 +4,7 @@ import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.client.PointerHighlightClient;
 import com.alben.createhandmade.item.PointerItem;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import net.minecraft.ChatFormatting;
@@ -14,6 +15,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
@@ -155,7 +157,13 @@ public class PointerModeHandler {
         BlockEntity be = mc.level.getBlockEntity(pos);
         if (be == null) return;
 
-        boolean isWorkBlock = be instanceof DepotBlockEntity || be instanceof BasinBlockEntity;
+        // ★ 工作方块：Depot / Basin / 传送带
+        //   客户端 TransportedItemStackHandlerBehaviour 可能不存在，改用 BeltBlock 判断
+        Block block = mc.level.getBlockState(pos).getBlock();
+        boolean isWorkBlock = be instanceof DepotBlockEntity
+                || be instanceof BasinBlockEntity
+                || block instanceof BeltBlock;
+
         if (!isWorkBlock) {
             boolean hasItemHandler = be.getCapability(
                     net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER, null).isPresent();
@@ -182,7 +190,8 @@ public class PointerModeHandler {
 
         PointerHighlightClient.setHighlight(color, pos);
 
-        MaidDebug.log("Marker client: pos={}, color={}", pos, Integer.toHexString(color));
+        MaidDebug.log("Marker client: pos={}, color={}, isWorkBlock={}",
+                pos, Integer.toHexString(color), isWorkBlock);
 
         MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
     }
@@ -192,7 +201,7 @@ public class PointerModeHandler {
     /**
      * 液体模式标记三个坐标：
      *   1. 输入（必须是 Basin）
-     *   2. 输出（Basin 或 Depot）
+     *   2. 输出（Basin / Depot / 传送带）
      *   3. 过剩输出（必须是 Basin）
      * 标完第三个后，再右键覆盖回输入。
      */
@@ -202,6 +211,9 @@ public class PointerModeHandler {
 
         boolean isBasin = be instanceof BasinBlockEntity;
         boolean isDepot = be instanceof DepotBlockEntity;
+        // ★ 传送带：用 BeltBlock 判断，客户端可靠
+        Block block = mc.level.getBlockState(pos).getBlock();
+        boolean isBelt = !isBasin && !isDepot && block instanceof BeltBlock;
 
         int color;
         if (clientLiquidInput == null) {
@@ -210,8 +222,8 @@ public class PointerModeHandler {
             clientLiquidInput = pos;
             color = PointerColors.INPUT;
         } else if (clientLiquidOutput == null) {
-            // 第 2 个：输出，Basin 或 Depot 都可以
-            if (!isBasin && !isDepot) return;
+            // 第 2 个：输出，Basin / Depot / 传送带都可以
+            if (!isBasin && !isDepot && !isBelt) return;
             clientLiquidOutput = pos;
             color = PointerColors.OUTPUT;
         } else if (clientLiquidOverflow == null) {
@@ -230,8 +242,8 @@ public class PointerModeHandler {
 
         PointerHighlightClient.setHighlight(color, pos);
 
-        // ★ 调试日志：观察三个字段的实际值
-        MaidDebug.log("Liquid marker client: pos={}, color={}", pos, Integer.toHexString(color));
+        MaidDebug.log("Liquid marker client: pos={}, color={}, isBelt={}",
+                pos, Integer.toHexString(color), isBelt);
         MaidDebug.log("liquid fields now: input={}, output={}, overflow={}",
                 clientLiquidInput, clientLiquidOutput, clientLiquidOverflow);
 

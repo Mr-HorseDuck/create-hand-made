@@ -3,6 +3,7 @@ package com.alben.createhandmade.compat.tlm;
 import com.alben.createhandmade.item.PointerItem;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.ModNetwork;
+import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -10,6 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
@@ -31,7 +33,15 @@ public class PointerMarker {
         BlockEntity be = level.getBlockEntity(pos);
         if (be == null) return;
 
-        boolean isWorkBlock = be instanceof DepotBlockEntity || be instanceof BasinBlockEntity;
+        // ★ 工作方块：Depot / Basin / 传送带
+        //   传送带用 BeltBlock 判断，和客户端 PointerModeHandler 保持一致，
+        //   不依赖 TransportedItemStackHandlerBehaviour 的注册时机
+        Block block = level.getBlockState(pos).getBlock();
+        boolean isWorkBlock = be instanceof DepotBlockEntity
+                || be instanceof BasinBlockEntity
+                || block instanceof BeltBlock;
+
+        // ★ 容器：有 ITEM_HANDLER 且不是工作方块
         boolean isContainer = !isWorkBlock
                 && be.getCapability(ForgeCapabilities.ITEM_HANDLER, null).isPresent();
 

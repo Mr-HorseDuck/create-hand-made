@@ -36,9 +36,9 @@ public class MaidClothConfigIntegration {
         maid.addEntry(entry
                 .startIntSlider(
                         Component.translatable("config.create_hand_made.maid.press_hammer_cooldown"),
-                        MaidConfig.INSTANCE.maidPressHammerCooldown.get(),
+                        MaidConfig.INSTANCE.maidPointerDeployCooldown.get(),
                         1, 200)
-                .setDefaultValue(20)
+                .setDefaultValue(16)
                 .setTooltip(Component.translatable(
                         "config.create_hand_made.maid.press_hammer_cooldown.tooltip"))
                 .setSaveConsumer(MaidConfig.INSTANCE.maidPressHammerCooldown::set)
@@ -50,7 +50,7 @@ public class MaidClothConfigIntegration {
                         Component.translatable("config.create_hand_made.maid.infusion_gun_cooldown"),
                         MaidConfig.INSTANCE.maidInfusionGunCooldown.get(),
                         1, 200)
-                .setDefaultValue(20)
+                .setDefaultValue(16)
                 .setTooltip(Component.translatable(
                         "config.create_hand_made.maid.infusion_gun_cooldown.tooltip"))
                 .setSaveConsumer(MaidConfig.INSTANCE.maidInfusionGunCooldown::set)
@@ -62,15 +62,73 @@ public class MaidClothConfigIntegration {
                         Component.translatable("config.create_hand_made.maid.hand_saw_cooldown"),
                         MaidConfig.INSTANCE.maidHandSawCooldown.get(),
                         1, 400)
-                .setDefaultValue(40)
+                .setDefaultValue(20)
                 .setTooltip(Component.translatable(
                         "config.create_hand_made.maid.hand_saw_cooldown.tooltip"))
                 .setSaveConsumer(MaidConfig.INSTANCE.maidHandSawCooldown::set)
                 .build());
 
-        // ---- 屏蔽模组列表（List<? extends String> → List<String>）----
-        // ★ 修改后需重启游戏才会生效：
-        //   女仆兼容的加载判定在 addMaidTask 启动阶段执行一次，运行时不重判。
+        // ---- 风箱冷却 ----
+        maid.addEntry(entry
+                .startIntSlider(
+                        Component.translatable("config.create_hand_made.maid.bellows_cooldown"),
+                        MaidConfig.INSTANCE.maidBellowsCooldown.get(),
+                        1, 200)
+                .setDefaultValue(16)
+                .setTooltip(Component.translatable(
+                        "config.create_hand_made.maid.bellows_cooldown.tooltip"))
+                .setSaveConsumer(MaidConfig.INSTANCE.maidBellowsCooldown::set)
+                .build());
+
+        // ---- 指杆部署冷却 ----
+        maid.addEntry(entry
+                .startIntSlider(
+                        Component.translatable("config.create_hand_made.maid.pointer_deploy_cooldown"),
+                        MaidConfig.INSTANCE.maidPointerDeployCooldown.get(),
+                        1, 200)
+                .setDefaultValue(16)
+                .setTooltip(Component.translatable(
+                        "config.create_hand_made.maid.pointer_deploy_cooldown.tooltip"))
+                .setSaveConsumer(MaidConfig.INSTANCE.maidPointerDeployCooldown::set)
+                .build());
+
+        // ---- 搅拌杖冷却 ----
+        maid.addEntry(entry
+                .startIntSlider(
+                        Component.translatable("config.create_hand_made.maid.stirring_staff_cooldown"),
+                        MaidConfig.INSTANCE.maidStirringStaffCooldown.get(),
+                        1, 200)
+                .setDefaultValue(16)
+                .setTooltip(Component.translatable(
+                        "config.create_hand_made.maid.stirring_staff_cooldown.tooltip"))
+                .setSaveConsumer(MaidConfig.INSTANCE.maidStirringStaffCooldown::set)
+                .build());
+
+        // ---- 研钵/碾钵冷却 ----
+        maid.addEntry(entry
+                .startIntSlider(
+                        Component.translatable("config.create_hand_made.maid.mortar_cooldown"),
+                        MaidConfig.INSTANCE.maidMortarCooldown.get(),
+                        1, 400)
+                .setDefaultValue(60)
+                .setTooltip(Component.translatable(
+                        "config.create_hand_made.maid.mortar_cooldown.tooltip"))
+                .setSaveConsumer(MaidConfig.INSTANCE.maidMortarCooldown::set)
+                .build());
+
+        // ---- 女仆粒子----
+                maid.addEntry(entry
+        .startIntSlider(
+                Component.translatable("config.create_hand_made.maid.particle_level"),
+                MaidConfig.INSTANCE.maidParticleLevel.get(),
+                1, 5)
+        .setDefaultValue(3)
+        .setTooltip(Component.translatable(
+                "config.create_hand_made.maid.particle_level.tooltip"))
+        .setSaveConsumer(MaidConfig.INSTANCE.maidParticleLevel::set)
+        .build());
+
+        // ---- 屏蔽模组列表 ----
         List<String> blocked = new ArrayList<>(MaidConfig.INSTANCE.blockedMods.get());
 
         maid.addEntry(entry

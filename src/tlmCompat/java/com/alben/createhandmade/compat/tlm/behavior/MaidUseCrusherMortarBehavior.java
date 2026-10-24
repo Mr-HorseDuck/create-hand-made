@@ -1,8 +1,8 @@
 package com.alben.createhandmade.compat.tlm.behavior;
 
-import com.alben.createhandmade.item.CrusherMortarItem;
+import com.alben.createhandmade.compat.tlm.MaidConfig;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
-import com.alben.createhandmade.Config;
+import com.alben.createhandmade.item.CrusherMortarItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
 import net.minecraft.core.BlockPos;
@@ -42,14 +42,12 @@ public class MaidUseCrusherMortarBehavior implements BehaviorControl<EntityMaid>
             return false;
         }
 
-        // ★ 强转 LivingEntity，避免 TLM 版本间方法签名变化导致 NoSuchMethodError
         ItemStack tool = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
         if (!(tool.getItem() instanceof CrusherMortarItem)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // ★ 批量加工附魔 → 拒绝
         if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
             status = Behavior.Status.STOPPED;
             return false;
@@ -64,8 +62,7 @@ public class MaidUseCrusherMortarBehavior implements BehaviorControl<EntityMaid>
         FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
 
         if (CrusherMortarItem.tryGrindOnce(level, maid, tool, inputInv, outputInv, filter)) {
-            cooldown = Config.INSTANCE.crusherMortarWindupTicks.get()
-        + Config.INSTANCE.crusherMortarProcessingTicks.get();
+            cooldown = MaidConfig.INSTANCE.maidMortarCooldown.get();
             status = Behavior.Status.RUNNING;
             return true;
         }

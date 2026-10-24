@@ -1,5 +1,6 @@
 package com.alben.createhandmade.compat.tlm.behavior;
 
+import com.alben.createhandmade.compat.tlm.MaidConfig;
 import com.alben.createhandmade.compat.tlm.PointerDataHelper;
 import com.alben.createhandmade.item.StirringStaffItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -22,11 +23,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  *   → BasinRecipe.apply 触发一次搅拌
  *   → 扣耐久
  *
- * 每 20 tick 触发一次。
+ * 冷却由 MaidConfig.maidStirringStaffCooldown 控制，默认 20 tick。
  */
 public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid> {
-
-    private static final int CHECK_INTERVAL = 20;
 
     private Behavior.Status status = Behavior.Status.STOPPED;
     private int cooldown = 0;
@@ -48,22 +47,19 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
             status = Behavior.Status.STOPPED;
             return false;
         }
-        cooldown = CHECK_INTERVAL;
+        cooldown = MaidConfig.INSTANCE.maidStirringStaffCooldown.get();
 
-        // ★ 强转 LivingEntity，避免 TLM 版本间方法签名变化导致 NoSuchMethodError
         ItemStack tool = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
         if (!(tool.getItem() instanceof StirringStaffItem)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // ★ 批量加工附魔 → 拒绝
         if (MaidBatchCraftingBlocker.checkAndRefuse(maid, tool)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        // 读液体模式的输出坐标 + 注视
         BlockPos outputPos = PointerDataHelper.getLiquidOutput(maid, level);
         MaidLookHelper.lookAtBlock(maid, outputPos);
         if (outputPos == null) {
@@ -71,7 +67,6 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
             return false;
         }
 
-        // ★ 交互距离校验
         if (!MaidRangeHelper.isWithinRange(maid, outputPos)) {
             status = Behavior.Status.STOPPED;
             return false;
@@ -101,10 +96,14 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
 
         basin.notifyChangeOfContents();
 
+        // 反馈
+        MaidFeedback.stirSound(level, outputPos);
+        MaidFeedback.stirParticles(level, outputPos, 8);
+
         // 扣耐久
         tool.hurtAndBreak(1, maid, e -> {});
 
-        cooldown = CHECK_INTERVAL;
+        cooldown = MaidConfig.INSTANCE.maidStirringStaffCooldown.get();
         status = Behavior.Status.RUNNING;
         return true;
     }
