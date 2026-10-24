@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.Config;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
@@ -8,7 +9,6 @@ import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.type.HandMadeToolRecipe;
 import com.alben.createhandmade.recipe.ToolType;
-import com.alben.createhandmade.Config;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity;
@@ -46,6 +46,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -54,19 +55,22 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 @Mod.EventBusSubscriber
 public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     private static final Object MIXING_RECIPE_KEY = new Object();
-    int windupTicks = Config.INSTANCE.stirringStaffWindupTicks.get();
-    int processingTicks = Config.INSTANCE.stirringStaffProcessingTicks.get();
+    private static final int STIR_DURATION = 60;
+    private static final int WINDUP_TICKS = 8;
 
-    /** ★ 保底音标记：本次搅拌是否已经播过常规 MIXING 音 */
-    private static final String NBT_SOUND_PLAYED = "HandMadeStirSoundPlayed";
+    /** ★ 玩家 → 搅拌目标 Basin 位置。use 时缓存，finishUsingItem / onUseTick 复用，避免准星偏移导致中断。 */
+    private static final Map<UUID, BlockPos> STIRRING_TARGET = new HashMap<>();
 
     public StirringStaffItem(Properties properties) {
         super(properties);
@@ -77,7 +81,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         return 15;
     }
 
-    // ★ 允许锋利附魔
     @Override
     public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
         if (enchantment == Enchantments.SHARPNESS) return true;
@@ -102,7 +105,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         }
     }
 
-    // ================= 右键拦截：把"工作盆的空手交互"让给搅拌杖 =================
+    // ================= 右键拦截 =================
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -119,7 +122,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        // ★ 副手使用需要潜行，避免和主手冲突
         if (hand == InteractionHand.OFF_HAND && !player.isShiftKeyDown()) {
             return InteractionResultHolder.pass(player.getItemInHand(hand));
         }
@@ -143,75 +145,64 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
-        // ★ 重置保底音标记：新一轮搅拌开始
-        stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, false);
+        // ★ 缓存目标 Basin 位置，后续 finishUsingItem / onUseTick 都用它
+        STIRRING_TARGET.put(player.getUUID(), pos.immutable());
 
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
     }
 
-    // ================= 使用时长 =================
-
     @Override
     public int getUseDuration(ItemStack stack) {
-    int windupTicks = Config.INSTANCE.stirringStaffWindupTicks.get();
-    int processingTicks = Config.INSTANCE.stirringStaffProcessingTicks.get();
-    return windupTicks + processingTicks;
-}
+        return WINDUP_TICKS + STIR_DURATION;
+    }
 
     // ================= 完成 =================
 
-    /**
-     * ★ 保底音：如果本次搅拌 onUseTick 一次都没播过 MIXING 音（加工时间极短时可能发生），
-     *   在配方应用成功后补一声，位置和音效与常规音效一致。
-     */
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
         if (level.isClientSide) return stack;
 
-        BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);
-        if (hit.getType() != HitResult.Type.BLOCK) return stack;
+        // ★ 用缓存位置，不再 raycast
+        BlockPos pos = STIRRING_TARGET.remove(player.getUUID());
+        if (pos == null) return stack;
 
-        BlockPos pos = hit.getBlockPos();
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return stack;
 
         Recipe<?> recipe = findMatchingRecipe(level, basin);
         if (recipe != null) {
             if (BasinRecipe.apply(basin, recipe)) {
                 basin.notifyChangeOfContents();
-
-                // ★ 保底音：配方确实应用了，但常规音效一次都没播
-                if (!stack.getOrCreateTag().getBoolean(NBT_SOUND_PLAYED)) {
-                    AllSoundEvents.MIXING.playOnServer(level, pos, 2.0f, 2f);
-                }
-
                 EquipmentSlot slot = entity.getUsedItemHand() == InteractionHand.MAIN_HAND
                         ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
                 stack.hurtAndBreak(1, entity, e -> e.broadcastBreakEvent(slot));
             }
         }
-
-        stack.removeTagKey(NBT_SOUND_PLAYED);
         return stack;
+    }
+
+    // ================= 中途松手：清理缓存 =================
+
+    @Override
+    public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
+        if (!(entity instanceof Player player)) return;
+        STIRRING_TARGET.remove(player.getUUID());
     }
 
     // ================= 每 tick：音效 + 粒子 =================
 
-    /**
-     * ★ 播了常规 MIXING 音后，标记 NBT_SOUND_PLAYED = true，供 finishUsingItem 判断是否需要保底音。
-     */
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
 
         int usedTicks = getUseDuration(stack) - remainingTicks;
-        if (usedTicks < Config.INSTANCE.mortarWindupTicks.get()) return;
+        if (usedTicks < WINDUP_TICKS) return;
 
-        BlockHitResult hit = getPlayerPOVHitResult(level, player, ClipContext.Fluid.NONE);
-        if (hit.getType() != HitResult.Type.BLOCK) return;
+        // ★ 用缓存位置，不再 raycast
+        BlockPos pos = STIRRING_TARGET.get(player.getUUID());
+        if (pos == null) return;
 
-        BlockPos pos = hit.getBlockPos();
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return;
         if (basin.isEmpty()) return;
 
@@ -226,10 +217,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
                 }
 
                 AllSoundEvents.MIXING.playOnServer(level, pos, 3.0f, 2f);
-
-                // ★ 标记：本次搅拌已经播过常规音
-                stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, true);
-
                 broadcastStirParticles(level, pos, basin);
             }
         }
@@ -255,13 +242,19 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         }
     }
 
-    // ================= 三层配方查询：MIXING + 无序合成 =================
+    // ================= 玩家下线清理 =================
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        STIRRING_TARGET.remove(event.getEntity().getUUID());
+    }
+
+    // ================= 三层配方查询 =================
 
     @Nullable
     public static Recipe<?> findMatchingRecipe(Level level, BasinBlockEntity basin) {
         if (basin.isEmpty()) return null;
 
-        // L3：独立 type + tool=stirring_staff
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(r instanceof HandMadeToolRecipe htr)) continue;
@@ -271,7 +264,6 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             }
         }
 
-        // L1：MIXING + 无序合成
         try {
             for (Recipe<?> recipe : RecipeFinder.get(MIXING_RECIPE_KEY, level,
                     StirringStaffItem::matchStaticFilters)) {
