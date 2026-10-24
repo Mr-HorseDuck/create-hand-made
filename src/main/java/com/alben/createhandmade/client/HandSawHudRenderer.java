@@ -17,7 +17,6 @@ import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Mod.EventBusSubscriber(modid = CreateHandMade.MODID, value = Dist.CLIENT)
@@ -77,24 +76,20 @@ public class HandSawHudRenderer {
         List<Recipe<?>> recipes = HandSawItem.getCuttingRecipes(level, off);
         if (recipes.isEmpty()) return;
 
-        // 收集产物（跳过空结果）
-        List<ItemStack> outputs = new ArrayList<>();
-        for (Recipe<?> recipe : recipes) {
-            ItemStack result = recipe.getResultItem(level.registryAccess());
-            if (!result.isEmpty()) outputs.add(result);
-        }
-        if (outputs.isEmpty()) return;
+        // ★ 直接用 recipes 列表，不再单独收集 outputs。
+        //   原因：switchRecipe / executeCut 都用 recipes.get(index)，
+        //   如果 HUD 跳过空结果的配方，index 会和 recipes 列表错位，
+        //   表现为"HUD 高亮和字幕不一致、切割按字幕切"。
+        int total = recipes.size();
 
         // 读取当前选中索引（NBT）
         int index = mainHand.getOrCreateTag().getInt(HandSawItem.NBT_RECIPE_INDEX);
-        if (index < 0 || index >= outputs.size()) index = 0;
+        if (index < 0 || index >= total) index = 0;
 
         // 计算位置：多行网格，整体水平居中；垂直方向上"最下面一行"固定在屏幕 1/3 处
         GuiGraphics graphics = event.getGuiGraphics();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
-
-        int total = outputs.size();
 
         // ★ 滑动窗口：配方数超过 MAX_SLOTS 时不再截断，而是让 36 个格位变成一扇滑动的窗。
         //   total ≤ 36 时退化成"窗口 = 全部配方、两端都没有指示符"，与旧版逐像素一致。
@@ -144,7 +139,9 @@ public class HandSawHudRenderer {
         for (int k = 0; k < slotsToDraw; k++) {
             int cell = beforeCount + k;
             int slot = start + k;
-            renderSlot(graphics, mc.font, outputs.get(slot),
+            // ★ 现算产物：和 switchRecipe / executeCut 走同一个 recipes 列表，索引一定对齐
+            ItemStack result = recipes.get(slot).getResultItem(level.registryAccess());
+            renderSlot(graphics, mc.font, result,
                     gridX(leftX, cell), gridY(baselineY, rows, cell), slot == index);
         }
 
@@ -185,15 +182,13 @@ public class HandSawHudRenderer {
         // 模组自带槽位贴图（1.20.1 传统 blit）
         graphics.blit(SLOT_SPRITE, x, y, 0, 0, SLOT_SIZE, SLOT_SIZE, SLOT_SIZE, SLOT_SIZE);
 
-        // 物品图标
-        int itemX = x + ITEM_INSET;
-        int itemY = y + ITEM_INSET;
-        graphics.renderItem(stack, itemX, itemY);
-
-        // ★ 数量角标：直接交给原版 API，坐标与 renderItem 一致。
-        //   只在 count != 1 时画数量（1.20.1 的 renderItemDecorations 行为与 1.21 相同），
-        //   空产物已在上面收集时跳过，所以不需要再判一次。
-        graphics.renderItemDecorations(font, stack, itemX, itemY);
+        // ★ 空产物只画槽框，不画物品图标和数量角标
+        if (!stack.isEmpty()) {
+            int itemX = x + ITEM_INSET;
+            int itemY = y + ITEM_INSET;
+            graphics.renderItem(stack, itemX, itemY);
+            graphics.renderItemDecorations(font, stack, itemX, itemY);
+        }
 
         // 选中槽位：画一圈金色高亮边框（贴在槽外沿 1px 处）
         if (selected) {
