@@ -167,5 +167,18 @@
   "message.create_hand_made.maid.refuse_batch.1": "Please give me another tool, I can't use this",
   "message.create_hand_made.maid.refuse_batch.2": "I really don't know how to use it",
 
-  "hud.create_hand_made.hand_saw.more": "+%s"
+  "hud.create_hand_made.hand_saw.more": "+%s",
+  
+  "config.create_hand_made.maid.bellows_cooldown": "Bellows Cooldown",
+  "config.create_hand_made.maid.bellows_cooldown.tooltip": "Cooldown (ticks) after maid uses bellows",
+
+  "config.create_hand_made.maid.pointer_deploy_cooldown": "Pointer Deploy Cooldown",
+  "config.create_hand_made.maid.pointer_deploy_cooldown.tooltip": "Cooldown (ticks) after maid uses pointer deploy",
+  "config.create_hand_made.maid.stirring_staff_cooldown": "Stirring Staff Cooldown",
+  "config.create_hand_made.maid.stirring_staff_cooldown.tooltip": "Cooldown (ticks) after maid uses stirring staff",
+  "config.create_hand_made.maid.mortar_cooldown": "Mortar / Crusher Mortar Cooldown",
+  "config.create_hand_made.maid.mortar_cooldown.tooltip": "Cooldown (ticks) after maid uses mortar or crusher mortar, shared by both",
+  "config.create_hand_made.maid.particle_level": "Particle Level",
+  "config.create_hand_made.maid.particle_level.tooltip": "Maid processing particle level (1-5), 1 = least, 3 = default, 5 = most"
+
 }

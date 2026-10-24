@@ -175,5 +175,18 @@
   "command.create_hand_made.reload.failed": "配置加载失败，请查看日志",
   "command.create_hand_made.reload.restart_hint": "§e注意：blocked_mods 的更改需要重启游戏才会生效",
 
-  "hud.create_hand_made.hand_saw.more": "+%s"
+  "hud.create_hand_made.hand_saw.more": "+%s",
+  
+  "config.create_hand_made.maid.bellows_cooldown": "风箱冷却",
+  "config.create_hand_made.maid.bellows_cooldown.tooltip": "女仆使用风箱后的冷却时间（tick）",
+
+  "config.create_hand_made.maid.pointer_deploy_cooldown": "指杆部署冷却",
+  "config.create_hand_made.maid.pointer_deploy_cooldown.tooltip": "女仆使用指杆部署后的冷却时间（tick）",
+  "config.create_hand_made.maid.stirring_staff_cooldown": "搅拌杖冷却",
+  "config.create_hand_made.maid.stirring_staff_cooldown.tooltip": "女仆使用搅拌杖后的冷却时间（tick）",
+  "config.create_hand_made.maid.mortar_cooldown": "研钵/碾钵冷却",
+  "config.create_hand_made.maid.mortar_cooldown.tooltip": "女仆使用研钵或碾钵后的冷却时间（tick），两者共用",
+  "config.create_hand_made.maid.particle_level": "粒子数量等级",
+  "config.create_hand_made.maid.particle_level.tooltip": "女仆加工粒子数量等级（1-5），1 最少、3 默认、5 最多"
+
 }
