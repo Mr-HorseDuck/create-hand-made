@@ -1,6 +1,6 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.foundation.gui.AllGuiTextures;
@@ -24,7 +24,6 @@ public class HandInfusionGunCategory extends CreateRecipeCategory<FillingRecipe>
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, FillingRecipe recipe, IFocusGroup focuses) {
-        // ★ 完全照抄 SpoutCategory.setRecipe
         builder
                 .addSlot(RecipeIngredientRole.INPUT, 27, 51)
                 .setBackground(getRenderedSlot(), -1, -1)
@@ -44,7 +43,6 @@ public class HandInfusionGunCategory extends CreateRecipeCategory<FillingRecipe>
         AllGuiTextures.JEI_SHADOW.render(graphics, 62, 57);
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 126, 29);
 
-        // ★ 灌注枪：轻轻上下摇晃
         float partialTicks = AnimationTickHolder.getPartialTicks();
         int ticks = AnimationTickHolder.getTicks();
         float dy = (float) Math.sin((ticks + partialTicks) * 0.4f) * 3f;

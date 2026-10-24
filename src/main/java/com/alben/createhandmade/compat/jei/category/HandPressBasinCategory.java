@@ -1,6 +1,6 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.simibubi.create.AllBlocks;

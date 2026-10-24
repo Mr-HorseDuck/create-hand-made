@@ -2,35 +2,40 @@ package com.alben.createhandmade.compat.jei;
 
 import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
-import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
+import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.HauntingRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.SplashingRecipe;
-import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
-import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import mezz.jei.api.recipe.RecipeType;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
-import net.minecraftforge.items.wrapper.RecipeWrapper;
 
 /**
- * ★ Forge 1.20.1 版本：
- *   - RecipeHolder 在 1.20.1 中不存在，直接使用 Recipe 子类本身
- *   - RecipeType.createRecipeHolderType(ResourceLocation) → RecipeType.create(namespace, path, Class)
+ * ★ Forge 1.20.1 版本。
+ *
+ * 泛型使用 Create 原配方类作为公共父类型：
+ *   - HandMadeCuttingRecipe        extends CuttingRecipe
+ *   - HandMadePressingRecipe       extends PressingRecipe
+ *   - HandMadeFillingRecipe        extends FillingRecipe
+ *   - HandMadeApplicationRecipe    extends ItemApplicationRecipe
+ *   - HandMadeCrushingRecipe       extends AbstractCrushingRecipe
+ *   - HandMadeToolRecipe（basin）  extends BasinRecipe
+ * 因此 JEI 类别泛型无需升到 ProcessingRecipe<RecipeWrapper>。
  */
 public class ModJeiTypes {
 
+    /** 手锯切削（L1 Cutting + L3 HandMadeCuttingRecipe） */
     public static final RecipeType<CuttingRecipe> HAND_SAW_CUTTING =
             RecipeType.create("create_hand_made", "hand_saw_cutting", CuttingRecipe.class);
 
-    /** ★ 手锯 · 切石（condensed，一页最多 15 个产物） */
+    /** 手锯 · 切石（condensed，一页最多 15 个产物） */
     public static final RecipeType<CondensedBlockCuttingRecipe> HAND_SAW_STONECUTTING =
             RecipeType.create("create_hand_made", "hand_saw_stonecutting",
                     CondensedBlockCuttingRecipe.class);
 
-    /** 冲压锤 · 置物台 / 传送带 */
+    /** 冲压锤 · 置物台 / 传送带（L1 Pressing + L3 HandMadePressingRecipe） */
     public static final RecipeType<PressingRecipe> HAND_PRESS_DEPOT =
             RecipeType.create("create_hand_made", "hand_press_depot", PressingRecipe.class);
 
@@ -42,22 +47,26 @@ public class ModJeiTypes {
     public static final RecipeType<BasinRecipe> HAND_PRESS_BASIN_AUTO_SQUARE =
             RecipeType.create("create_hand_made", "hand_press_basin_auto_square", BasinRecipe.class);
 
-    /** 灌注枪 · 注液 */
+    /** 灌注枪 · 注液（L1 Filling + L3 HandMadeFillingRecipe） */
     public static final RecipeType<FillingRecipe> HAND_INFUSION_GUN =
             RecipeType.create("create_hand_made", "hand_infusion_gun", FillingRecipe.class);
 
-    /** 研钵 · 研磨 */
-    public static final RecipeType<MillingRecipe> MORTAR_MILLING =
-            RecipeType.create("create_hand_made", "mortar_milling", MillingRecipe.class);
+    /**
+     * 研钵 · 研磨（L1 Milling + L3 HandMadeCrushingRecipe）
+     * 公共父类是 AbstractCrushingRecipe。
+     */
+    public static final RecipeType<AbstractCrushingRecipe> MORTAR_MILLING =
+            RecipeType.create("create_hand_made", "mortar_milling",
+                    AbstractCrushingRecipe.class);
 
     /**
      * 碾钵 · 粉碎
-     * ★ 同时容纳 CrushingRecipe 和 MillingRecipe（两者都是 ProcessingRecipe<RecipeWrapper> 子类）
+     * 同时容纳 CrushingRecipe / MillingRecipe / HandMadeCrushingRecipe，
+     * 公共父类是 AbstractCrushingRecipe。
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public static final RecipeType<ProcessingRecipe<RecipeWrapper>> CRUSHER_MORTAR_CRUSHING =
-            (RecipeType) RecipeType.create("create_hand_made", "crusher_mortar_crushing",
-                    CrushingRecipe.class);
+    public static final RecipeType<AbstractCrushingRecipe> CRUSHER_MORTAR_CRUSHING =
+            RecipeType.create("create_hand_made", "crusher_mortar_crushing",
+                    AbstractCrushingRecipe.class);
 
     /** 搅拌杖 · 混合（MIXING） */
     public static final RecipeType<BasinRecipe> STIRRING_STAFF_MIXING =
@@ -71,7 +80,7 @@ public class ModJeiTypes {
     public static final RecipeType<BasinRecipe> STIRRING_STAFF_AUTO_BREWING =
             RecipeType.create("create_hand_made", "stirring_staff_auto_brewing", BasinRecipe.class);
 
-    /** 指杆 · 物品应用 */
+    /** 指杆 · 物品应用（L1 ItemApplication + L3 HandMadeApplicationRecipe） */
     public static final RecipeType<ItemApplicationRecipe> POINTER_APPLICATION =
             RecipeType.create("create_hand_made", "pointer_application", ItemApplicationRecipe.class);
 

@@ -1,6 +1,6 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.content.kinetics.fan.processing.SplashingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;

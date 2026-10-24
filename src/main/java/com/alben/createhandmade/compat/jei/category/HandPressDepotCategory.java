@@ -1,6 +1,6 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
@@ -29,7 +29,6 @@ public class HandPressDepotCategory extends CreateRecipeCategory<PressingRecipe>
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, PressingRecipe recipe, IFocusGroup focuses) {
-        // ★ 照抄 HandSawCategory 的坐标
         builder
                 .addSlot(RecipeIngredientRole.INPUT, 27, 29)
                 .setBackground(getRenderedSlot(), -1, -1)
@@ -46,7 +45,7 @@ public class HandPressDepotCategory extends CreateRecipeCategory<PressingRecipe>
                             single ? 132 : 126 + xOffset, 29 + yOffset)
                     .setBackground(getRenderedSlot(output), -1, -1)
                     .addItemStack(output.getStack())
-                .addRichTooltipCallback(addStochasticTooltip(output));
+                    .addRichTooltipCallback(addStochasticTooltip(output));
             i++;
         }
     }
@@ -54,7 +53,6 @@ public class HandPressDepotCategory extends CreateRecipeCategory<PressingRecipe>
     @Override
     public void draw(PressingRecipe recipe, IRecipeSlotsView slotsView,
                      GuiGraphics graphics, double mouseX, double mouseY) {
-        // ★ 阴影 + 长箭头，坐标照抄 HandSawCategory
         AllGuiTextures.JEI_SHADOW.render(graphics, 61, 21);
         AllGuiTextures.JEI_LONG_ARROW.render(graphics, 52, 32);
 
@@ -72,5 +70,4 @@ public class HandPressDepotCategory extends CreateRecipeCategory<PressingRecipe>
                 .scale(2)
                 .render(graphics);
     }
-
 }

@@ -1,9 +1,9 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
+import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
-import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.gui.AllGuiTextures;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
@@ -13,24 +13,27 @@ import net.createmod.catnip.animation.AnimationTickHolder;
 import net.createmod.catnip.gui.element.GuiGameElement;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.items.wrapper.RecipeWrapper;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.List;
 
+/**
+ * ★ 泛型用 AbstractCrushingRecipe（CrushingRecipe / MillingRecipe /
+ *   HandMadeCrushingRecipe 的公共父类）。
+ */
 @ParametersAreNonnullByDefault
-public class CrusherMortarCrushingCategory extends CreateRecipeCategory<ProcessingRecipe<RecipeWrapper>> {
+public class CrusherMortarCrushingCategory extends CreateRecipeCategory<AbstractCrushingRecipe> {
 
     /** 抖幅比研钵大一点（粉碎更重） */
     private static final float SHAKE_AMPLITUDE = 2f;
     private static final float SHAKE_SPEED = 0.4f;
 
-    public CrusherMortarCrushingCategory(Info<ProcessingRecipe<RecipeWrapper>> info) {
+    public CrusherMortarCrushingCategory(Info<AbstractCrushingRecipe> info) {
         super(info);
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, ProcessingRecipe<RecipeWrapper> recipe, IFocusGroup focuses) {
+    public void setRecipe(IRecipeLayoutBuilder builder, AbstractCrushingRecipe recipe, IFocusGroup focuses) {
         builder
                 .addSlot(RecipeIngredientRole.INPUT, 27, 37)
                 .setBackground(getRenderedSlot(), -1, -1)
@@ -53,7 +56,7 @@ public class CrusherMortarCrushingCategory extends CreateRecipeCategory<Processi
     }
 
     @Override
-    public void draw(ProcessingRecipe<RecipeWrapper> recipe, IRecipeSlotsView slotsView,
+    public void draw(AbstractCrushingRecipe recipe, IRecipeSlotsView slotsView,
                      GuiGraphics graphics, double mouseX, double mouseY) {
         AllGuiTextures.JEI_SHADOW.render(graphics, 61, 29);
         AllGuiTextures.JEI_LONG_ARROW.render(graphics, 52, 40);

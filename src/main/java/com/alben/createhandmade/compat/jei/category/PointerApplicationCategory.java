@@ -1,6 +1,6 @@
 package com.alben.createhandmade.compat.jei.category;
 
-import com.alben.createhandmade.item.ModItems;
+import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
@@ -29,12 +29,10 @@ public class PointerApplicationCategory extends CreateRecipeCategory<ItemApplica
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, ItemApplicationRecipe recipe, IFocusGroup focuses) {
-        // ★ 用 Deploying 的布局（27,51），因为两种配方都要能显示
         builder.addSlot(RecipeIngredientRole.INPUT, 27, 51)
                 .setBackground(getRenderedSlot(), -1, -1)
                 .addIngredients(recipe.getProcessedItem());
 
-        // ★ 保留"工具不消耗"的提示（用 @SuppressWarnings 掉弃用警告）
         var handItemSlot = builder.addSlot(RecipeIngredientRole.INPUT, 51, 5)
                 .setBackground(getRenderedSlot(), -1, -1)
                 .addIngredients(recipe.getRequiredHeldItem());
@@ -65,7 +63,6 @@ public class PointerApplicationCategory extends CreateRecipeCategory<ItemApplica
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics,
                 126, 29 + (recipe.getRollableResults().size() > 2 ? -19 : 0));
 
-        // ★ 指杆：轻轻上下摇晃
         float partialTicks = AnimationTickHolder.getPartialTicks();
         int ticks = AnimationTickHolder.getTicks();
         float dy = (float) Math.sin((ticks + partialTicks) * 0.4f) * 3f;

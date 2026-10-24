@@ -14,8 +14,10 @@ import com.alben.createhandmade.compat.jei.category.HandSawStonecuttingCategory;
 import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
-import com.alben.createhandmade.item.ModItems;
-import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.registry.ModItems;
+import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
+import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
@@ -30,6 +32,7 @@ import com.simibubi.create.compat.jei.category.SpoutCategory;
 import com.simibubi.create.content.fluids.potion.PotionMixingRecipes;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crafter.MechanicalCraftingRecipe;
+import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.kinetics.fan.processing.AllFanProcessingTypes;
@@ -40,7 +43,6 @@ import com.simibubi.create.content.kinetics.press.MechanicalPressBlockEntity;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
-import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.infrastructure.config.AllConfigs;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -157,20 +159,21 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(new HandInfusionGunCategory(handInfusionGunInfo));
 
         // ==================== 研钵 · 研磨 ====================
-        CreateRecipeCategory.Info<MillingRecipe> mortarMillingInfo = new CreateRecipeCategory.Info<>(
-                ModJeiTypes.MORTAR_MILLING,
-                Component.translatable("jei.create_hand_made.mortar_milling"),
-                new EmptyBackground(177, 55),
-                new DoubleItemIcon(
-                        () -> new ItemStack(ModItems.MORTAR.get()),
-                        () -> new ItemStack(AllItems.WHEAT_FLOUR.get())),
-                CreateHandMadeJEI::collectMillingRecipes,
-                List.of(() -> new ItemStack(ModItems.MORTAR.get()))
-        );
+        CreateRecipeCategory.Info<AbstractCrushingRecipe> mortarMillingInfo =
+                new CreateRecipeCategory.Info<>(
+                        ModJeiTypes.MORTAR_MILLING,
+                        Component.translatable("jei.create_hand_made.mortar_milling"),
+                        new EmptyBackground(177, 55),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.MORTAR.get()),
+                                () -> new ItemStack(AllItems.WHEAT_FLOUR.get())),
+                        CreateHandMadeJEI::collectMillingRecipes,
+                        List.of(() -> new ItemStack(ModItems.MORTAR.get()))
+                );
         allCategories.add(new MortarMillingCategory(mortarMillingInfo));
 
         // ==================== 碾钵 · 粉碎（含研磨备选） ====================
-        CreateRecipeCategory.Info<ProcessingRecipe<RecipeWrapper>> crusherMortarCrushingInfo =
+        CreateRecipeCategory.Info<AbstractCrushingRecipe> crusherMortarCrushingInfo =
                 new CreateRecipeCategory.Info<>(
                         ModJeiTypes.CRUSHER_MORTAR_CRUSHING,
                         Component.translatable("jei.create_hand_made.crusher_mortar_crushing"),
@@ -223,16 +226,17 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(StirringStaffMixingCategory.autoBrewing(stirringStaffAutoBrewingInfo));
 
         // ==================== 指杆 · 应用 ====================
-        CreateRecipeCategory.Info<ItemApplicationRecipe> pointerApplicationInfo = new CreateRecipeCategory.Info<>(
-                ModJeiTypes.POINTER_APPLICATION,
-                Component.translatable("jei.create_hand_made.pointer_application"),
-                new EmptyBackground(177, 70),
-                new DoubleItemIcon(
-                        () -> new ItemStack(ModItems.POINTER.get()),
-                        () -> new ItemStack(AllBlocks.DEPOT.get())),
-                CreateHandMadeJEI::collectPointerRecipes,
-                List.of(() -> new ItemStack(ModItems.POINTER.get()))
-        );
+        CreateRecipeCategory.Info<ItemApplicationRecipe> pointerApplicationInfo =
+                new CreateRecipeCategory.Info<>(
+                        ModJeiTypes.POINTER_APPLICATION,
+                        Component.translatable("jei.create_hand_made.pointer_application"),
+                        new EmptyBackground(177, 70),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.POINTER.get()),
+                                () -> new ItemStack(AllBlocks.DEPOT.get())),
+                        CreateHandMadeJEI::collectPointerRecipes,
+                        List.of(() -> new ItemStack(ModItems.POINTER.get()))
+                );
         allCategories.add(new PointerApplicationCategory(pointerApplicationInfo));
 
         // ==================== 风箱 · 熔炼 ====================
@@ -307,22 +311,36 @@ public class CreateHandMadeJEI implements IModPlugin {
 
     // ==================== 配方收集 ====================
 
+    /**
+     * 手锯切削：L1（CuttingRecipe）+ L3（HandMadeCuttingRecipe extends CuttingRecipe）。
+     */
     private static List<CuttingRecipe> collectHandSawRecipes() {
         List<CuttingRecipe> result = new ArrayList<>();
+
+        // L1：Create 的切削
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.CUTTING.getType())) {
             if (r instanceof CuttingRecipe c) result.add(c);
         }
+
+        // L3：独立 type（HandMadeCuttingRecipe 也是 CuttingRecipe 子类）
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof CuttingRecipe c)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                if (like.getTool() != ToolType.HAND_SAW) continue;
+                result.add(c);
+            }
+        }
+
         return result;
     }
 
     /**
-     * ★ 手锯切石：原版 minecraft:stonecutting + L3 独占切石。
-     * 走 HandMadeRecipePool 的 L3 收集，与游戏内工具同源；
-     * L1 用 CreateJEI.getTypedRecipes(RecipeType.STONECUTTING) 拿。
-     * 交给 Create 的 BlockCuttingCategory.condenseRecipes 折叠。
+     * 手锯切石：L1（原版 minecraft:stonecutting）+ L3（HandMadeStonecuttingRecipe）。
      */
-
-private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecipes() {
+    private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecipes() {
         List<Recipe<?>> recipes = new ArrayList<>();
 
         // L1：原版切石
@@ -330,20 +348,41 @@ private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecip
             if (r instanceof StonecutterRecipe) recipes.add(r);
         }
 
-        // L3：独占切石（从 CUSTOM_MAP 拿）
-        for (Recipe<?> r : HandMadeRecipePool.getAllCustomRecipes(
-                ToolType.HAND_SAW_STONECUTTING)) {
-            if (r instanceof StonecutterRecipe) recipes.add(r);
+        // L3：独立 type 的切石
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (HandMadeStonecuttingRecipe r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.STONECUTTING_RECIPE.get())) {
+                recipes.add(r);
+            }
         }
 
         return BlockCuttingCategory.condenseRecipes(recipes);
     }
 
+    /**
+     * 冲压锤 · 置物台：L1（PressingRecipe）+ L3（HandMadePressingRecipe extends PressingRecipe）。
+     */
     private static List<PressingRecipe> collectPressingRecipes() {
         List<PressingRecipe> result = new ArrayList<>();
+
+        // L1
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.PRESSING.getType())) {
             if (r instanceof PressingRecipe p) result.add(p);
         }
+
+        // L3
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof PressingRecipe p)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                if (like.getTool() != ToolType.PRESS_HAMMER_DEPOT) continue;
+                result.add(p);
+            }
+        }
+
         return result;
     }
 
@@ -369,33 +408,88 @@ private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecip
         return result;
     }
 
+    /**
+     * 灌注枪 · 注液：L1（FillingRecipe）+ L3（HandMadeFillingRecipe extends FillingRecipe）。
+     */
     private List<FillingRecipe> collectInfusionGunRecipes() {
         List<FillingRecipe> result = new ArrayList<>();
+
+        // L1
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.FILLING.getType())) {
             if (r instanceof FillingRecipe f) result.add(f);
         }
         if (ingredientManager != null) {
             SpoutCategory.consumeRecipes(result::add, ingredientManager);
         }
-        return result;
-    }
 
-    private static List<MillingRecipe> collectMillingRecipes() {
-        List<MillingRecipe> result = new ArrayList<>();
-        for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.MILLING.getType())) {
-            if (r instanceof MillingRecipe m) result.add(m);
+        // L3
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof FillingRecipe f)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                if (like.getTool() != ToolType.INFUSION_GUN) continue;
+                result.add(f);
+            }
         }
+
         return result;
     }
 
-    private static List<ProcessingRecipe<RecipeWrapper>> collectCrushingRecipes() {
-        List<ProcessingRecipe<RecipeWrapper>> result = new ArrayList<>();
+    /**
+     * 研钵研磨：L1（MillingRecipe）+ L3（HandMadeCrushingRecipe）
+     * 公共父类型是 AbstractCrushingRecipe。
+     */
+    private static List<AbstractCrushingRecipe> collectMillingRecipes() {
+        List<AbstractCrushingRecipe> result = new ArrayList<>();
 
+        // L1：Create 的 MILLING
+        for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.MILLING.getType())) {
+            if (r instanceof AbstractCrushingRecipe m) result.add(m);
+        }
+
+        // L3：独立 type（tool=mortar）
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof AbstractCrushingRecipe acr)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                if (like.getTool() != ToolType.MORTAR) continue;
+                result.add(acr);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 碾钵粉碎：L1（CrushingRecipe + MillingRecipe）+ L3（HandMadeCrushingRecipe）。
+     */
+    private static List<AbstractCrushingRecipe> collectCrushingRecipes() {
+        List<AbstractCrushingRecipe> result = new ArrayList<>();
+
+        // L1：Create 的 CRUSHING
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.CRUSHING.getType())) {
-            if (r instanceof CrushingRecipe c) result.add(c);
+            if (r instanceof AbstractCrushingRecipe c) result.add(c);
         }
+        // L1：Create 的 MILLING（备选）
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.MILLING.getType())) {
-            if (r instanceof MillingRecipe m) result.add(m);
+            if (r instanceof AbstractCrushingRecipe m) result.add(m);
+        }
+
+        // L3：独立 type（tool=crusher_mortar 或 mortar）
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof AbstractCrushingRecipe acr)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                ToolType owner = like.getTool();
+                if (owner != ToolType.CRUSHER_MORTAR && owner != ToolType.MORTAR) continue;
+                result.add(acr);
+            }
         }
 
         return result;
@@ -432,14 +526,33 @@ private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecip
         return result;
     }
 
+    /**
+     * 指杆 · 应用：L1（ItemApplicationRecipe）+ L3（HandMadeApplicationRecipe extends ItemApplicationRecipe）。
+     */
     private static List<ItemApplicationRecipe> collectPointerRecipes() {
         List<ItemApplicationRecipe> result = new ArrayList<>();
+
+        // L1：Create 的 DEPLOYING
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.DEPLOYING.getType())) {
             if (r instanceof ItemApplicationRecipe ra) result.add(ra);
         }
+        // L1：Create 的 ITEM_APPLICATION
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.ITEM_APPLICATION.getType())) {
             if (r instanceof ItemApplicationRecipe ra) result.add(ra);
         }
+
+        // L3：独立 type
+        var level = Minecraft.getInstance().level;
+        if (level != null) {
+            for (Recipe<?> r : level.getRecipeManager()
+                    .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
+                if (!(r instanceof ItemApplicationRecipe iar)) continue;
+                if (!(r instanceof HandMadeToolRecipeLike like)) continue;
+                if (like.getTool() != ToolType.POINTER) continue;
+                result.add(iar);
+            }
+        }
+
         return result;
     }
 
