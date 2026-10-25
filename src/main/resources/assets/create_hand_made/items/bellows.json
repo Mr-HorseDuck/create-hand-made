@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "create_hand_made:bellows",
+    "model": "create_hand_made:item/bellows"
+  }
+}

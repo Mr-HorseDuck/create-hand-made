@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " s ",
+    "nll",
+    " s "
+  ],
+  "key": {
+    "s": "#minecraft:wooden_slabs",
+    "n": "#c:nuggets/iron",
+    "l": "minecraft:leather"
+  },
+  "result": {
+    "id": "create_hand_made:bellows",
+    "count": 1
+  }
+}

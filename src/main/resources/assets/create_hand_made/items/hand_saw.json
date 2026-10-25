@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "create_hand_made:hand_saw",
+    "model": "create_hand_made:item/hand_saw"
+  }
+}

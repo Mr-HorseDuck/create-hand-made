@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "create_hand_made:stirring_staff",
+    "model": "create_hand_made:item/stirring_staff"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  i",
+    " i ",
+    "p  "
+  ],
+  "key": {
+    "i": "#c:plates/iron",
+    "p": "#minecraft:planks"
+  },
+  "result": {
+    "id": "create_hand_made:hand_saw",
+    "count": 1
+  }
+}

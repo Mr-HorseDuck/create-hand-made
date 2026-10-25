@@ -1,0 +1,9 @@
+{
+  "type": "create:haunting",
+  "ingredients": [
+    "minecraft:soul_campfire",
+    "minecraft:soul_torch",
+    "minecraft:soul_lantern",
+    "minecraft:soul_sand"
+  ]
+}

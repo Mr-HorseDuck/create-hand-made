@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  s",
+    " w ",
+    "w  "
+  ],
+  "key": {
+    "s": "create:whisk",
+    "w": "minecraft:stick"
+  },
+  "result": {
+    "id": "create_hand_made:stirring_staff",
+    "count": 1
+  }
+}

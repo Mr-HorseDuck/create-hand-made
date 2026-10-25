@@ -1,0 +1,10 @@
+{
+  "type": "create:smoking",
+  "ingredients": [
+    "minecraft:campfire",
+    "create:blaze_burner",
+    "minecraft:torch",
+    "minecraft:lantern",
+    "minecraft:magma_block"
+  ]
+}

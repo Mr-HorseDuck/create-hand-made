@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    "bab",
+    " b "
+  ],
+  "key": {
+    "a": "create:andesite_alloy",
+    "b": "#c:stones"
+  },
+  "result": {
+    "id": "create_hand_made:mortar",
+    "count": 1
+  }
+}

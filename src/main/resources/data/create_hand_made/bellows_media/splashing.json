@@ -1,0 +1,6 @@
+{
+  "type": "create:splashing",
+  "ingredients": [
+    "minecraft:water_bucket"
+  ]
+}

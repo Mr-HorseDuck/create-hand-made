@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "create_hand_made",
+  "version": "${version}",
+  "name": "Create: Hand Made",
+  "description": "A Create addon adding manual crafting tools. Fabric port for 26.1.2 on top of Create Fly.",
+  "authors": [
+    "alben"
+  ],
+  "contact": {
+    "homepage": "https://github.com/Mr-HorseDuck/create-hand-made",
+    "sources": "https://github.com/Mr-HorseDuck/create-hand-made"
+  },
+  "license": "MIT",
+  "icon": "mod_logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.alben.createhandmade.CreateHandMade"
+    ],
+    "client": [
+      "com.alben.createhandmade.CreateHandMadeClient"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "create_hand_made.mixins.json"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~26.1",
+    "java": ">=25",
+    "create": ">=6.0.9-4"
+  },
+  "suggests": {
+    "jei": ">=29.0.0"
+  }
+}

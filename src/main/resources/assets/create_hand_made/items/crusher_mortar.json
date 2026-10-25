@@ -1,0 +1,7 @@
+{
+  "model": {
+    "type": "create_hand_made:mortar",
+    "bowl": "create_hand_made:item/crusher_mortar",
+    "pestle": "create_hand_made:item/crusher_mortar_pestle"
+  }
+}
