@@ -528,7 +528,8 @@ public class CreateHandMadeJEI implements IModPlugin {
         if (path.startsWith("coloring_")) {
             return List.of(jeiUid(ns, "fan_coloring"), jeiUid(ns, "coloring"), fanTypeId);
         }
-        return List.of(jeiUid(ns, "fan_" + path), fanTypeId);
+        // DnD 把它的鼓风类别注册在 create 命名空间下（页面标题就是 "create"），所以多试一个 create:<name>
+        return List.of(jeiUid(ns, "fan_" + path), jeiUid("create", path), jeiUid(ns, path), fanTypeId);
     }
 
     /**
