@@ -784,12 +784,16 @@ public class BellowsItem extends Item {
     private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId, Level level) {
         // —— 更多触媒（CMC）的特殊实体效果：上游只对真实气流生效，风箱这里写死复刻 ——
         if (typeId.getNamespace().equals("create_more_catalysts")) {
-            entity.invulnerableTime = 0;   // 绕过受击无敌帧：每次鼓风都吃满这一下
             switch (typeId.getPath()) {
                 case "exploding" -> {
-                    entity.invulnerableTime = 0;   // 绕过受击无敌帧，保证每次鼓风都能吃满这一下
-                    level.explode(entity, entity.getX(), entity.getY(), entity.getZ(),
+                    // 关键：explode 的 source 必须是 null。
+                    // 原版 Explosion 会跳过"爆炸源实体"，把 entity 自己当 source 会导致它永远不掉血
+                    // （之前"只有第一次掉血"就是被相邻实体的爆炸顺带打的，不是无敌帧问题）。
+                    entity.invulnerableTime = 0;
+                    level.explode(null, entity.getX(), entity.getY(), entity.getZ(),
                             1.5f, Level.ExplosionInteraction.NONE);
+                    entity.invulnerableTime = 0;
+                    entity.hurt(level.damageSources().explosion(null, null), 6.0f);   // 显式补一次伤害
                 }
                 case "snow_flow" -> {
                     entity.setTicksFrozen(entity.getTicksRequiredToFreeze() + 40);

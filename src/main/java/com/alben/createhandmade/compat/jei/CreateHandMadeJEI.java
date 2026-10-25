@@ -495,7 +495,9 @@ public class CreateHandMadeJEI implements IModPlugin {
             "dndesires:bulk_seething",
             "dndesires:fan_bulk_seething",
             "dndesires:seething_catalyst",
-            "dndesires:fan_dragon_breathing");
+            "dndesires:fan_dragon_breathing",
+            "create:bulk_seething", "create:seething", "create:fan_bulk_seething",
+            "create:bulk_sanding", "create:bulk_freezing");
 
     /**
      * 按 UID 反查某个鼓风类型对应的 JEI 类别类型。
@@ -528,8 +530,14 @@ public class CreateHandMadeJEI implements IModPlugin {
         if (path.startsWith("coloring_")) {
             return List.of(jeiUid(ns, "fan_coloring"), jeiUid(ns, "coloring"), fanTypeId);
         }
-        // DnD 把它的鼓风类别注册在 create 命名空间下（页面标题就是 "create"），所以多试一个 create:<name>
-        return List.of(jeiUid(ns, "fan_" + path), jeiUid("create", "bulk_" + path), jeiUid("create", path), jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "bulk_" + path), jeiUid(ns, path), fanTypeId);
+        // DnD 的鼓风类别注册在 create 命名空间下（页面标题就是 "Bulk Seething"、模组显示 Create），
+        // 所以 create:bulk_<name> 必须排第一位；旧候选保留做兜底。
+        if (ns.equals("dndesires")) {
+            return List.of(jeiUid("create", "bulk_" + path), jeiUid("create", path),
+                    jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "fan_" + path), jeiUid(ns, path), fanTypeId);
+        }
+        return List.of(jeiUid(ns, "fan_" + path), jeiUid("create", "bulk_" + path), jeiUid("create", path),
+                jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "bulk_" + path), jeiUid(ns, path), fanTypeId);
     }
 
     /**
@@ -552,9 +560,9 @@ public class CreateHandMadeJEI implements IModPlugin {
                     .forEach(category -> {
                         ResourceLocation uid = category.getRecipeType().getUid();
                         String ns = uid.getNamespace();
-                        if (ns.equals("create_dragons_plus") || ns.equals("dndesires")
+                        if (ns.equals("create") || ns.equals("create_dragons_plus") || ns.equals("dndesires")
                                 || ns.equals("create_more_catalysts")) {
-                            fanCategories.add(uid.toString());
+                            fanCategories.add(uid + " [" + category.getTitle().getString() + "]");
                         }
                     });
         } catch (Throwable t) {
