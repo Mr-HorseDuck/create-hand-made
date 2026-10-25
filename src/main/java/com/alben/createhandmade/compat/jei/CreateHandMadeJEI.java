@@ -537,7 +537,8 @@ public class CreateHandMadeJEI implements IModPlugin {
                     jeiUid("create", path), jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "fan_" + path),
                     jeiUid(ns, path), fanTypeId);
         }
-        return List.of(jeiUid(ns, "fan_" + path), jeiUid("create", "bulk_" + path), jeiUid("create", path),
+            return List.of(jeiUid(ns, "mekanism_fan_" + path), jeiUid(ns, "immersiveengineering_fan_" + path),
+                    jeiUid(ns, "fan_" + path), jeiUid("create", "bulk_" + path),
                 jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "bulk_" + path), jeiUid(ns, path), fanTypeId);
     }
 
@@ -579,9 +580,9 @@ public class CreateHandMadeJEI implements IModPlugin {
     /** 写死的 UID 例外：与 {@link #fanTypeUidCandidates} 的通用规则不一致的类别。 */
     private static final java.util.Map<ResourceLocation, ResourceLocation> FAN_TYPE_UID_OVERRIDES =
             java.util.Map.of(
-                    jeiUid("create_dragons_plus", "sanding"), jeiUid("create_dragons_plus", "fan_sanding"),
-                    jeiUid("create_dragons_plus", "freezing"), jeiUid("create_dragons_plus", "fan_freezing"),
-                    jeiUid("create_dragons_plus", "ending"), jeiUid("create_dragons_plus", "fan_ending"));
+                    jeiUid("create_dragons_plus", "sanding"), jeiUid("create_dragons_plus", "sanding"),
+                    jeiUid("create_dragons_plus", "freezing"), jeiUid("create_dragons_plus", "freezing"),
+                    jeiUid("create_dragons_plus", "ending"), jeiUid("create_dragons_plus", "ending"));
 
     // ==================== 配方收集 ====================
 
