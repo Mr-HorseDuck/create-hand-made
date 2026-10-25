@@ -324,7 +324,7 @@ public class BellowsItem extends Item {
                 FanProcessingType candidateType = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(candidateId);
                 if (candidateType == null) continue;
                 applyEntityEffectNow(candidateType, e, level);
-                applyHardcodedEntityEffect(e, candidateId);
+                applyHardcodedEntityEffect(e, candidateId, level);
                 if (e.isRemoved()) break;
             }
             // ★ 让"粒子型"鼓风（龙+ 的染色/喷砂就是这一类：效果挂在粒子/气流接触上，
@@ -781,7 +781,17 @@ public class BellowsItem extends Item {
      * {@code #tickAffectedEntities$spawnProcessingParticlesWithParticleData}），
      * 而风箱并不产生气流。这里按"染料变体名"直接给可染色实体上色，等价复刻其可见结果。
      */
-    private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId) {
+    private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId, Level level) {
+        // —— 更多触媒（CMC）的特殊实体效果：上游只对真实气流生效，风箱这里写死复刻 ——
+        if (typeId.getNamespace().equals("create_more_catalysts")) {
+            switch (typeId.getPath()) {
+                case "exploding" -> level.explode(entity, entity.getX(), entity.getY(), entity.getZ(),
+                        1.5f, Level.ExplosionInteraction.NONE);          // 批量爆炸：吹到的实体处爆炸
+                case "snow_flow" -> entity.setTicksFrozen(entity.getTicksRequiredToFreeze() + 40);  // 批量雪流：细雪冻结
+                default -> {
+                }
+            }
+        }
         if (!typeId.getNamespace().equals("create_dragons_plus")) return;
         String path = typeId.getPath();
         if (!path.startsWith("coloring_")) return;
