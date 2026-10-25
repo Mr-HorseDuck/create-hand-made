@@ -782,27 +782,6 @@ public class BellowsItem extends Item {
      * 而风箱并不产生气流。这里按"染料变体名"直接给可染色实体上色，等价复刻其可见结果。
      */
     private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId, Level level) {
-        // —— 更多触媒（CMC）的特殊实体效果：上游只对真实气流生效，风箱这里写死复刻 ——
-        if (typeId.getNamespace().equals("create_more_catalysts")) {
-            switch (typeId.getPath()) {
-                case "exploding" -> {
-                    // 关键：explode 的 source 必须是 null。
-                    // 原版 Explosion 会跳过"爆炸源实体"，把 entity 自己当 source 会导致它永远不掉血
-                    // （之前"只有第一次掉血"就是被相邻实体的爆炸顺带打的，不是无敌帧问题）。
-                    entity.invulnerableTime = 0;
-                    level.explode(null, entity.getX(), entity.getY(), entity.getZ(),
-                            0.5f, Level.ExplosionInteraction.NONE);
-                    entity.invulnerableTime = 0;
-                    entity.hurt(level.damageSources().explosion(null, null), 0.0f);   // 显式补一次伤害
-                }
-                case "snow_flow" -> {
-                    entity.setTicksFrozen(entity.getTicksRequiredToFreeze() + 40);
-                    entity.setIsInPowderSnow(true);   // 触发细雪覆盖层与减速表现
-                }
-                default -> {
-                }
-            }
-        }
         if (!typeId.getNamespace().equals("create_dragons_plus")) return;
         String path = typeId.getPath();
         if (!path.startsWith("coloring_")) return;
