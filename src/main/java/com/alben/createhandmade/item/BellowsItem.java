@@ -784,10 +784,17 @@ public class BellowsItem extends Item {
     private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId, Level level) {
         // —— 更多触媒（CMC）的特殊实体效果：上游只对真实气流生效，风箱这里写死复刻 ——
         if (typeId.getNamespace().equals("create_more_catalysts")) {
+            entity.invulnerableTime = 0;   // 绕过受击无敌帧：每次鼓风都吃满这一下
             switch (typeId.getPath()) {
-                case "exploding" -> level.explode(entity, entity.getX(), entity.getY(), entity.getZ(),
-                        1.5f, Level.ExplosionInteraction.NONE);          // 批量爆炸：吹到的实体处爆炸
-                case "snow_flow" -> entity.setTicksFrozen(entity.getTicksRequiredToFreeze() + 40);  // 批量雪流：细雪冻结
+                case "exploding" -> {
+                    entity.invulnerableTime = 0;   // 绕过受击无敌帧，保证每次鼓风都能吃满这一下
+                    level.explode(entity, entity.getX(), entity.getY(), entity.getZ(),
+                            1.5f, Level.ExplosionInteraction.NONE);
+                }
+                case "snow_flow" -> {
+                    entity.setTicksFrozen(entity.getTicksRequiredToFreeze() + 40);
+                    entity.setIsInPowderSnow(true);   // 触发细雪覆盖层与减速表现
+                }
                 default -> {
                 }
             }
