@@ -722,9 +722,7 @@ public class BellowsMediaRegistry {
      */
     private static final Map<ResourceLocation, List<ResourceLocation>> BUILT_IN_TYPE_MEDIA = Map.of(
             DP_FREEZING, List.of(ResourceLocation.fromNamespaceAndPath("minecraft", "powder_snow_bucket")),
-            DP_ENDING, List.of(ResourceLocation.fromNamespaceAndPath("minecraft", "dragon_head")),
-            ResourceLocation.fromNamespaceAndPath("create_more_catalysts", "snow_flow"),
-            List.of(ResourceLocation.fromNamespaceAndPath("minecraft", "snow_block")));
+            DP_ENDING, List.of(ResourceLocation.fromNamespaceAndPath("minecraft", "dragon_head")));
 
     /** 查 {@code create:blaze_burner}（惰性查注册表，避免静态初始化顺序问题）。 */
     @Nullable
