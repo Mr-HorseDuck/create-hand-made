@@ -533,8 +533,9 @@ public class CreateHandMadeJEI implements IModPlugin {
         // DnD 的鼓风类别注册在 create 命名空间下（页面标题就是 "Bulk Seething"、模组显示 Create），
         // 所以 create:bulk_<name> 必须排第一位；旧候选保留做兜底。
         if (ns.equals("dndesires")) {
-            return List.of(jeiUid("create", "bulk_" + path), jeiUid("create", path),
-                    jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "fan_" + path), jeiUid(ns, path), fanTypeId);
+            return List.of(jeiUid("create", "fan_" + path), jeiUid("create", "bulk_" + path),
+                    jeiUid("create", path), jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "fan_" + path),
+                    jeiUid(ns, path), fanTypeId);
         }
         return List.of(jeiUid(ns, "fan_" + path), jeiUid("create", "bulk_" + path), jeiUid("create", path),
                 jeiUid("create", "fan_bulk_" + path), jeiUid(ns, "bulk_" + path), jeiUid(ns, path), fanTypeId);

@@ -791,7 +791,7 @@ public class BellowsItem extends Item {
                     // （之前"只有第一次掉血"就是被相邻实体的爆炸顺带打的，不是无敌帧问题）。
                     entity.invulnerableTime = 0;
                     level.explode(null, entity.getX(), entity.getY(), entity.getZ(),
-                            1.5f, Level.ExplosionInteraction.NONE);
+                            0.5f, Level.ExplosionInteraction.NONE);
                     entity.invulnerableTime = 0;
                     entity.hurt(level.damageSources().explosion(null, null), 0.0f);   // 显式补一次伤害
                 }
