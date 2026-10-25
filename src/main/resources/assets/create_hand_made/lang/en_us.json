@@ -89,6 +89,8 @@
   "jei.create_hand_made.bellows_smoking": "Bellows Smoking",
   "jei.create_hand_made.bellows_haunting": "Bellows Haunting",
   "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
+  "jei.create_hand_made.bellows_exclusive": "Bellows: Third-Party Compat",
+  "jei.create_hand_made.bellows_exclusive.type": "Type: %s",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling",
@@ -126,8 +128,9 @@
   "create_hand_made.configuration.tools.press_hammer.charge_window_ticks": "Press Hammer charged-hit window (ticks)",
 
   "create_hand_made.configuration.tools.bellows": "Bellows",
-  "create_hand_made.configuration.tools.bellows.tooltip": "Bellows charge time",
+  "create_hand_made.configuration.tools.bellows.tooltip": "Bellows charge time and catalyst type overrides",
   "create_hand_made.configuration.tools.bellows.charge_ticks": "Bellows charge time (ticks)",
+  "create_hand_made.configuration.bellows_type_overrides": "Bellows catalyst type overrides",
 
   "create_hand_made.configuration.tools.infusion_gun": "Infusion Gun",
   "create_hand_made.configuration.tools.infusion_gun.tooltip": "Infusion Gun long-press threshold and extraction cadence",

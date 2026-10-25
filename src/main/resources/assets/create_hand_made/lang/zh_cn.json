@@ -90,6 +90,8 @@
   "jei.create_hand_made.bellows_smoking": "风箱烟熏",
   "jei.create_hand_made.bellows_haunting": "风箱缠魂",
   "jei.create_hand_made.bellows_splashing": "风箱洗涤",
+  "jei.create_hand_made.bellows_exclusive": "风箱 · 第三方兼容",
+  "jei.create_hand_made.bellows_exclusive.type": "类型: %s",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树",
@@ -127,8 +129,9 @@
   "create_hand_made.configuration.tools.press_hammer.charge_window_ticks": "冲压锤蓄力命中窗口（tick）",
 
   "create_hand_made.configuration.tools.bellows": "风箱",
-  "create_hand_made.configuration.tools.bellows.tooltip": "风箱的蓄力门槛",
+  "create_hand_made.configuration.tools.bellows.tooltip": "风箱的蓄力门槛与触媒类型覆盖",
   "create_hand_made.configuration.tools.bellows.charge_ticks": "风箱蓄力时长（tick）",
+  "create_hand_made.configuration.bellows_type_overrides": "风箱触媒类型覆盖",
 
   "create_hand_made.configuration.tools.infusion_gun": "灌注枪",
   "create_hand_made.configuration.tools.infusion_gun.tooltip": "灌注枪的长按门槛与抽取节奏",
