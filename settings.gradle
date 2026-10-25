@@ -1,17 +1,12 @@
 pluginManagement {
     repositories {
         maven {
-            name = 'HuaweiCloud'
-            url = 'https://repo.huaweicloud.com/repository/maven/'
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
         }
-        maven {
-            name = 'HuaweiCloudMinecraft'
-            url = 'https://repo.huaweicloud.com/repository/minecraft/'
-        }
+        mavenCentral()
         gradlePluginPortal()
     }
 }
 
-plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
-}
+rootProject.name = 'create_hand_made'
