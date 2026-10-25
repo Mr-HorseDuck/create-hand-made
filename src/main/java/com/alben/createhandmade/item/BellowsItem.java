@@ -665,7 +665,7 @@ public class BellowsItem extends Item {
                 if (now - lastNoMatchLogTick[0] >= 100) {
                     lastNoMatchLogTick[0] = now;
                     CreateHandMade.LOGGER.info(
-                            "bellows: no fan type could process {} (media candidates = {}, preferred = {})",
+                            "bellows: no fan type could process {} (media={}, preferred={})",
                             single.getItem(), candidateIds, preferred);
                 }
                 return TransportedResult.doNothing();

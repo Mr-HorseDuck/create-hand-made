@@ -335,7 +335,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         // ★ T11 B8 诊断：把"第三方兼容"类别的条数打出来。
         //   如果这里是 0，说明当前数据包里没有 fan_type 属于第三方模组的 bellows_recipe
         //   （数据包没启用 / 没装对应模组 / fan_type 写成了 create 命名空间）。
-        CreateHandMade.LOGGER.info("JEI: third-party bellows recipe category has {} recipe(s)",
+        CreateHandMade.LOGGER.debug("JEI: third-party bellows recipe category has {} recipe(s)",
                 collectThirdPartyBellowsExclusive().size());
     }
 
@@ -415,7 +415,7 @@ public class CreateHandMadeJEI implements IModPlugin {
             CreateHandMade.LOGGER.info(
                     "JEI: no third-party fan category matched for bellows catalysts (candidates: {})", missing);
         } else {
-            CreateHandMade.LOGGER.info("JEI: bellows registered as catalyst for {} third-party fan categor(ies): {}",
+            CreateHandMade.LOGGER.debug("JEI: bellows registered as catalyst for {} third-party fan categor(ies): {}",
                     added.size(), added);
             if (!missing.isEmpty()) {
                 CreateHandMade.LOGGER.debug("JEI: fan types without a matching JEI category: {}", missing);
@@ -431,7 +431,7 @@ public class CreateHandMadeJEI implements IModPlugin {
             mezz.jei.api.recipe.RecipeType<?> type = helpers.getRecipeType(uidId)
                     .orElseGet(() -> mezz.jei.api.recipe.RecipeType.createRecipeHolderType(uidId));
             registration.addRecipeCatalyst(bellows, type);
-            CreateHandMade.LOGGER.info("JEI: bellows catalyst added by hardcoded UID {}", uid);
+            CreateHandMade.LOGGER.debug("JEI: bellows catalyst added by hardcoded UID {}", uid);
         }
 
         // ★ 最终兜底：反射读第三方自己的 RecipeTypeInfo#getId()，用它当 JEI 类别 UID。
@@ -472,7 +472,7 @@ public class CreateHandMadeJEI implements IModPlugin {
 
                 registration.addRecipeCatalyst(bellows,
                         mezz.jei.api.recipe.RecipeType.createRecipeHolderType(typeId));
-                CreateHandMade.LOGGER.info("JEI: bellows catalyst added for {}#{} (id {})", ref[0], ref[1], typeId);
+                CreateHandMade.LOGGER.debug("JEI: bellows catalyst added for {}#{} (id {})", ref[0], ref[1], typeId);
             } catch (Throwable ignored) {
                 // 模组没装（ClassNotFound）/ 字段改名 / 方法缺失 —— 都是"这条兼容不可用"，静默跳过
             }
@@ -569,7 +569,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         } catch (Throwable t) {
             CreateHandMade.LOGGER.warn("JEI: failed to enumerate recipe categories", t);
         }
-        CreateHandMade.LOGGER.info("JEI runtime: fan category UIDs = {}", fanCategories);
+        CreateHandMade.LOGGER.debug("JEI runtime: fan category UIDs = {}", fanCategories);
     }
 
     private static ResourceLocation jeiUid(String namespace, String path) {

@@ -530,7 +530,7 @@ public class BellowsMediaRegistry {
 
         if (tagCount > 0) {
             CreateHandMade.LOGGER.info(
-                    "Auto-discovered {} fan catalyst tags ({} new media items, {} total, "
+                    "Auto-discovered {} fan catalyst tags ({} new media, {} total, "
                             + "{} item-less blocks skipped, {} asItem()-rescued, "
                             + "{} bucket-less fluids registered as fluid media)",
                     tagCount, map.size() - itemCountBefore, map.size(), noItemBlocks, rescuedBlocks,
