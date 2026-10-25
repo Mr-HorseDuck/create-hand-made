@@ -1,5 +1,6 @@
 package com.alben.createhandmade.compat.jei;
 
+import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
 import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
@@ -115,4 +116,20 @@ public class ModJeiTypes {
     public static final RecipeType<RecipeHolder<SplashingRecipe>> BELLOWS_SPLASHING =
             RecipeType.createRecipeHolderType(
                     ResourceLocation.fromNamespaceAndPath("create_hand_made", "bellows_splashing"));
+
+    /**
+     * 风箱 · 第三方兼容（T11 B6/B7）：{@code create_hand_made:bellows_recipe} 里
+     * {@code fan_type} 属于<b>第三方模组</b>（命名空间不是 {@code create}）的配方。
+     *
+     * <p>与上面 4 个 {@code BELLOWS_*} 的区别：那 4 个绑定的是 Create 的配方类
+     * （{@code AbstractCookingRecipe} / {@code HauntingRecipe} / {@code SplashingRecipe}），
+     * 因为它们要复用 Create 的类别布局、并把本模组的 L3 配方包成显示代理；
+     * 本类别直接以 {@code HandMadeBellowsRecipe} 为泛型 —— 它本身是
+     * {@code StandardProcessingRecipe} 子类，能自己提供原料与产物，无需代理。</p>
+     *
+     * <p>原版 4 种类型<b>不收</b>（B7）：它们在各自的类别里已经显示过，重复收会变成两页同样的配方。</p>
+     */
+    public static final RecipeType<RecipeHolder<HandMadeBellowsRecipe>> BELLOWS_EXCLUSIVE =
+            RecipeType.createRecipeHolderType(
+                    ResourceLocation.fromNamespaceAndPath("create_hand_made", "bellows_exclusive"));
 }

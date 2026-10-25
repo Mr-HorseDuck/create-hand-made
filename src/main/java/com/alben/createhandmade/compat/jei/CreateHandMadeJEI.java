@@ -3,6 +3,7 @@ package com.alben.createhandmade.compat.jei;
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.compat.jei.category.BellowsCookingCategory;
+import com.alben.createhandmade.compat.jei.category.BellowsExclusiveCategory;
 import com.alben.createhandmade.compat.jei.category.BellowsHauntingCategory;
 import com.alben.createhandmade.compat.jei.category.BellowsSplashingCategory;
 import com.alben.createhandmade.compat.jei.category.CrusherMortarCrushingCategory;
@@ -53,6 +54,7 @@ import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
 import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
+import mezz.jei.api.helpers.IJeiHelpers;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
@@ -68,6 +70,7 @@ import net.minecraft.world.level.Level;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 @JeiPlugin
@@ -304,6 +307,23 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
                 () -> BellowsMediaRegistry.getMediaFor(fanTypeId(AllFanProcessingTypes.SPLASHING))));
 
+        // ==================== 风箱 · 第三方兼容（非 create 命名空间） ====================
+        // T11 B6/B7：4 个原版类别只收 fan_type 等于对应 Create 内置类型的独占配方，
+        // 第三方类型（dndesires:sanding / create_more_catalysts:snow_flow …）原本在 JEI 里看不到。
+        // 这个类别只收第三方类型，避免与原版 4 类重复；介质图标按每条配方自己的 fan_type 查，
+        // 页面上还会写出 fan_type 的 id。
+        CreateRecipeCategory.Info<HandMadeBellowsRecipe> bellowsExclusiveInfo = new CreateRecipeCategory.Info<>(
+                ModJeiTypes.BELLOWS_EXCLUSIVE,
+                Component.translatable("jei.create_hand_made.bellows_exclusive"),
+                new EmptyBackground(177, 70),
+                new DoubleItemIcon(
+                        () -> new ItemStack(ModItems.BELLOWS.get()),
+                        () -> new ItemStack(Items.DRAGON_HEAD)),
+                CreateHandMadeJEI::collectThirdPartyBellowsExclusive,
+                List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
+        );
+        allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));
+
         registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
     }
 
@@ -311,12 +331,243 @@ public class CreateHandMadeJEI implements IModPlugin {
     public void registerRecipes(IRecipeRegistration registration) {
         this.ingredientManager = registration.getIngredientManager();
         allCategories.forEach(c -> c.registerRecipes(registration));
+
+        // ★ T11 B8 诊断：把"第三方兼容"类别的条数打出来。
+        //   如果这里是 0，说明当前数据包里没有 fan_type 属于第三方模组的 bellows_recipe
+        //   （数据包没启用 / 没装对应模组 / fan_type 写成了 create 命名空间）。
+        CreateHandMade.LOGGER.info("JEI: third-party bellows recipe category has {} recipe(s)",
+                collectThirdPartyBellowsExclusive().size());
     }
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
         allCategories.forEach(c -> c.registerCatalysts(registration));
+
+        // ★ T11 B6：把风箱挂到第三方鼓风类别的催化剂上
+        registerThirdPartyFanCatalysts(registration);
     }
+
+    /**
+     * 把 {@code ModItems.BELLOWS} 注册成第三方模组鼓风类别的催化剂（T11 B6）。
+     *
+     * <h3>做法：用 JEI 的 RecipeType 注册表按 UID 反查，不碰第三方类</h3>
+     * <p>反编译三个模组后确认，它们的鼓风 JEI 类别 UID 全部是
+     * <b>{@code <命名空间>:fan_<类型名>}</b>：</p>
+     * <ul>
+     *   <li>DnD：{@code dndesires:fan_sanding} / {@code fan_freezing} / {@code fan_seething} /
+     *       {@code fan_dragon_breathing}（{@code DesiresJEI} 里的 {@code CategoryBuilder#build}）；</li>
+     *   <li>CMC：{@code create_more_catalysts:fan_withering} / {@code fan_snow_flow} /
+     *       {@code fan_sand_blow} …（{@code FanCategoryRegistrar}）；</li>
+     *   <li>龙+：{@code create_dragons_plus:fan_sanding} / {@code fan_freezing} / {@code fan_ending}
+     *       （{@code FanSandingCategory.create()} 等）。</li>
+     * </ul>
+     * <p>所以只要遍历 Create 的 {@code FanProcessingType} 注册表，把每个类型 id
+     * ({@code <ns>:<name>}) 拼成候选 UID {@code <ns>:fan_<name>}（找不到再退回 {@code <ns>:<name>}，
+     * Create 自己的类别就是这个写法），用 {@link IJeiHelpers#getRecipeType} 反查即可 ——
+     * <b>不需要反射、不需要编译期依赖</b>，也不会因为某个模组没装而报错。</p>
+     *
+     * <p>Create 自带的 4 类跳过：它们的类别由本模组自己的 4 个风箱类别负责
+     * （而且 {@code create:blasting} 这类本来就没有同名 RecipeType，鼓风熔炼用的是
+     * {@code minecraft:smelting}）。</p>
+     *
+     * <p><b>T11 B10：</b>除了风箱本身，还会把该类型的<b>介质物品</b>
+     * （{@link BellowsMediaRegistry#getMediaFor}）一并注册成催化剂 —— 玩家打开龙+「批量终结」
+     * 页面时，左侧能直接看到"该拿龙息桶/龙首"，而不是只有一个空降的风箱。</p>
+     */
+    private static void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
+        IJeiHelpers helpers = registration.getJeiHelpers();
+        ItemStack bellows = new ItemStack(ModItems.BELLOWS.get());
+        List<String> added = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+        java.util.Set<ResourceLocation> registeredUids = new java.util.LinkedHashSet<>();
+
+        for (ResourceLocation typeId : CreateBuiltInRegistries.FAN_PROCESSING_TYPE.keySet()) {
+            if (typeId.getNamespace().equals("create") || typeId.getNamespace().equals(CreateHandMade.MODID)) {
+                continue;
+            }
+
+            mezz.jei.api.recipe.RecipeType<?> jeiType = findJeiFanType(helpers, typeId);
+            if (jeiType == null) {
+                // 该模组只注册了 FanProcessingType、没有对应的 JEI 类别（例如只支持真实鼓风机）
+                missing.add(typeId.toString());
+                continue;
+            }
+            // ★ 同一个类别 UID 只挂一次风箱：龙+ 的染色是"每个染料变体一个 FanProcessingType、
+            //   但 JEI 只有一个 category"，不去重就会在页面上叠出一排风箱图标。
+            ResourceLocation catalystUid = jeiType.getUid();
+            if (!registeredUids.contains(catalystUid)) {
+                registeredUids.add(catalystUid);
+                registration.addRecipeCatalyst(bellows, jeiType);
+            }
+            // 按用户要求：龙+ / DnD 的催化剂栏<b>只挂风箱</b>（媒介是什么玩家心里有数，避免冗余）；
+            // 更多触媒（CMC）本身提供了物品形态的媒介，保持"风箱 + 媒介"。
+            boolean withMedia = typeId.getNamespace().equals("create_more_catalysts");
+            List<ItemStack> media = withMedia ? BellowsMediaRegistry.getMediaFor(typeId) : List.of();
+            for (ItemStack stack : media) {
+                if (stack.isEmpty()) continue;
+                registration.addRecipeCatalyst(stack, jeiType);
+            }
+            added.add(typeId + " -> " + catalystUid + " (+" + media.size() + " media)");
+        }
+
+        if (added.isEmpty()) {
+            // 有第三方鼓风类型但一个 JEI 类别都没匹配上：把候选打出来，便于排查（不静默失败）
+            CreateHandMade.LOGGER.info(
+                    "JEI: no third-party fan category matched for bellows catalysts (candidates: {})", missing);
+        } else {
+            CreateHandMade.LOGGER.info("JEI: bellows registered as catalyst for {} third-party fan categor(ies): {}",
+                    added.size(), added);
+            if (!missing.isEmpty()) {
+                CreateHandMade.LOGGER.debug("JEI: fan types without a matching JEI category: {}", missing);
+            }
+        }
+
+        // ★ 写死兜底：以上按"鼓风类型 → UID"推导，个别模组的类别 UID 对不上时整页都没有风箱。
+        //   这里把已知的第三方鼓风类别 UID 直接列出来，逐个查/造再挂一次风箱（幂等去重）。
+        for (String uid : HARDCODED_FAN_CATEGORY_UIDS) {
+            ResourceLocation uidId = ResourceLocation.tryParse(uid);
+            if (uidId == null) continue;
+            if (!registeredUids.add(uidId)) continue;   // 同一类别只挂一次，避免叠出一排风箱
+            mezz.jei.api.recipe.RecipeType<?> type = helpers.getRecipeType(uidId)
+                    .orElseGet(() -> mezz.jei.api.recipe.RecipeType.createRecipeHolderType(uidId));
+            registration.addRecipeCatalyst(bellows, type);
+            CreateHandMade.LOGGER.info("JEI: bellows catalyst added by hardcoded UID {}", uid);
+        }
+
+        // ★ 最终兜底：反射读第三方自己的 RecipeTypeInfo#getId()，用它当 JEI 类别 UID。
+        //   现场诊断证明"按命名惯例猜 UID"对龙+ 的喷砂/冷冻/终结、DnD 的超级冶炼无效
+        //   （那几页始终没有图标），而模组自己的 id 一定是它注册类别时用的那个。
+        registerByThirdPartyIds(registration, bellows, registeredUids);
+    }
+
+    /** 第三方 RecipeTypeInfo 的「类名#字段名」；两家的对象都有 {@code getId()}。 */
+    private static final String[][] THIRD_PARTY_RECIPE_TYPE_REFS = {
+            {"plus.dragons.createdragonsplus.common.registry.CDPRecipes", "SANDING"},
+            {"plus.dragons.createdragonsplus.common.registry.CDPRecipes", "FREEZING"},
+            {"plus.dragons.createdragonsplus.common.registry.CDPRecipes", "ENDING"},
+            {"plus.dragons.createdragonsplus.common.registry.CDPRecipes", "COLORING"},
+            {"dev.lopyluna.dndesires.register.DesiresRecipeTypes", "SEETHING"},
+            {"dev.lopyluna.dndesires.register.DesiresRecipeTypes", "SANDING"},
+            {"dev.lopyluna.dndesires.register.DesiresRecipeTypes", "FREEZING"},
+            {"dev.lopyluna.dndesires.register.DesiresRecipeTypes", "DRAGON_BREATHING"},
+    };
+
+    /**
+     * 反射读第三方模组自己的配方类型 id，并据此注册风箱催化剂（T11 B10 收尾）。
+     *
+     * <p>为什么不再猜 UID：现场日志里龙+ 的喷砂/冷冻/终结、DnD 的超级冶炼页面
+     * 用任何"命名惯例"都挂不上，而对方 {@code RecipeTypeInfo#getId()} 返回的 id
+     * 就是它注册 JEI 类别时用的那个。JAR 里这两个类都是 public、常量字段也是 public，
+     * 反射不需要给构建加任何依赖；模组没装时 {@link ClassNotFoundException} 直接跳过。</p>
+     */
+    private static void registerByThirdPartyIds(IRecipeCatalystRegistration registration, ItemStack bellows,
+                                                java.util.Set<ResourceLocation> registeredUids) {
+        for (String[] ref : THIRD_PARTY_RECIPE_TYPE_REFS) {
+            try {
+                Class<?> holder = Class.forName(ref[0]);
+                Object info = holder.getField(ref[1]).get(null);
+                Object id = info.getClass().getMethod("getId").invoke(info);
+                if (!(id instanceof ResourceLocation typeId)) continue;
+                if (!registeredUids.add(typeId)) continue;
+
+                registration.addRecipeCatalyst(bellows,
+                        mezz.jei.api.recipe.RecipeType.createRecipeHolderType(typeId));
+                CreateHandMade.LOGGER.info("JEI: bellows catalyst added for {}#{} (id {})", ref[0], ref[1], typeId);
+            } catch (Throwable ignored) {
+                // 模组没装（ClassNotFound）/ 字段改名 / 方法缺失 —— 都是"这条兼容不可用"，静默跳过
+            }
+        }
+    }
+
+    /**
+     * 写死的第三方鼓风类别 UID（按用户现场反馈补的）：
+     * 龙+ 的批量喷砂/冷冻/终结/染色 + DnD 的磨砂/冷冻/超级冶炼/龙息。
+     */
+    private static final List<String> HARDCODED_FAN_CATEGORY_UIDS = List.of(
+            "create_dragons_plus:fan_sanding",
+            "create_dragons_plus:fan_freezing",
+            "create_dragons_plus:fan_ending",
+            "create_dragons_plus:fan_coloring",
+            "dndesires:fan_sanding",
+            "dndesires:fan_freezing",
+            "dndesires:fan_seething",
+            "dndesires:fan_dragon_breathing");
+
+    /**
+     * 按 UID 反查某个鼓风类型对应的 JEI 类别类型。
+     *
+     * <p>先试 {@code <ns>:fan_<name>}（三家第三方模组的实测惯例），再退回 {@code <ns>:<name>}
+     * （Create 自身与部分模组的写法）。都没有就返回 {@code null}。</p>
+     */
+    @Nullable
+    private static mezz.jei.api.recipe.RecipeType<?> findJeiFanType(IJeiHelpers helpers, ResourceLocation fanTypeId) {
+        List<ResourceLocation> candidates = fanTypeUidCandidates(fanTypeId);
+        for (ResourceLocation uid : candidates) {
+            Optional<mezz.jei.api.recipe.RecipeType<?>> found = helpers.getRecipeType(uid);
+            if (found.isPresent()) return found.get();
+        }
+        // ★ 用户实测兜底：龙+ 的批量染色/喷砂/终结类别在"注册催化剂"这个时机查不到
+        //   （JEI 的 RecipeType 注册表那时可能还没填完）。
+        //   JEI 内部按 UID 匹配类别，所以直接按最可能的 UID 造一个即可 ——
+        //   只要对方类别用的就是这个 UID，催化剂就会挂上去；UID 不存在则 JEI 静默忽略。
+        return mezz.jei.api.recipe.RecipeType.createRecipeHolderType(candidates.get(0));
+    }
+
+    /** 一个鼓风类型可能对应的 JEI 类别 UID（按可能性排序）；含写死的例外表。 */
+    private static List<ResourceLocation> fanTypeUidCandidates(ResourceLocation fanTypeId) {
+        ResourceLocation override = FAN_TYPE_UID_OVERRIDES.get(fanTypeId);
+        if (override != null) return List.of(override);
+
+        String ns = fanTypeId.getNamespace();
+        String path = fanTypeId.getPath();
+        // 龙+ 的染色类型按染料变体各注册一个（coloring_black…），但 JEI 只有<b>一个</b> coloring 类别
+        if (path.startsWith("coloring_")) {
+            return List.of(jeiUid(ns, "fan_coloring"), jeiUid(ns, "coloring"), fanTypeId);
+        }
+        return List.of(jeiUid(ns, "fan_" + path), fanTypeId);
+    }
+
+    /**
+     * JEI 运行时到达后核对：那 8 个第三方类别 UID 在 JEI 里到底存不存在。
+     *
+     * <p>催化剂只能在注册阶段添加（JEI 运行时 API 没有 addRecipeCatalyst），所以这里只做诊断：
+     * 若某个 UID 在运行时"不存在"，说明我们注册阶段是<b>现造实例</b>挂上去的（必然不显示）；
+     * 若"存在"却仍不显示，就是注册时机/插件顺序问题，需要改注册策略。</p>
+     */
+    @Override
+    public void onRuntimeAvailable(mezz.jei.api.runtime.IJeiRuntime runtime) {
+        // 枚举 JEI 里真实存在的全部类别 UID —— 这是唯一可靠的"真实 ID"来源
+        // （IRecipeManager#getRecipeType 只认注册过配方条目的类型，之前用它做判据是错的）。
+        List<String> fanCategories = new ArrayList<>();
+        try {
+            runtime.getRecipeManager()
+                    .createRecipeCategoryLookup()
+                    .includeHidden()
+                    .get()
+                    .forEach(category -> {
+                        ResourceLocation uid = category.getRecipeType().getUid();
+                        String ns = uid.getNamespace();
+                        if (ns.equals("create_dragons_plus") || ns.equals("dndesires")
+                                || ns.equals("create_more_catalysts")) {
+                            fanCategories.add(uid.toString());
+                        }
+                    });
+        } catch (Throwable t) {
+            CreateHandMade.LOGGER.warn("JEI: failed to enumerate recipe categories", t);
+        }
+        CreateHandMade.LOGGER.info("JEI runtime: fan category UIDs = {}", fanCategories);
+    }
+
+    private static ResourceLocation jeiUid(String namespace, String path) {
+        return ResourceLocation.fromNamespaceAndPath(namespace, path);
+    }
+
+    /** 写死的 UID 例外：与 {@link #fanTypeUidCandidates} 的通用规则不一致的类别。 */
+    private static final java.util.Map<ResourceLocation, ResourceLocation> FAN_TYPE_UID_OVERRIDES =
+            java.util.Map.of(
+                    jeiUid("create_dragons_plus", "sanding"), jeiUid("create_dragons_plus", "fan_sanding"),
+                    jeiUid("create_dragons_plus", "freezing"), jeiUid("create_dragons_plus", "fan_freezing"),
+                    jeiUid("create_dragons_plus", "ending"), jeiUid("create_dragons_plus", "fan_ending"));
 
     // ==================== 配方收集 ====================
 
@@ -764,6 +1015,36 @@ public class CreateHandMadeJEI implements IModPlugin {
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
             if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
             if (!fanTypeId.equals(recipe.getFanTypeId())) continue;
+            result.add(new RecipeHolder<>(holder.id(), recipe));
+        }
+        return result;
+    }
+
+    /**
+     * 收集 {@code create_hand_made:bellows_recipe} 里<b>第三方</b> {@code fan_type} 的配方（T11 B6/B7）。
+     *
+     * <p>与 {@link #collectBellowsExclusive} 的关系：后者给 4 个"按 Create 内置类型分组"的类别用
+     * （精确匹配某一个 id），本方法服务"第三方兼容"总览类别。</p>
+     *
+     * <p><b>为什么排除 {@code create} 命名空间（B7）：</b>4 个原版类别已经把
+     * {@code create:blasting / smoking / haunting / splashing} 的 L3 配方各显示了一遍，
+     * 总览类别再收就是完全重复的两份。这里按命名空间排除最省事，也顺带覆盖将来 Create
+     * 可能新增的同命名空间类型。</p>
+     */
+    private static List<RecipeHolder<HandMadeBellowsRecipe>> collectThirdPartyBellowsExclusive() {
+        List<RecipeHolder<HandMadeBellowsRecipe>> result = new ArrayList<>();
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return result;
+
+        for (RecipeHolder<?> holder : level.getRecipeManager()
+                .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.getType())) {
+            if (!(holder.value() instanceof HandMadeBellowsRecipe recipe)) continue;
+
+            ResourceLocation fanTypeId = recipe.getFanTypeId();
+            // fan_type 理论上是必填（序列化器校验过），这里仍然兜一手：null 无法归属，跳过
+            if (fanTypeId == null) continue;
+            if (fanTypeId.getNamespace().equals("create")) continue;
+
             result.add(new RecipeHolder<>(holder.id(), recipe));
         }
         return result;
