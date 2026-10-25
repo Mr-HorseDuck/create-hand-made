@@ -323,6 +323,7 @@ public class BellowsItem extends Item {
             for (ResourceLocation candidateId : candidateIds) {
                 FanProcessingType candidateType = CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(candidateId);
                 if (candidateType == null) continue;
+                clearExplodingCooldown(candidateId, e);
                 applyEntityEffectNow(candidateType, e, level);
                 applyHardcodedEntityEffect(e, candidateId, level);
                 if (e.isRemoved()) break;
@@ -781,6 +782,22 @@ public class BellowsItem extends Item {
      * {@code #tickAffectedEntities$spawnProcessingParticlesWithParticleData}），
      * 而风箱并不产生气流。这里按"染料变体名"直接给可染色实体上色，等价复刻其可见结果。
      */
+    /** 反射清掉 CMC「批量爆炸」的每实体冷却（它靠气流每 tick 递减，风箱没有气流会把冷却永久卡住）。 */
+    private static void clearExplodingCooldown(ResourceLocation typeId, Entity entity) {
+        if (!typeId.getNamespace().equals("create_more_catalysts") || !typeId.getPath().equals("exploding")) return;
+        try {
+            Class<?> c = Class.forName("com.chinaex123.create_more_catalysts.processing.fans.vanilla.exploding.ExplodingType");
+            java.lang.reflect.Field f = c.getDeclaredField("EXPLOSION_COOLDOWN");
+            f.setAccessible(true);
+            Object map = f.get(null);
+            if (map instanceof java.util.Map<?, ?> m) {
+                ((java.util.Map<Object, Object>) m).remove(entity);
+            }
+        } catch (Throwable ignored) {
+            // 没装 CMC / 字段改名：静默跳过
+        }
+    }
+
     private static void applyHardcodedEntityEffect(Entity entity, ResourceLocation typeId, Level level) {
         if (!typeId.getNamespace().equals("create_dragons_plus")) return;
         String path = typeId.getPath();
