@@ -516,6 +516,25 @@ public class CreateHandMadeJEI implements IModPlugin {
         //   （JEI 的 RecipeType 注册表那时可能还没填完）。
         //   JEI 内部按 UID 匹配类别，所以直接按最可能的 UID 造一个即可 ——
         //   只要对方类别用的就是这个 UID，催化剂就会挂上去；UID 不存在则 JEI 静默忽略。
+        // ★ 通用兜底：在 JEI 已注册的全部类型里按"路径等于 <name> / fan_<name>，或以 _fan_<name> 结尾"匹配。
+        //   CMC 的联动类别命名是 <集成名>_fan_<类型名>（实测 mekanism_fan_salout、immersiveengineering_fan_preservation），
+        //   这样任何未知联动都不需要再逐个补前缀。
+        try {
+            String path = fanTypeId.getPath();
+            mezz.jei.api.recipe.RecipeType<?> loose = helpers.getAllRecipeTypes()
+                    .filter(t -> {
+                        String p = t.getUid().getPath();
+                        return p.equals(path) || p.equals("fan_" + path) || p.endsWith("_fan_" + path);
+                    })
+                    .filter(t -> {
+                        String ns = t.getUid().getNamespace();
+                        return ns.equals(fanTypeId.getNamespace()) || ns.equals("create");
+                    })
+                    .findFirst().orElse(null);
+            if (loose != null) return loose;
+        } catch (Throwable ignored) {
+            // 拿不到注册表就退回"现造"
+        }
         return mezz.jei.api.recipe.RecipeType.createRecipeHolderType(candidates.get(0));
     }
 
