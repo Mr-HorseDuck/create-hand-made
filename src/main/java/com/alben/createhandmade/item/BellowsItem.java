@@ -603,6 +603,8 @@ public class BellowsItem extends Item {
     private static int priorityOf(ResourceLocation id, FanProcessingType type,
                                   @Nullable ResourceLocation preferred) {
         if (preferred != null && preferred.equals(id)) return Integer.MAX_VALUE;
+        Integer typeOverride = BellowsMediaRegistry.typePriorityOverride(id);
+        if (typeOverride != null) return typeOverride;
         Integer override = BellowsMediaRegistry.priorityOverride(id);
         return override != null ? override : type.getPriority();
     }

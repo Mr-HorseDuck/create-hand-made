@@ -112,6 +112,12 @@ public class BellowsMediaRegistry {
      */
     private static volatile Map<ResourceLocation, Integer> PRIORITY_OVERRIDES = Map.of();
 
+    /** 类型级禁用（{@code bellows_type_overrides} 里 {@code <type_id>=none}）。 */
+    private static volatile java.util.Set<ResourceLocation> DISABLED_TYPES = java.util.Set.of();
+
+    /** 类型级优先级覆盖（{@code <type_id>=<整数>}）。 */
+    private static volatile java.util.Map<ResourceLocation, Integer> TYPE_PRIORITY = java.util.Map.of();
+
     /** 自动发现结果：物品 → 它能触发的<b>全部</b>类型 id（同一物品可能同时属于多个 Create 标签）。 */
     private static volatile Map<Item, List<ResourceLocation>> AUTO_MAP = Map.of();
 
@@ -623,10 +629,27 @@ public class BellowsMediaRegistry {
                 }
             }
         }
+        ids.removeIf(BellowsMediaRegistry::isTypeDisabled);
         return List.copyOf(ids);
     }
 
     /** 该物品是否<b>至少</b>能触发一个鼓风类型（渲染器/预览用，避免为了判空而构造列表）。 */
+    /** 左侧是否是"已注册的鼓风类型 id"（用于区分类型级规则与物品级规则）。 */
+    private static boolean isFanType(ResourceLocation id) {
+        return CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(id) != null;
+    }
+
+    /** 该鼓风类型是否被配置整体禁用。 */
+    public static boolean isTypeDisabled(ResourceLocation typeId) {
+        return DISABLED_TYPES.contains(typeId);
+    }
+
+    /** 类型级优先级覆盖（没配返回 null）。 */
+    @Nullable
+    public static Integer typePriorityOverride(ResourceLocation typeId) {
+        return TYPE_PRIORITY.get(typeId);
+    }
+
     public static boolean isMedia(ItemStack stack) {
         return !resolveAll(stack).isEmpty();
     }
@@ -771,6 +794,8 @@ public class BellowsMediaRegistry {
         if (raw.equals(RULE_SOURCE)) return RULE_CACHE;
 
         List<OverrideRule> parsed = new ArrayList<>();
+        java.util.Set<ResourceLocation> disabledTypes = new java.util.LinkedHashSet<>();
+        java.util.Map<ResourceLocation, Integer> typePriorities = new java.util.LinkedHashMap<>();
         Set<ResourceLocation> seenItems = new LinkedHashSet<>();
         for (String entry : raw) {
             if (entry == null) continue;
@@ -783,6 +808,20 @@ public class BellowsMediaRegistry {
             ResourceLocation itemId = ResourceLocation.tryParse(line.substring(0, eq).trim());
             if (itemId == null) {
                 CreateHandMade.LOGGER.warn("bellows_type_overrides: invalid item id in '{}'", entry);
+                continue;
+            }
+            if (isFanType(itemId)) {
+                // ★ 类型级规则：<type_id>=none 整体禁用，<type_id>=<整数> 覆盖优先级
+                String rhsType = line.substring(eq + 1).trim();
+                if (rhsType.equalsIgnoreCase("none")) {
+                    disabledTypes.add(itemId);
+                } else {
+                    try {
+                        typePriorities.put(itemId, Integer.parseInt(rhsType));
+                    } catch (NumberFormatException nfe) {
+                        CreateHandMade.LOGGER.warn("bellows_type_overrides: type rule '{}' needs 'none' or an integer", entry);
+                    }
+                }
                 continue;
             }
             if (BuiltInRegistries.ITEM.get(itemId) == Items.AIR) {
@@ -823,6 +862,8 @@ public class BellowsMediaRegistry {
             parsed.add(new OverrideRule(itemId, typeId));
         }
 
+        DISABLED_TYPES = java.util.Set.copyOf(disabledTypes);
+        TYPE_PRIORITY = java.util.Map.copyOf(typePriorities);
         RULE_CACHE = List.copyOf(parsed);
         RULE_SOURCE = raw;
         if (!parsed.isEmpty()) {
