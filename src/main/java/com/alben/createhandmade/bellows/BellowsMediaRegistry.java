@@ -340,7 +340,7 @@ public class BellowsMediaRegistry {
         // （上一轮排查 DnD/龙+ 失效时就缺这个视角；DEBUG 日志在开发环境默认可见）
         if (CreateHandMade.LOGGER.isDebugEnabled()) {
             Map<String, Integer> perType = new java.util.TreeMap<>();
-            map.forEach((item, ids) -> ids.forEach(id -> perType.merge(id.toString(), 1, Integer::sum)));
+            map.forEach((item, ids) -> ids.forEach(id -> { if (isSuppressed(item, id)) return; perType.merge(id.toString(), 1, Integer::sum); }));
             CreateHandMade.LOGGER.debug("bellows media by fan type: {}", perType);
             // 再把"已注册但一个介质都没有"的类型单独列出来：这类类型从副手永远触发不了，
             // 要么是上游没给标签（龙+ 的冷冻/磨砂），要么是只支持真实鼓风机。
@@ -1004,6 +1004,7 @@ public class BellowsMediaRegistry {
     }
 
     private static void collectType(Map<Item, List<ResourceLocation>> byItem, Item item, ResourceLocation typeId) {
+        if (isSuppressed(item, typeId)) return;   // 写死抑制的类型不计入冲突报告
         List<ResourceLocation> ids = byItem.computeIfAbsent(item, k -> new ArrayList<>());
         if (!ids.contains(typeId)) ids.add(typeId);
     }

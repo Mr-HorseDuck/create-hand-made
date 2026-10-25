@@ -491,6 +491,10 @@ public class CreateHandMadeJEI implements IModPlugin {
             "dndesires:fan_sanding",
             "dndesires:fan_freezing",
             "dndesires:fan_seething",
+            "dndesires:seething",
+            "dndesires:bulk_seething",
+            "dndesires:fan_bulk_seething",
+            "dndesires:seething_catalyst",
             "dndesires:fan_dragon_breathing");
 
     /**
