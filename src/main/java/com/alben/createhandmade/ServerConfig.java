@@ -3,6 +3,8 @@ package com.alben.createhandmade;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.List;
+
 /**
  * 服务端权威配置（{@code config/create_hand_made-server.toml}）：
  * <b>所有工具</b>的时间参数与开关，按两级分组 {@code [tools] → [tools.<tool>]} 组织。
@@ -101,6 +103,16 @@ public class ServerConfig {
 
     /** 风箱蓄力门槛：按住至少这么多 tick 才吹出效果。 */
     public final ModConfigSpec.IntValue bellowsChargeTicks;
+
+    /**
+     * 风箱触媒类型覆盖（T11 B5）：把某个物品锁定到指定鼓风类型，或直接禁用。
+     *
+     * <p>格式 {@code "<item_id>=<type_id>"} 或 {@code "<item_id>=none"}，
+     * 例如 {@code "minecraft:powder_snow=dndesires:freezing"}。
+     * 命中的物品<b>无视优先级</b>只用锁定的类型；{@code none} 表示该物品不再能当介质。
+     * 用于解决多模组触媒冲突（CMC 优先级 2000 会压掉 DnD 等同物品类型）。</p>
+     */
+    public final ModConfigSpec.ConfigValue<List<? extends String>> bellowsTypeOverrides;
 
     // ===================== 灌注枪 =====================
 
@@ -253,6 +265,32 @@ public class ServerConfig {
                 .comment("Bellows charge time: hold at least this many ticks to blow.")
                 .translation("create_hand_made.configuration.tools.bellows.charge_ticks")
                 .defineInRange("charge_ticks", 16, 1, 200);
+
+        bellowsTypeOverrides = builder
+                .comment("Force a specific fan type for an item, or disable a type.",
+                        "Format: 'item_id=type_id' or 'item_id=none'",
+                        "Example: 'minecraft:powder_snow_bucket=create_dragons_plus:freezing'",
+                        "Example: 'minecraft:sand=none' (disable entirely)",
+                        "'item_id=type_id' is a PREFERENCE: the chosen type wins over getPriority(),",
+                        "and other types still serve as a fallback when it cannot process the item.",
+                        "Rules whose mod is not installed are skipped silently (debug log only).",
+                        "Defaults below only take effect when the matching mod is installed.",
+                        "Note: a blaze burner prefers DnD's seething, but DnD also has a dedicated",
+                        "medium (dndesires:seething_sail) that needs no configuration at all.",
+                        "Only affects the bellows media selection; recipes are untouched.")
+                .translation("create_hand_made.configuration.bellows_type_overrides")
+                .defineListAllowEmpty("bellows_type_overrides",
+                        List.of(
+                                // 默认让龙+ 的读取优先级高于更多触媒（"龙+ 优于 CMC"）
+                                "minecraft:dragon_head=create_dragons_plus:ending",
+                                // 细雪桶：龙+「批量冷冻」优先
+                                "minecraft:powder_snow_bucket=create_dragons_plus:freezing",
+                                // 沙子：DnD「磨砂」优先，吃不下时仍回落 CMC「扬沙」
+                                "minecraft:sand=dndesires:sanding",
+                                // 沙类全部对齐到 DnD，避免"沙子走 DnD、红沙走 CMC"的同族不一致
+                                "minecraft:red_sand=dndesires:sanding",
+                                "minecraft:suspicious_sand=dndesires:sanding"),
+                        o -> o instanceof String);
         builder.pop();
 
         // ===================== 灌注枪 =====================
