@@ -180,65 +180,6 @@ public class BellowsItem extends Item {
         // 蓄力期间不施加任何实体效果（全部改为松手击中的瞬间结算）
     }
 
-    /**
-     * 持续吹风：每 tick 对射线上的实体施加一次介质效果（T11 B4）。
-     *
-     * <h3>为什么必须每 tick 调</h3>
-     * <p>Create 自己的 {@code AirCurrent} 就是<b>每 tick</b>对气流内实体调一次
-     * {@code FanProcessingType#affectEntity}；很多第三方类型把"进度"累加在实体身上，只吹一次永远到不了终点。
-     * 实测 Create: More Catalysts 正是这种：{@code FanEntityTransformHelper#advanceTransformation}
-     * 把计数器写进实体 persistentData，每次调用 +1，累计到 <b>50</b> 才真正生成新生物
-     * （所以"药水效果中了、转化没发生"——药水是单次 addEffect，转化需要 50 次）。</p>
-     *
-     * <p>起始时刻取"蓄力完成"，与"松手才爆发"的既有设计一致：按住不放 = 持续吹风，松手 = 一次冲击。</p>
-     *
-     * @param chargedTicks 蓄满之后又过了多少 tick（0 = 刚蓄满），仅用于日志节流
-     */
-    private static void applySustainedEntityEffect(Level level, Player player, int chargedTicks) {
-        ItemStack media = player.getOffhandItem();
-        if (media.isEmpty()) return;
-
-        BellowsMediaRegistry.EffectiveTypes effective = BellowsMediaRegistry.resolveEffective(media);
-        List<ResourceLocation> candidateIds = effective.ids();
-        if (candidateIds.isEmpty()) return;
-
-        FanProcessingType type = pickHighestPriority(candidateIds, effective.preferred());
-        if (type == null) return;
-
-        // 射线参数与 releaseUsing 保持同一套（喷嘴起点 / 视线终点 / 距离上限）
-        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
-        Vec3 eye = player.getEyePosition(1);
-        Vec3 look = player.getViewVector(1);
-
-        BlockHitResult hit = level.clip(new ClipContext(eye, eye.add(look.scale(reach)),
-                ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
-        boolean hitBlock = hit.getType() == HitResult.Type.BLOCK;
-        boolean posDistanceAbnormal = hitBlock
-                && hit.getBlockPos().distSqr(player.blockPosition()) > BELLOWS_RAY_MAX_DISTANCE_SQR;
-        Vec3 rayTarget = (hitBlock && !posDistanceAbnormal)
-                ? Vec3.atCenterOf(hit.getBlockPos()).add(0, 0.5, 0)
-                : eye.add(look.scale(reach));
-
-        boolean rightArm = (player.getUsedItemHand() == InteractionHand.MAIN_HAND)
-                == (player.getMainArm() == HumanoidArm.RIGHT);
-        Vec3 origin = getItemMuzzlePos(player, rightArm, BELLOWS_MUZZLE_OFFSET);
-
-        List<Entity> targets = findEntitiesInRay(level, player, origin, rayTarget);
-        if (targets.isEmpty()) return;
-
-        // 日志节流：每 10 tick 一条，够确认"真的被调用了"，又不至于把日志刷爆
-        boolean logThisTick = chargedTicks == 0 || chargedTicks % 10 == 0;
-
-        for (Entity e : targets) {
-            // ★ 完全委托（T11 B3）：效果内容全在类型对象里，本模组不写死任何原版判断
-            type.affectEntity(e, level);
-            if (logThisTick) {
-                CreateHandMade.LOGGER.debug("bellows: affectEntity({}) via {} (charged tick {})",
-                        e.getType(), getTypeId(type), chargedTicks);
-            }
-        }
-    }
-
     // ================= 松手 =================
 
     @Override
