@@ -28,15 +28,8 @@ public final class ToolStackMatcher {
     /** 见类注释；这是所有 mixin 注入点共用的唯一实现。 */
     public static boolean matches(ItemStack requested, ItemStack stored) {
         if (isOwnTool(requested) || isOwnTool(stored)) {
-            boolean sameItem = ItemStack.isSameItem(requested, stored);
-            boolean sameDamage = requested.getDamageValue() == stored.getDamageValue();
-            if ((!sameItem || !sameDamage) && CreateHandMade.LOGGER.isDebugEnabled()) {
-                CreateHandMade.LOGGER.debug(
-                        "logistics match FAILED: requested={} dmg={} stored={} dmg={} sameItem={} sameDamage={}",
-                        requested.getItem(), requested.getDamageValue(),
-                        stored.getItem(), stored.getDamageValue(), sameItem, sameDamage);
-            }
-            return sameItem && sameDamage;
+            return ItemStack.isSameItem(requested, stored)
+                    && requested.getDamageValue() == stored.getDamageValue();
         }
         return ItemStack.isSameItemSameComponents(requested, stored);
     }
