@@ -3,6 +3,8 @@ package com.alben.createhandmade;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.List;
+
 public class Config {
     public static final Config INSTANCE;
     public static final ForgeConfigSpec SPEC;
@@ -18,6 +20,7 @@ public class Config {
 
     // ==================== 风箱 ====================
     public final ForgeConfigSpec.IntValue bellowsChargeTicks;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> bellowsTypeOverrides;
 
     // ==================== 研钵 ====================
     public final ForgeConfigSpec.IntValue mortarWindupTicks;
@@ -94,6 +97,21 @@ public class Config {
                 .comment("蓄力时长：按住右键多久后可以释放",
                          "默认: 10")
                 .defineInRange("charge_ticks", 10, 1, 200);
+
+        bellowsTypeOverrides = builder
+                .comment("风箱介质类型覆盖规则，每行一条",
+                         "物品级（偏好，吃不下时仍回落）：",
+                         "  'minecraft:powder_snow_bucket=create_dragons_plus:freezing'",
+                         "类型级（整体禁用）：",
+                         "  'create_more_catalysts:withering=none'",
+                         "类型级（改优先级）：",
+                         "  'create_more_catalysts:withering=50'",
+                         "注意：本配置的默认值不会回填到已有 toml 文件，",
+                         "     升级后请删除 bellows_type_overrides 所在行并重启，或手动抄写默认值",
+                         "默认: []")
+                .defineListAllowEmpty("bellows_type_overrides",
+                        List.of(),
+                        obj -> obj instanceof String);
 
         builder.pop(); // bellows
 
