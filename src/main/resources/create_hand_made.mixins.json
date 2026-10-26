@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "create_hand_made.refmap.json",
   "mixins": [
+    "InventorySummaryMixin",
     "PackagerBlockEntityMixin"
   ],
   "client": [
