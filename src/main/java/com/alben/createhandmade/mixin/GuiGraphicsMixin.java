@@ -9,7 +9,6 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -26,31 +25,32 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * 给注液枪画"液体背景层"。
+ *
+ * <h3>为什么挂在 {@code renderItem} 的 HEAD（T12 修正）</h3>
+ * <p>原来挂在 {@code renderItemDecorations} 的 HEAD，并在物品已经画完之后以
+ * {@code zLevel = 100} 覆盖上去 —— 层序变成「物品 → 液体 → 数量」，于是仓储管理员等
+ * 界面里液体压在灌注枪本体（甚至数量）之上。</p>
+ *
+ * <p>现在改为在 <b>物品本体绘制之前</b>把液体画在同一位置、同一深度，
+ * 层序自然变成「液体背景 → 灌注枪 → 数量角标」，与物品栏/HUD/容器槽位一致，
+ * 也不需要再依赖各界面自己绘制数量角标的先后顺序。</p>
+ */
 @OnlyIn(Dist.CLIENT)
 @Mixin(GuiGraphics.class)
 public class GuiGraphicsMixin {
 
     private static final int TEXTURE_SIZE = 16;
 
-    /**
-     * 注入<b>5 参数</b>重载（不是 3 参数）。
-     *
-     * <p>原因（T10 排查结论）：`GuiGraphics` 有两个重载，而 3 参数那个只是把
-     * {@code text = null} 转调 5 参数版本 ——</p>
-     * <pre>
-     * renderItemDecorations(Font, ItemStack, int, int)            // aconst_null → 转调下面那个
-     * renderItemDecorations(Font, ItemStack, int, int, String)    // 真正画数量/耐久的地方
-     * </pre>
-     * <p>快捷栏 HUD 走 3 参数（所以一直能显示液体 ✓），而物品栏/容器槽位
-     * （{@code AbstractContainerScreen#renderSlot}）会带数量字符串<b>直接</b>调 5 参数 ⇒
-     * 原来只注入 3 参数时物品栏里根本不触发 ✗。改成注入 5 参数即可两头都覆盖
-     * （3 参数的调用会转调进来），且不会重复绘制。</p>
-     */
+    /** 物品图标的基础 z（原版 {@code renderItem} 内部用 100）。 */
+    private static final float ITEM_Z = 100.0F;
+
     @Inject(
-            method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
+            method = "renderItem(Lnet/minecraft/world/item/ItemStack;II)V",
             at = @At("HEAD")
     )
-    private void createHandMade$fluidUnderlay(Font font, ItemStack stack, int x, int y, String text, CallbackInfo ci) {
+    private void createHandMade$fluidUnderlay(ItemStack stack, int x, int y, CallbackInfo ci) {
         if (!(stack.getItem() instanceof InfusionGunItem)) return;
 
         FluidStack fluid = InfusionGunItem.getContents(stack).fluid();
@@ -80,19 +80,13 @@ public class GuiGraphicsMixin {
 
         GuiGraphics self = (GuiGraphics) (Object) this;
 
-        // 开启混合，让半透明水叠加正确
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-
-        Matrix4f matrix = self.pose().last().pose();
-
-        // ★ 关键：用流体的 tint 给纹理染色
         setGLColorFromInt(tintColor);
 
-        // 绘制 tiled sprite（这里只画一个 16x16 的 tile，按液面高度裁剪）
+        Matrix4f matrix = self.pose().last().pose();
         drawTiledSprite(matrix, x, y, 16, fluidHeight, sprite);
 
-        // 恢复
         RenderSystem.setShaderColor(1, 1, 1, 1);
         RenderSystem.disableBlend();
     }
@@ -106,21 +100,17 @@ public class GuiGraphicsMixin {
         RenderSystem.setShaderColor(red, green, blue, alpha);
     }
 
-    /**
-     * 从底部向上画 fluidHeight 像素的液体。
-     * x, y 是物品图标左上角。
-     */
+    /** 从底部向上画 fluidHeight 像素的液体；x, y 是物品图标左上角。 */
     private static void drawTiledSprite(Matrix4f matrix, int x, int y, int width, int fluidHeight,
                                         TextureAtlasSprite sprite) {
         RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
 
-        // 单个 16x16 的 tile，裁剪底部 fluidHeight
-        int xTileCount = width / TEXTURE_SIZE;         // = 1
-        int xRemainder = width - (xTileCount * TEXTURE_SIZE);  // = 0
-        int yTileCount = fluidHeight / TEXTURE_SIZE;   // = 0
-        int yRemainder = fluidHeight - (yTileCount * TEXTURE_SIZE); // = fluidHeight
+        int xTileCount = width / TEXTURE_SIZE;
+        int xRemainder = width - (xTileCount * TEXTURE_SIZE);
+        int yTileCount = fluidHeight / TEXTURE_SIZE;
+        int yRemainder = fluidHeight - (yTileCount * TEXTURE_SIZE);
 
-        int yStart = y + 16;  // 物品图标底部
+        int yStart = y + 16;
 
         for (int xTile = 0; xTile <= xTileCount; xTile++) {
             for (int yTile = 0; yTile <= yTileCount; yTile++) {
@@ -132,13 +122,13 @@ public class GuiGraphicsMixin {
                 if (w > 0 && h > 0) {
                     int maskTop = TEXTURE_SIZE - h;
                     int maskRight = TEXTURE_SIZE - w;
-                    drawTextureWithMasking(matrix, dx, dy, sprite, maskTop, maskRight, 100);
+                    drawTextureWithMasking(matrix, dx, dy, sprite, maskTop, maskRight, ITEM_Z);
                 }
             }
         }
     }
 
-    /** 抄自 JEI，用 quad 精确绘制纹理并裁剪 */
+    /** 抄自 JEI，用 quad 精确绘制纹理并裁剪。 */
     private static void drawTextureWithMasking(Matrix4f matrix, float x, float y,
                                                TextureAtlasSprite sprite,
                                                int maskTop, int maskRight, float zLevel) {
