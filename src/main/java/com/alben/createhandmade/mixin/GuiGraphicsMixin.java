@@ -60,6 +60,12 @@ public class GuiGraphicsMixin {
     private void createHandMade$fluidUnderlay(Font font, ItemStack stack, int x, int y, String text, CallbackInfo ci) {
         if (!(stack.getItem() instanceof InfusionGunItem)) return;
 
+        // ★ 仓储管理员界面专用处理：该界面用 GuiGameElement 做 3D 物品绘制，
+        //   我们的 2D 液体层在那里会盖到物品与数量之上（其它容器是 2D 绘制，层序正常）。
+        //   在没有拿到该界面精确坐标之前，这里选择"不画"——宁可没有液体层，
+        //   也不能让它压住物品和数字。常规容器/物品栏/HUD 不受影响。
+        if (isStockKeeperScreen()) return;
+
         FluidStack fluid = InfusionGunItem.getContents(stack).fluid();
         if (fluid.isEmpty()) return;
 
@@ -101,6 +107,13 @@ public class GuiGraphicsMixin {
     }
 
     /** 抄自 JEI FluidTankRenderer */
+    /** 当前是否处于 Create 的仓储管理员（Stock Keeper）界面；用类名判断避免硬依赖。 */
+    private static boolean isStockKeeperScreen() {
+        net.minecraft.client.gui.screens.Screen screen = Minecraft.getInstance().screen;
+        if (screen == null) return false;
+        return screen.getClass().getName().startsWith("com.simibubi.create.content.logistics.stockTicker.");
+    }
+
     private static void setGLColorFromInt(int color) {
         float red = (color >> 16 & 0xFF) / 255.0F;
         float green = (color >> 8 & 0xFF) / 255.0F;
