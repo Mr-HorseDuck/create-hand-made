@@ -1,7 +1,9 @@
 package com.alben.createhandmade.mixin;
 
-import com.alben.createhandmade.logistics.ToolStackMatcher;
+import com.alben.createhandmade.CreateHandMade;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -28,7 +30,16 @@ public class PackagerBlockEntityMixin {
             )
     )
     private static boolean createHandMade$matchLenientForOwnTools(ItemStack requested, ItemStack stored) {
-        return ToolStackMatcher.matches(requested, stored);
+        if (isOwnTool(requested) || isOwnTool(stored)) {
+            return ItemStack.isSameItem(requested, stored)
+                    && requested.getDamageValue() == stored.getDamageValue();
+        }
+        return ItemStack.isSameItemSameComponents(requested, stored);
     }
 
+    private static boolean isOwnTool(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return id != null && id.getNamespace().equals(CreateHandMade.MODID);
+    }
 }
