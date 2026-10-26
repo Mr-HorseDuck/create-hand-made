@@ -240,61 +240,54 @@ public class BellowsMediaRegistry {
         int bucketlessFluids = 0;
 
         // block tags
-        for (ResourceLocation tagId : ForgeRegistries.BLOCKS.tags().getTagNames().toList()) {
-            ResourceLocation typeId = catalystTypeIdFor(tagId);
-            if (typeId == null) continue;
-            if (!isRegisteredFanType(typeId)) continue;
-            tagCount++;
+        for (TagKey<Block> tagKey : ForgeRegistries.BLOCKS.tags().getTagNames().toList()) {
+    ResourceLocation tagId = tagKey.location();
+    ResourceLocation typeId = catalystTypeIdFor(tagId);
+    if (typeId == null) continue;
+    if (!isRegisteredFanType(typeId)) continue;
+    tagCount++;
 
-            for (Holder<Block> h : BuiltInRegistries.BLOCK.getTagOrEmpty(
-                    TagKey.create(Registries.BLOCK, tagId))) {
-                Item item = itemForBlock(h.value());
-                if (item == Items.AIR) {
-                    noItemBlocks++;
-                    continue;
-                }
-                addTypeId(map, item, typeId);
-            }
+    for (Holder<Block> h : BuiltInRegistries.BLOCK.getTagOrEmpty(tagKey)) {
+        Item item = itemForBlock(h.value());
+        if (item == Items.AIR) {
+            noItemBlocks++;
+            continue;
         }
+        addTypeId(map, item, typeId);
+    }
+}
 
         // item tags
-        for (ResourceLocation tagId : ForgeRegistries.ITEMS.tags().getTagNames().toList()) {
-            ResourceLocation typeId = catalystTypeIdFor(tagId);
-            if (typeId == null) continue;
-            if (!isRegisteredFanType(typeId)) continue;
-            tagCount++;
+        for (TagKey<Item> tagKey : ForgeRegistries.ITEMS.tags().getTagNames().toList()) {
+    ResourceLocation tagId = tagKey.location();
+    ResourceLocation typeId = catalystTypeIdFor(tagId);
+    if (typeId == null) continue;
+    if (!isRegisteredFanType(typeId)) continue;
+    tagCount++;
 
-            for (Holder<Item> h : BuiltInRegistries.ITEM.getTagOrEmpty(
-                    TagKey.create(Registries.ITEM, tagId))) {
-                if (h.value() != Items.AIR) addTypeId(map, h.value(), typeId);
-            }
-        }
+    for (Holder<Item> h : BuiltInRegistries.ITEM.getTagOrEmpty(tagKey)) {
+        if (h.value() != Items.AIR) addTypeId(map, h.value(), typeId);
+    }
+}
 
         // fluid tags
-        for (ResourceLocation tagId : ForgeRegistries.FLUIDS.tags().getTagNames().toList()) {
-            ResourceLocation typeId = catalystTypeIdFor(tagId);
-            if (typeId == null) continue;
-            if (!isRegisteredFanType(typeId)) continue;
-            tagCount++;
+        for (TagKey<Fluid> tagKey : ForgeRegistries.FLUIDS.tags().getTagNames().toList()) {
+    ResourceLocation tagId = tagKey.location();
+    ResourceLocation typeId = catalystTypeIdFor(tagId);
+    if (typeId == null) continue;
+    if (!isRegisteredFanType(typeId)) continue;
+    tagCount++;
 
-            for (Holder<Fluid> h : BuiltInRegistries.FLUID.getTagOrEmpty(
-                    TagKey.create(Registries.FLUID, tagId))) {
-                Item bucket = h.value().getBucket();
-                if (bucket != Items.AIR) {
-                    addTypeId(map, bucket, typeId);
-                } else {
-                    bucketlessFluids++;
-                    addFluid(fluids, typeId, h.value());
-                }
-            }
+    for (Holder<Fluid> h : BuiltInRegistries.FLUID.getTagOrEmpty(tagKey)) {
+        Item bucket = h.value().getBucket();
+        if (bucket != Items.AIR) {
+            addTypeId(map, bucket, typeId);
+        } else {
+            bucketlessFluids++;
+            addFluid(fluids, typeId, h.value());
         }
-
-        if (tagCount > 0) {
-            CreateHandMade.LOGGER.info(
-                    "Auto-discovered {} fan catalyst tags ({} new media, {} total, "
-                            + "{} item-less blocks skipped, {} bucket-less fluids registered)",
-                    tagCount, map.size() - itemCountBefore, map.size(), noItemBlocks, bucketlessFluids);
-        }
+    }
+}
     }
 
     /** 按 id 后缀识别染料桶。 */
