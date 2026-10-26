@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -26,16 +27,22 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 给注液枪画"液体背景层"。
+ * 给注液枪画"液体层"（覆盖在物品图标上，但压在数量角标之下）。
  *
- * <h3>为什么挂在 {@code renderItem} 的 HEAD（T12 修正）</h3>
- * <p>原来挂在 {@code renderItemDecorations} 的 HEAD，并在物品已经画完之后以
- * {@code zLevel = 100} 覆盖上去 —— 层序变成「物品 → 液体 → 数量」，于是仓储管理员等
- * 界面里液体压在灌注枪本体（甚至数量）之上。</p>
+ * <h3>层序</h3>
+ * <pre>
+ * 数量数字  &gt;  灌注枪本体  &gt;  液体层
+ * </pre>
+ * 液体层如果真画在图标<b>下面</b>，会被不透明的枪身纹理完全挡住（实测"哪里都不显示"），
+ * 所以实际是"先物品、再液体（半透明可见）、数量最后"；并且绘制液体时开启深度测试，
+ * 让已经画好的数量数字（z 更高）不会被液体覆盖。
  *
- * <p>现在改为在 <b>物品本体绘制之前</b>把液体画在同一位置、同一深度，
- * 层序自然变成「液体背景 → 灌注枪 → 数量角标」，与物品栏/HUD/容器槽位一致，
- * 也不需要再依赖各界面自己绘制数量角标的先后顺序。</p>
+ * <h3>两个已踩过的坑</h3>
+ * <ul>
+ *   <li>注入 {@code renderItem} HEAD（物品之前）⇒ 液体被不透明图标挡住，全界面不可见；</li>
+ *   <li>结束时 {@code disableBlend()} ⇒ 打断调用方后续文字绘制，仓储管理员里的数量数字消失。
+ *       现在结束时恢复为<b>开启</b>混合。</li>
+ * </ul>
  */
 @OnlyIn(Dist.CLIENT)
 @Mixin(GuiGraphics.class)
@@ -43,14 +50,14 @@ public class GuiGraphicsMixin {
 
     private static final int TEXTURE_SIZE = 16;
 
-    /** 物品图标的基础 z（原版 {@code renderItem} 内部用 100）。 */
+    /** 与物品图标一致的 z（原版 renderItem 内部用 100）。 */
     private static final float ITEM_Z = 100.0F;
 
     @Inject(
-            method = "renderItem(Lnet/minecraft/world/item/ItemStack;II)V",
+            method = "renderItemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
             at = @At("HEAD")
     )
-    private void createHandMade$fluidUnderlay(ItemStack stack, int x, int y, CallbackInfo ci) {
+    private void createHandMade$fluidUnderlay(Font font, ItemStack stack, int x, int y, String text, CallbackInfo ci) {
         if (!(stack.getItem() instanceof InfusionGunItem)) return;
 
         FluidStack fluid = InfusionGunItem.getContents(stack).fluid();
@@ -82,13 +89,15 @@ public class GuiGraphicsMixin {
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.enableDepthTest();          // 保护已绘制的高 z 内容（数量数字）
         setGLColorFromInt(tintColor);
 
         Matrix4f matrix = self.pose().last().pose();
         drawTiledSprite(matrix, x, y, 16, fluidHeight, sprite);
 
         RenderSystem.setShaderColor(1, 1, 1, 1);
-        RenderSystem.disableBlend();
+        RenderSystem.disableDepthTest();
+        RenderSystem.enableBlend();              // 不要关混合，调用方还要画文字
     }
 
     /** 抄自 JEI FluidTankRenderer */
