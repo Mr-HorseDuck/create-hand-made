@@ -1,6 +1,6 @@
 package com.alben.createhandmade.mixin;
 
-import com.alben.createhandmade.item.InfusionGunContents;
+import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.InfusionGunItem;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
