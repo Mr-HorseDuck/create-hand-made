@@ -4,12 +4,8 @@
   "package": "com.alben.createhandmade.mixin",
   "compatibilityLevel": "JAVA_21",
   "refmap": "create_hand_made.refmap.json",
-  "mixins": [
-    "PackagerBlockEntityMixin"
-  ],
   "client": [
-    "BasinBlockEntityMixin",
-    "GuiGraphicsMixin"
+    "BasinBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1
