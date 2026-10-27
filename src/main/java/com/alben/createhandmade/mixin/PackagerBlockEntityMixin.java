@@ -42,4 +42,20 @@ public class PackagerBlockEntityMixin {
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id != null && id.getNamespace().equals(CreateHandMade.MODID);
     }
+
+    /** 诊断：打印进入 attemptToSend 的请求列表，用于定位"请求成功但抽不出货"。 */
+    @org.spongepowered.asm.mixin.injection.Inject(
+            method = "attemptToSend",
+            at = @org.spongepowered.asm.mixin.injection.At("HEAD")
+    )
+    private void createHandMade$logRequests(java.util.List<com.simibubi.create.content.logistics.packager.PackagingRequest> requests,
+                                            org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        if (!com.alben.createhandmade.CreateHandMade.LOGGER.isDebugEnabled()) return;
+        for (com.simibubi.create.content.logistics.packager.PackagingRequest r : requests) {
+            net.minecraft.world.item.ItemStack s = r.item();
+            com.alben.createhandmade.CreateHandMade.LOGGER.debug(
+                    "attemptToSend request: {} x{} comps={}",
+                    s.getItem(), s.getCount(), s.getComponents());
+        }
+    }
 }

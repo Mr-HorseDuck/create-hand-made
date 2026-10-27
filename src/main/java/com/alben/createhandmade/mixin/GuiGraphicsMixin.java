@@ -64,7 +64,7 @@ public class GuiGraphicsMixin {
         //   我们的 2D 液体层在那里会盖到物品与数量之上（其它容器是 2D 绘制，层序正常）。
         //   在没有拿到该界面精确坐标之前，这里选择"不画"——宁可没有液体层，
         //   也不能让它压住物品和数字。常规容器/物品栏/HUD 不受影响。
-        if (isStockKeeperScreen()) return;
+        boolean stockKeeperBar = isStockKeeperScreen();
 
         FluidStack fluid = InfusionGunItem.getContents(stack).fluid();
         if (fluid.isEmpty()) return;
@@ -90,6 +90,19 @@ public class GuiGraphicsMixin {
         int capacity = InfusionGunContents.CAPACITY;
         int fluidHeight = (int) Math.ceil(16.0 * amount / capacity);
         if (fluidHeight <= 0) return;
+
+        // 仓储管理员：物品是 GuiGameElement 的 3D 绘制，任何覆盖都容易压在物品/数字上。
+        // 这里改为在图标<b>正下方</b>画一条 2px 的液条——永不遮挡，又能看出还剩多少。
+        if (stockKeeperBar) {
+            GuiGraphics selfBar = (GuiGraphics) (Object) this;
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            setGLColorFromInt(tintColor);
+            drawTiledSprite(selfBar.pose().last().pose(), x, y + 16, 16, 2, sprite);
+            RenderSystem.setShaderColor(1, 1, 1, 1);
+            RenderSystem.enableBlend();
+            return;
+        }
 
         GuiGraphics self = (GuiGraphics) (Object) this;
 
