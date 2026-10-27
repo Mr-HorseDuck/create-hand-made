@@ -315,7 +315,7 @@ public class BellowsItem extends Item {
      * 找到射线路径上所有有效生物。
      * 有效判定参考鼓风：存活、非旁观、非创造飞行。
      */
-    private static List<Entity> findEntitiesInRay(Level level, Player player, Vec3 origin, Vec3 target) {
+    public static List<Entity> findEntitiesInRay(Level level, Player player, Vec3 origin, Vec3 target) {
         // 防御：射线路径异常时直接返回（正常射线长度不会超过交互距离）
         double lenSqr = origin.distanceToSqr(target);
         if (lenSqr < 1e-6 || lenSqr > BELLOWS_RAY_MAX_DISTANCE_SQR) {
@@ -340,7 +340,7 @@ public class BellowsItem extends Item {
     }
 
     /** 参考鼓风的实体过滤逻辑 */
-    private static boolean isValidBellowsTarget(Entity entity) {
+    public static boolean isValidBellowsTarget(Entity entity) {
         if (!entity.isAlive()) return false;
         if (entity.isSpectator()) return false;
         // 创造飞行玩家不受影响（和鼓风一致）
@@ -356,7 +356,7 @@ public class BellowsItem extends Item {
      * 沿射线方向推实体。
      * 参考鼓风：距离越远推力越小；玩家蹲下时推力减半。
      */
-    private static void pushEntity(Entity entity, Vec3 origin, Vec3 target) {
+    public static void pushEntity(Entity entity, Vec3 origin, Vec3 target) {
         Vec3 delta = target.subtract(origin);
         if (delta.lengthSqr() < 1e-6) return;
         Vec3 direction = delta.normalize();
@@ -407,7 +407,7 @@ public class BellowsItem extends Item {
 
     // ================= 探测目标物品 =================
 
-    private static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
+    public static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
         List<ItemStack> result = new ArrayList<>();
 
         if (level.getBlockEntity(pos) instanceof DepotBlockEntity depot) {
@@ -445,7 +445,7 @@ public class BellowsItem extends Item {
      * <p>顺序取第一条命中的 —— 与 L1 路径"取第一个能加工的"语义一致。</p>
      */
     @Nullable
-    private static RecipeHolder<HandMadeBellowsRecipe> findL3BellowsRecipe(Level level, ItemStack item,
+    public static RecipeHolder<HandMadeBellowsRecipe> findL3BellowsRecipe(Level level, ItemStack item,
                                                                           ResourceLocation fanTypeId) {
         SingleRecipeInput input = new SingleRecipeInput(item);
         for (RecipeHolder<?> holder : level.getRecipeManager()
@@ -572,7 +572,7 @@ public class BellowsItem extends Item {
         return best;
     }
 
-    private static boolean applyToTarget(Level level, BlockPos pos, List<ResourceLocation> candidateIds,
+    public static boolean applyToTarget(Level level, BlockPos pos, List<ResourceLocation> candidateIds,
                                          @Nullable ResourceLocation preferred,
                                          FanProcessingType[] pickedOut) {
         TransportedItemStackHandlerBehaviour handler =
@@ -667,7 +667,7 @@ public class BellowsItem extends Item {
      *
      * <p>只在<b>产物里还有别的东西</b>时才丢，避免把"桶本身变成空桶"这种正常配方也吃掉。</p>
      */
-    private static List<ItemStack> dropContainerRemainder(ItemStack input, List<ItemStack> results) {
+    public static List<ItemStack> dropContainerRemainder(ItemStack input, List<ItemStack> results) {
         if (results == null || results.size() < 2) return results;
 
         ItemStack remainder = input.getCraftingRemainingItem();
@@ -706,7 +706,7 @@ public class BellowsItem extends Item {
      * </ul>
      * <p>进度键是对方私有的，所以只看"NBT 有没有变"这种与实现无关的判据。</p>
      */
-    private static void applyEntityEffectNow(@Nullable FanProcessingType type, Entity entity, Level level) {
+    public static void applyEntityEffectNow(@Nullable FanProcessingType type, Entity entity, Level level) {
         if (type == null) return;
         for (int i = 0; i < 64; i++) {
             CompoundTag before = entity.getPersistentData().copy();
@@ -773,7 +773,7 @@ public class BellowsItem extends Item {
     }
     // ================= 广播 =================
 
-    private static void broadcastBellows(Level level,
+    public static void broadcastBellows(Level level,
                                          @Nullable BlockPos blastPos,
                                          List<ItemStack> stacks,
                                          Vec3 origin, Vec3 target,

@@ -362,7 +362,7 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
      * @return 第一个匹配的研磨配方；没有则返回 null
      */
     @Nullable
-    private static RecipeHolder<?> findMillingRecipe(Level level, SingleRecipeInput recipeInput) {
+    public static RecipeHolder<?> findMillingRecipe(Level level, SingleRecipeInput recipeInput) {
         // 用 instanceof 模式匹配取出确切的配方类型再调 matches：
         // holder.value() 的静态类型是 Recipe<?>，其 matches 的参数是通配符捕获，
         // 无法直接接受 SingleRecipeInput。instanceof 能拿到确切类型，

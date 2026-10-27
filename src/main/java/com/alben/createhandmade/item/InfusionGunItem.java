@@ -407,7 +407,7 @@ public class InfusionGunItem extends Item {
      * @return 真的抽到流体并写入枪内时为 true；任何前置检查失败或 drain 落空时为 false
      *         （调用方据此决定是否置位 {@code EXTRACT_TRIGGERED}，失败则下个周期重试）
      */
-    private static boolean tryExtractMax(Level level, BlockPos pos, Player player, ItemStack gun) {
+    public static boolean tryExtractMax(Level level, BlockPos pos, Player player, ItemStack gun) {
         IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
         if (handler == null) return false;
 
@@ -474,7 +474,7 @@ public class InfusionGunItem extends Item {
      * 从方块位置读出一个"源流体"（1000mB）。
      * 只处理源方块 + 有桶形式的流体；否则返回空。
      */
-    private static FluidStack getFluidFromSource(Level level, BlockPos pos) {
+    public static FluidStack getFluidFromSource(Level level, BlockPos pos) {
         FluidState state = level.getFluidState(pos);
         if (state.isEmpty()) return FluidStack.EMPTY;
         if (!state.isSource()) return FluidStack.EMPTY;
@@ -491,7 +491,7 @@ public class InfusionGunItem extends Item {
         return new FluidStack(fluid, FLUID_BLOCK_AMOUNT);
     }
 
-    private static boolean isFluidSource(Level level, BlockPos pos) {
+    public static boolean isFluidSource(Level level, BlockPos pos) {
         return !getFluidFromSource(level, pos).isEmpty();
     }
 
@@ -619,7 +619,7 @@ public class InfusionGunItem extends Item {
 
     // ================== 注入物品（保留原逻辑） ==================
 
-    private static boolean tryInjectItems(Level level, BlockPos pos, Player player, ItemStack gun) {
+    public static boolean tryInjectItems(Level level, BlockPos pos, Player player, ItemStack gun) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -681,7 +681,7 @@ public class InfusionGunItem extends Item {
         return success[0];
     }
 
-    private static TransportedResult finishInject(TransportedItemStack item, ItemStack stack,
+    public static TransportedResult finishInject(TransportedItemStack item, ItemStack stack,
                                                   List<ItemStack> results) {
         ItemStack left = stack.copy();
         left.shrink(1);
@@ -712,7 +712,7 @@ public class InfusionGunItem extends Item {
 
     // ================== 存入流体容器（保留原逻辑） ==================
 
-    private static boolean tryStoreFluid(Level level, BlockPos pos, Player player, ItemStack gun) {
+    public static boolean tryStoreFluid(Level level, BlockPos pos, Player player, ItemStack gun) {
         IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
         if (handler == null) return false;
 
@@ -733,13 +733,13 @@ public class InfusionGunItem extends Item {
 
     // ================== 耐久 ==================
 
-    private static void damageGun(ItemStack gun, Player player) {
+    public static void damageGun(ItemStack gun, Player player) {
         gun.hurtAndBreak(1, player, LivingEntity.getSlotForHand(player.getUsedItemHand()));
     }
 
     // ================== 判定：能否交互 ==================
 
-    private static boolean canInteractAt(Level level, BlockPos pos, ItemStack gun) {
+    public static boolean canInteractAt(Level level, BlockPos pos, ItemStack gun) {
         InfusionGunContents contents = getContents(gun);
 
         // 流体源方块：总是"可交互"（吸/放都由后续分支处理）
@@ -775,7 +775,7 @@ public class InfusionGunItem extends Item {
         return false;
     }
 
-    private static boolean canInjectItemsAt(Level level, BlockPos pos, InfusionGunContents contents) {
+    public static boolean canInjectItemsAt(Level level, BlockPos pos, InfusionGunContents contents) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -804,7 +804,7 @@ public class InfusionGunItem extends Item {
     // ================== 配方查找 ==================
 
     @Nullable
-    private static RecipeHolder<? extends StandardProcessingRecipe<?>> findFillingRecipe(
+    public static RecipeHolder<? extends StandardProcessingRecipe<?>> findFillingRecipe(
             Level level, ItemStack target, FluidStack fluid) {
         SingleRecipeInput input = new SingleRecipeInput(target);
 
@@ -846,7 +846,7 @@ public class InfusionGunItem extends Item {
      *
      * @throws IllegalStateException 传入的不是注液类配方（正常流程到不了这里）
      */
-    private static SizedFluidIngredient requiredFluidOf(StandardProcessingRecipe<?> recipe) {
+    public static SizedFluidIngredient requiredFluidOf(StandardProcessingRecipe<?> recipe) {
         if (recipe instanceof FillingRecipe filling) {
             return filling.getRequiredFluid();
         }
@@ -914,7 +914,7 @@ public class InfusionGunItem extends Item {
 
     // ================== 广播流体粒子 ==================
 
-    private static void broadcastFluidParticles(Level level, BlockPos pos, FluidStack fluid) {
+    public static void broadcastFluidParticles(Level level, BlockPos pos, FluidStack fluid) {
         if (!(level instanceof ServerLevel serverLevel)) return;
         if (fluid.isEmpty()) return;
 

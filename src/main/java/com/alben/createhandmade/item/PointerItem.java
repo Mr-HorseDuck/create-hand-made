@@ -126,7 +126,7 @@ public class PointerItem extends Item {
 
     // ================= 置物台加工 =================
 
-    private static void executeDepotProcess(Player player, Level level, BlockPos pos,
+    public static void executeDepotProcess(Player player, Level level, BlockPos pos,
                                             ItemStack tool, ItemStack held, RecipeHolder<?> recipe,
                                             DepotBlockEntity depot) {
         TransportedItemStackHandlerBehaviour handler =
@@ -222,7 +222,7 @@ public class PointerItem extends Item {
 
     // ================= 传送带加工 =================
 
-    private static boolean tryProcessBelt(Player player, Level level, BlockPos pos, ItemStack tool) {
+    public static boolean tryProcessBelt(Player player, Level level, BlockPos pos, ItemStack tool) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
@@ -287,7 +287,7 @@ public class PointerItem extends Item {
     // ================= 配方查找 =================
 
     @Nullable
-    private static RecipeHolder<?> findRecipe(Level level, ItemStack target, ItemStack tool) {
+    public static RecipeHolder<?> findRecipe(Level level, ItemStack target, ItemStack tool) {
         ItemStackHandler tempInv = new ItemStackHandler(2);
         tempInv.setStackInSlot(0, target);
         tempInv.setStackInSlot(1, tool);
@@ -333,7 +333,7 @@ public class PointerItem extends Item {
 
     // ================= 辅助 =================
 
-    private static void consumeTool(Player player, ItemStack tool, RecipeHolder<?> recipe) {
+    public static void consumeTool(Player player, ItemStack tool, RecipeHolder<?> recipe) {
         // L3 独占配方（应用家族）与 Create 的 ItemApplicationRecipe 都可能有"手持物品不消耗"
         if (recipe.value() instanceof HandMadeApplicationRecipe handmade && handmade.shouldKeepHeldItem()) {
             return;
@@ -348,7 +348,7 @@ public class PointerItem extends Item {
         }
     }
 
-    private static void playProcessEffects(Level level, BlockPos pos, ItemStack particleItem) {
+    public static void playProcessEffects(Level level, BlockPos pos, ItemStack particleItem) {
         level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 1.0f, 1.0f);
 
         if (particleItem.isEmpty()) return;

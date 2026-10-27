@@ -285,7 +285,7 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
      * 「按配方管理器顺序找第一条 {@code matches}」，与这里的顺序遍历 + matches 一致。</p>
      */
     @Nullable
-    private static RecipeHolder<?> findRecipe(Level level, ItemStack input) {
+    public static RecipeHolder<?> findRecipe(Level level, ItemStack input) {
         SingleRecipeInput recipeInput = new SingleRecipeInput(input);
 
         // 用 instanceof 模式匹配取出确切类型再调 matches：

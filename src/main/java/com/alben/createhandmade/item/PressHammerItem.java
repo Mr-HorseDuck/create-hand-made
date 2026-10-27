@@ -210,7 +210,7 @@ public class PressHammerItem extends Item {
     }
 
     @Nullable
-    private static EntityHitResult findEntityHit(Player player, Vec3 eye, Vec3 look, double reach) {
+    public static EntityHitResult findEntityHit(Player player, Vec3 eye, Vec3 look, double reach) {
         Vec3 end = eye.add(look.scale(reach));
         AABB box = player.getBoundingBox().expandTowards(end.subtract(eye)).inflate(1.0);
         return ProjectileUtil.getEntityHitResult(
@@ -278,7 +278,7 @@ public class PressHammerItem extends Item {
 
     // ================= 探测目标物品 =================
 
-    private static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
+    public static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
         List<ItemStack> result = new ArrayList<>();
 
         if (level.getBlockEntity(pos) instanceof DepotBlockEntity depot) {
@@ -309,7 +309,7 @@ public class PressHammerItem extends Item {
 
     // ================= 广播粒子 =================
 
-    private static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
+    public static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
         if (!(level instanceof ServerLevel serverLevel)) return;
         if (stacks.isEmpty()) return;
 
@@ -325,7 +325,7 @@ public class PressHammerItem extends Item {
 
     // ================= 工作盆 =================
 
-    private static boolean tryPressBasin(Level level, BlockPos pos) {
+    public static boolean tryPressBasin(Level level, BlockPos pos) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
         if (basin.isEmpty()) return false;
 
@@ -357,7 +357,7 @@ public class PressHammerItem extends Item {
     // ================= 置物台 / 传送带 =================
 
     @Nullable
-    private static RecipeHolder<?> findPressingRecipe(Level level, ItemStack stack) {
+    public static RecipeHolder<?> findPressingRecipe(Level level, ItemStack stack) {
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
         //   不是一条普通的 PRESSING 配方，保持原样。
         Optional<RecipeHolder<PressingRecipe>> sequenced =
@@ -388,7 +388,7 @@ public class PressHammerItem extends Item {
         return null;
     }
 
-    private static boolean tryPressTransported(Level level, BlockPos pos) {
+    public static boolean tryPressTransported(Level level, BlockPos pos) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return false;
