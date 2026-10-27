@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import java.util.Objects;
+
 import com.mojang.serialization.Codec;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -17,6 +19,36 @@ public record InfusionGunContents(FluidStack fluid) {
 
     public boolean isEmpty() {
         return fluid.isEmpty();
+    }
+
+    /**
+     * 值相等：必须与 {@link #hashCode()} 一致。
+     *
+     * <p>NeoForge 的 {@link FluidStack} <b>没有覆写 equals/hashCode</b>（21.1.250 实测只有 toString），
+     * 所以 record 自动生成的 equals 会退化成引用比较。后果是"内容完全相同的两把灌注枪"组件永不相等，
+     * 进而让 {@code ItemStack#isSameItemSameComponents} 恒为 false，破坏 Create 物流/库存的一切精确匹配：
+     * 仓储管理员里请求会因 {@code InventorySummary#getCountOf} 返回 0 而静默消失（待打包栏闪一下）。</p>
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (!(obj instanceof InfusionGunContents other))
+            return false;
+        boolean thisEmpty = fluid.isEmpty();
+        boolean otherEmpty = other.fluid.isEmpty();
+        if (thisEmpty || otherEmpty)
+            return thisEmpty && otherEmpty;
+        return fluid.getAmount() == other.fluid.getAmount()
+                && FluidStack.isSameFluidSameComponents(fluid, other.fluid);
+    }
+
+    @Override
+    public int hashCode() {
+        if (fluid.isEmpty())
+            return 0;
+        // FluidStack 本身没有 hashCode，用 注册项 + 数量 + 组件补丁 组合；两者都与 equals 的判断依据一致
+        return Objects.hash(fluid.getFluid(), fluid.getAmount(), fluid.getComponents());
     }
 
     public int amount() {

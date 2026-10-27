@@ -43,4 +43,28 @@ public record MortarContents(ItemStack stack, int durationTicks) {
             ItemStack.STREAM_CODEC, MortarContents::stack,
             ByteBufCodecs.VAR_INT, MortarContents::durationTicks,
             MortarContents::new);
+
+    /**
+     * 值相等：必须与 {@link #hashCode()} 一致。
+     *
+     * <p>{@link ItemStack} <b>没有覆写 equals/hashCode</b>（1.21.1 实测只有 {@code matches}/{@code hashItemAndComponents}），
+     * 所以 record 自动生成的 equals 会退化成引用比较，导致"装了同样料的两个研钵"组件永不相等，
+     * 进而破坏 Create 物流/库存里一切基于 {@code ItemStack#isSameItemSameComponents} 的匹配
+     * （症状：请求被 {@code InventorySummary#getCountOf} 判成 0，待打包栏闪一下消失）。</p>
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (!(obj instanceof MortarContents other))
+            return false;
+        return durationTicks == other.durationTicks
+                && stack.getCount() == other.stack.getCount()
+                && ItemStack.isSameItemSameComponents(stack, other.stack);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * ItemStack.hashItemAndComponents(stack) + 17 * durationTicks + stack.getCount();
+    }
 }
