@@ -399,98 +399,91 @@ public class BellowsItem extends Item {
     }
 
     // ================= 加工 =================
-
-    /**
-     * 把指定鼓风类型应用到方块上的物品。
-     * L3 优先（{@code create_hand_made:bellows_recipe}），未命中时回落到 Create 的 L1 鼓风逻辑。
-     */
     public static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
-        TransportedItemStackHandlerBehaviour handler =
-                BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
-        if (handler == null) return false;
+    TransportedItemStackHandlerBehaviour handler =
+            BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
+    if (handler == null) return false;
 
-        boolean[] success = {false};
+    boolean[] success = {false};
 
-        handler.handleProcessingOnAllItems(item -> {
-            if (success[0]) return TransportedResult.doNothing();
-            ItemStack stack = item.stack;
-            if (stack.isEmpty()) return TransportedResult.doNothing();
+    handler.handleProcessingOnAllItems(item -> {
+        if (success[0]) return TransportedResult.doNothing();
+        ItemStack stack = item.stack;
+        if (stack.isEmpty()) return TransportedResult.doNothing();
 
-            ItemStack single = stack.copyWithCount(1);
+        ItemStack single = stack.copyWithCount(1);
 
-            // L3 优先
-            List<ItemStack> results = null;
-            FanType fanType = toFanType(type);
-            if (fanType != null) {
-                HandMadeBellowsRecipe l3 = findL3BellowsRecipe(level, single, fanType);
-                if (l3 != null) {
-                    results = RecipeApplier.applyRecipeOn(level, single, l3, true);
-                }
+        // L3 优先
+        List<ItemStack> results = findL3Results(level, single, type);
+
+        // L1 兜底
+        if (results == null) {
+            if (!type.canProcess(single, level)) return TransportedResult.doNothing();
+            results = type.process(single, level);
+            if (results == null) return TransportedResult.doNothing();
+        }
+
+        success[0] = true;
+        ItemStack left = stack.copy();
+        left.shrink(1);
+
+        List<TransportedItemStack> outputs = new ArrayList<>();
+        for (ItemStack r : results) {
+            if (r.isEmpty()) continue;
+            TransportedItemStack copy = item.copy();
+            copy.stack = r;
+            outputs.add(copy);
+        }
+
+        type.spawnProcessingParticles(level, handler.getWorldPositionOf(item));
+
+        if (outputs.isEmpty()) {
+            if (left.isEmpty()) return TransportedResult.removeItem();
+            TransportedItemStack leftStack = item.copy();
+            leftStack.stack = left;
+            return TransportedResult.convertTo(leftStack);
+        } else {
+            if (left.isEmpty()) {
+                return TransportedResult.convertTo(outputs);
             }
+            TransportedItemStack leftStack = item.copy();
+            leftStack.stack = left;
+            return TransportedResult.convertToAndLeaveHeld(outputs, leftStack);
+        }
+    });
 
-            // L1 回落
-            if (results == null) {
-                if (!type.canProcess(single, level)) return TransportedResult.doNothing();
-                results = type.process(single, level);
-                if (results == null) return TransportedResult.doNothing();
-            }
+    return success[0];
+}
 
-            success[0] = true;
-            ItemStack left = stack.copy();
-            left.shrink(1);
+/**
+ * 查 L3 风箱配方并应用，返回产物列表；没有匹配返回 null（调用方回落到 L1）。
+ */
+@Nullable
+private static List<ItemStack> findL3Results(Level level, ItemStack single, FanProcessingType type) {
+    FanType fanType = toFanType(type);
+    if (fanType == null) return null;
 
-            List<TransportedItemStack> outputs = new ArrayList<>();
-            for (ItemStack r : results) {
-                if (r.isEmpty()) continue;
-                TransportedItemStack copy = item.copy();
-                copy.stack = r;
-                outputs.add(copy);
-            }
+    ItemStackHandler handler = new ItemStackHandler(1);
+    handler.setStackInSlot(0, single);
+    RecipeWrapper wrapper = new RecipeWrapper(handler);
 
-            type.spawnProcessingParticles(level, handler.getWorldPositionOf(item));
-
-            if (outputs.isEmpty()) {
-                if (left.isEmpty()) return TransportedResult.removeItem();
-                TransportedItemStack leftStack = item.copy();
-                leftStack.stack = left;
-                return TransportedResult.convertTo(leftStack);
-            } else {
-                if (left.isEmpty()) {
-                    return TransportedResult.convertTo(outputs);
-                }
-                TransportedItemStack leftStack = item.copy();
-                leftStack.stack = left;
-                return TransportedResult.convertToAndLeaveHeld(outputs, leftStack);
-            }
-        });
-
-        return success[0];
+    for (Recipe<?> r : level.getRecipeManager()
+            .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
+        if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
+        if (recipe.getFanType() != fanType) continue;
+        if (!recipe.matches(wrapper, level)) continue;
+        return RecipeApplier.applyRecipeOn(level, single, recipe, true);
     }
-    
-    /**
+    return null;
+}
+
+/**
  * 判断某个物品能否被指定鼓风类型加工。女仆行为用它区分"原料"和"产物"。
- * L3 优先，L1 兜底。
  */
 public static boolean canProcess(Level level, ItemStack item, FanProcessingType type) {
     if (item.isEmpty()) return false;
     ItemStack single = item.copyWithCount(1);
-
-    // L3 优先
-    FanType fanType = toFanType(type);
-    if (fanType != null) {
-        ItemStackHandler handler = new ItemStackHandler(1);
-        handler.setStackInSlot(0, single);
-        RecipeWrapper wrapper = new RecipeWrapper(handler);
-
-        for (Recipe<?> r : level.getRecipeManager()
-                .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
-            if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
-            if (recipe.getFanType() != fanType) continue;
-            if (recipe.matches(wrapper, level)) return true;
-        }
-    }
-
-    // L1 兜底
+    if (findL3Results(level, single, type) != null) return true;
     return type.canProcess(single, level);
 }
 
