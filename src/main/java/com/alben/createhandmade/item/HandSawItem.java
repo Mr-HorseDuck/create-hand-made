@@ -31,6 +31,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
@@ -396,7 +397,7 @@ public class HandSawItem extends Item {
 
     // ================= 切削执行 =================
 
-    private static void executeCut(Level level, Player player, ItemStack saw) {
+    public static void executeCut(Level level, Player player, ItemStack saw) {
         ItemStack off = player.getOffhandItem();
         if (off.isEmpty()) return;
 
@@ -512,7 +513,7 @@ public class HandSawItem extends Item {
     }
 
     // ================= 整树砍伐 =================
-    private static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
+    public static void fellTreeFromBroken(Level level, Player player, ItemStack saw,
                                            BlockPos pos, BlockState brokenState) {
         // ★ 配置开关：关闭时只破坏当前方块（原版行为）。
         //   放在任何整树扫描之前早退，零开销；不影响切削配方 / 剥皮 / 刮铜 / 去蜡。
@@ -537,11 +538,11 @@ public class HandSawItem extends Item {
 
     // ================= 去皮 =================
 
-    private static boolean canStrip(BlockState state, UseOnContext context) {
+    public static boolean canStrip(BlockState state, UseOnContext context) {
         return state.getToolModifiedState(context, ItemAbilities.AXE_STRIP, false) != null;
     }
 
-    private static void stripBlock(Level level, Player player, ItemStack saw,
+    public static void stripBlock(Level level, Player player, ItemStack saw,
                                    BlockPos pos, InteractionHand hand) {
         BlockState state = level.getBlockState(pos);
 
@@ -559,7 +560,22 @@ public class HandSawItem extends Item {
 
     // ================= 切换配方 =================
 
-    private static InteractionResult switchRecipe(Level level, Player player, ItemStack saw, ItemStack off) {
+    /**
+     * 存量数据自愈：旧版本切换回默认配方时会写入 {@code hand_saw_recipe_index = 0}，
+     * 而全新手锯没有这个组件——两者外观相同却因为组件存在与否不同而无法堆叠。
+     * 这里在服务端把 {@code <= 0} 的组件移除，玩家把旧手锯在背包里放一 tick 就会恢复可堆叠。
+     */
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, net.minecraft.world.entity.Entity entity,
+                              int slot, boolean selected) {
+        if (level.isClientSide) return;
+        Integer index = stack.get(ModDataComponents.HAND_SAW_RECIPE_INDEX.get());
+        if (index != null && index <= 0) {
+            stack.remove(ModDataComponents.HAND_SAW_RECIPE_INDEX.get());
+        }
+    }
+
+    public static InteractionResult switchRecipe(Level level, Player player, ItemStack saw, ItemStack off) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
 
         List<RecipeHolder<? extends Recipe<?>>> recipes = getCuttingRecipes(level, off);
@@ -569,13 +585,35 @@ public class HandSawItem extends Item {
 
         int current = saw.getOrDefault(ModDataComponents.HAND_SAW_RECIPE_INDEX.get(), 0);
         int next = (current + 1) % recipes.size();
-        saw.set(ModDataComponents.HAND_SAW_RECIPE_INDEX.get(), next);
+        if (next == 0) {
+            // 回到默认（序号 1）⇒ 移除组件而不是写入 0：否则会留下一份 index=0 的组件，
+            // 与"全新手锯"看起来完全相同、却因为组件存在与否不同而无法堆叠。
+            saw.remove(ModDataComponents.HAND_SAW_RECIPE_INDEX.get());
+        } else {
+            saw.set(ModDataComponents.HAND_SAW_RECIPE_INDEX.get(), next);
+        }
 
         // ★ 删掉了"已选择：xxx（N/M）"的文字提示，只保留音效
         level.playSound(null, player.blockPosition(), SoundEvents.UI_BUTTON_CLICK.value(),
                 SoundSource.PLAYERS, 0.5f, 1.4f);
 
         return InteractionResult.SUCCESS;
+    }
+
+    // ================= 提示 =================
+
+    /**
+     * 显示当前选中的切削配方序号。
+     *
+     * <p>序号存在物品组件 {@code hand_saw_recipe_index} 里（从 0 开始），但玩家看到的编号从 1 开始。
+     * 组件存在与否会参与 {@code isSameItemSameComponents} 比对，所以"序号不同的手锯无法堆叠"——
+     * 有了这行编号，玩家就能看出差异来源（不再额外加文字说明）。</p>
+     */
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+        int index = stack.getOrDefault(ModDataComponents.HAND_SAW_RECIPE_INDEX.get(), 0);
+        tooltip.add(Component.translatable("item.create_hand_made.hand_saw.tooltip.recipe_index", index + 1)
+                .withStyle(ChatFormatting.GRAY));
     }
     // ================= 斧头兜底 =================
 

@@ -16,6 +16,7 @@
   "item.create_hand_made.hand_saw": "Hand Saw",
   "item.create_hand_made.hand_saw.no_recipe": "No cutting recipe for this item",
   "item.create_hand_made.hand_saw.recipe_selected": "Selected: %s (%s/%s)",
+  "item.create_hand_made.hand_saw.tooltip.recipe_index": "Selected cutting recipe: #%s",
 
   "item.create_hand_made.press_hammer.tooltip.summary": "A tool for hand-_pressing_ items.",
   "item.create_hand_made.press_hammer.tooltip.condition1": "Hold right-click on a Basin",

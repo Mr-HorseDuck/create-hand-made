@@ -16,6 +16,7 @@
   "item.create_hand_made.hand_saw": "手锯",
   "item.create_hand_made.hand_saw.no_recipe": "此物品没有切削配方",
   "item.create_hand_made.hand_saw.recipe_selected": "已选择：%s（%s/%s）",
+  "item.create_hand_made.hand_saw.tooltip.recipe_index": "当前切削配方序号：#%s",
 
   "item.create_hand_made.press_hammer.tooltip.summary": "用于手工_冲压_物品的工具。",
   "item.create_hand_made.press_hammer.tooltip.condition1": "长按右键点击工作盆时",
