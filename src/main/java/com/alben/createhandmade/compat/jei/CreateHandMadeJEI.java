@@ -332,91 +332,63 @@ public class CreateHandMadeJEI implements IModPlugin {
     }
 
     /**
-    * 0.6.1：把风箱注册为第三方鼓风类别（DnD / 龙+ / CMC / 创意传动）的 JEI 催化剂。
-    *
-    * <p>四层匹配：
-    * <ol>
-    *   <li>精确候选 UID</li>
-    *   <li>{@code fan_<name>} 前缀</li>
-    *   <li>{@code *_fan_<name>} 包含</li>
-    *   <li>已知鼓风名称后缀</li>
-    * </ol>
-    * 已注册的不重复注册。</p>
-    */
-    private void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
+ * 把 {@code ModItems.BELLOWS} 注册成第三方模组鼓风类别的催化剂。
+ *
+ * <p>遍历 Create 的 {@code FAN_PROCESSING_TYPE} 注册表，把每个类型 id
+ * ({@code <ns>:<name>}) 拼成候选 UID {@code <ns>:fan_<name>}，
+ * 找不到再退回 {@code <ns>:<name>}，用 {@link IJeiHelpers#getRecipeType} 反查。</p>
+ *
+ * <p>Create 自带的 4 类跳过：它们由本模组自己的 4 个风箱类别负责。</p>
+ *
+ * <p>除了风箱本身，还会把该类型的介质物品（{@link BellowsMediaRegistry#getMediaFor}）
+ * 一并注册成催化剂，玩家打开第三方类别时左侧能直接看到"该拿什么介质"。</p>
+ */
+private void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
     ItemStack bellows = new ItemStack(ModItems.BELLOWS.get());
     Set<ResourceLocation> registered = new HashSet<>();
 
-    // 第 1 层：精确候选（1.20.1 实际 UID）
-    List<ResourceLocation> exactCandidates = List.of(
-            // DnD：注册在 create 命名空间下
-            new ResourceLocation("create", "fan_seething"),
-            new ResourceLocation("create", "fan_sanding"),
-            new ResourceLocation("create", "fan_freezing"),
-            new ResourceLocation("create", "fan_dragon_breathing"),
-            // 龙+
-            new ResourceLocation("create_dragons_plus", "sanding"),
-            new ResourceLocation("create_dragons_plus", "freezing"),
-            new ResourceLocation("create_dragons_plus", "ending"),
-            new ResourceLocation("create_dragons_plus", "coloring")
-    );
+    for (ResourceLocation fanTypeId : com.simibubi.create.api.registry.CreateBuiltInRegistries
+            .FAN_PROCESSING_TYPE.keySet()) {
+        String ns = fanTypeId.getNamespace();
+        String name = fanTypeId.getPath();
 
-    for (mezz.jei.api.recipe.RecipeType<?> type : registration.getJeiHelpers().getAllRecipeTypes().toList()) {
-        ResourceLocation uid = type.getUid();
-        if (exactCandidates.contains(uid)) {
-            registration.addRecipeCatalyst(bellows, type);
-            registered.add(uid);
+        // 跳过 Create 自带 4 类（由本模组自己的风箱类别负责）
+        if (ns.equals("create") && List.of("blasting", "smoking", "haunting", "splashing").contains(name)) {
+            continue;
         }
-    }
 
-    // 第 2-4 层：遍历所有类别按规律匹配
-    for (mezz.jei.api.recipe.RecipeType<?> type : registration.getJeiHelpers().getAllRecipeTypes().toList()) {
-        ResourceLocation uid = type.getUid();
-        if (registered.contains(uid)) continue;
-        if (isThirdPartyFanCategory(uid)) {
-            registration.addRecipeCatalyst(bellows, type);
-            registered.add(uid);
+        // 候选 UID：<ns>:fan_<name>，退回 <ns>:<name>
+        ResourceLocation fanUid = new ResourceLocation(ns, "fan_" + name);
+        ResourceLocation plainUid = new ResourceLocation(ns, name);
+
+        mezz.jei.api.recipe.RecipeType<?> found = null;
+        var fanOpt = registration.getJeiHelpers().getRecipeType(fanUid);
+        if (fanOpt.isPresent()) {
+            found = fanOpt.get();
+        } else {
+            var plainOpt = registration.getJeiHelpers().getRecipeType(plainUid);
+            if (plainOpt.isPresent()) found = plainOpt.get();
+        }
+
+        if (found == null) continue;
+        if (!registered.add(found.getUid())) continue;
+
+        registration.addRecipeCatalyst(bellows, found);
+
+        // 介质物品也注册成催化剂
+        for (ItemStack media : BellowsMediaRegistry.getMediaFor(fanTypeId)) {
+            if (!media.isEmpty()) {
+                registration.addRecipeCatalyst(media, found);
+            }
         }
     }
 
     if (CreateHandMade.LOGGER.isDebugEnabled()) {
-        CreateHandMade.LOGGER.debug("[HandMade] Registered bellows catalyst into {} third-party fan categories: {}",
+        CreateHandMade.LOGGER.debug(
+                "[HandMade] Registered bellows catalyst into {} third-party fan categories: {}",
                 registered.size(), registered);
     }
-    }
-
-    /**
-    * 四层匹配的 2-4 层：判断一个 JEI 类别 UID 是否是第三方鼓风类别。
-     */
-    private boolean isThirdPartyFanCategory(ResourceLocation uid) {
-    String ns = uid.getNamespace();
-    String path = uid.getPath();
-
-    // 排除本模组自己的类别
-    if (ns.equals(CreateHandMade.MODID)) return false;
-
-    // 排除 Create 原版 4 个鼓风类别
-    if (ns.equals("create") && List.of(
-            "fan_blasting", "fan_smoking", "fan_haunting", "fan_splashing").contains(path)) {
-        return false;
-    }
-
-    // 第 2 层：fan_<name>
-    if (path.startsWith("fan_")) return true;
-
-    // 第 3 层：*_fan_<name>
-    if (path.contains("_fan_")) return true;
-
-    // 第 4 层：已知鼓风名称后缀
-    for (String name : List.of(
-            "sanding", "freezing", "ending", "coloring",
-            "seething", "dragon_breathing",
-            "salout", "preservation", "withering")) {
-        if (path.equals(name) || path.endsWith("_" + name)) return true;
-    }
-
-    return false;
-    }
+}
 
     // ==================== 配方收集 ====================
 
