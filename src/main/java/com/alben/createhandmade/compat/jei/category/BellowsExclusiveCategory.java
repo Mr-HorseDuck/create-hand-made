@@ -147,5 +147,22 @@ public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeBello
         String ellipsis = "…";
         int budget = Math.max(0, maxWidth - font.width(ellipsis));
         return font.plainSubstrByWidth(text, budget) + ellipsis;
+
+        /** 收集所有 fan_type 属于第三方模组的 bellows_recipe。 */
+public static List<HandMadeBellowsRecipe> collectThirdPartyRecipes() {
+    List<HandMadeBellowsRecipe> result = new ArrayList<>();
+    var level = Minecraft.getInstance().level;
+    if (level == null) return result;
+
+    for (Recipe<?> r : level.getRecipeManager()
+            .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
+        if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
+        ResourceLocation fanType = recipe.getFanType();
+        if (fanType == null) continue;
+        if ("create".equals(fanType.getNamespace())) continue;
+        result.add(recipe);
+    }
+    return result;
+}
     }
 }
