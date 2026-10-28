@@ -19,7 +19,7 @@ import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
-import com.alben.createhandmade.compat.jei.category.BellowsThirdPartyCategory;
+import com.alben.createhandmade.compat.jei.category.BellowsExclusiveCategory;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
@@ -299,96 +299,19 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
                 () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SPLASHING)));
 
-            // ==================== 风箱 · 第三方兼容 ====================
-        CreateRecipeCategory.Info<ProcessingRecipe<RecipeWrapper>> bellowsThirdPartyInfo =
-                new CreateRecipeCategory.Info<ProcessingRecipe<RecipeWrapper>>(
-                        ModJeiTypes.BELLOWS_THIRD_PARTY,
-                        Component.translatable("jei.create_hand_made.bellows_third_party"),
-                        new EmptyBackground(177, 70),
-                        new DoubleItemIcon(
-                                () -> new ItemStack(ModItems.BELLOWS.get()),
-                                () -> ItemStack.EMPTY),
-                        BellowsThirdPartyCategory::collectThirdPartyRecipes,
-                        List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
-                );
-        allCategories.add(new BellowsThirdPartyCategory(bellowsThirdPartyInfo));
-
-        registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
-    }
-
-    @Override
-    public void registerRecipes(IRecipeRegistration registration) {
-        this.ingredientManager = registration.getIngredientManager();
-        allCategories.forEach(c -> c.registerRecipes(registration));
-    }
-
-    @Override
-    public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
-        // 本模组自己的类别
-        allCategories.forEach(c -> c.registerCatalysts(registration));
-
-        // ★ 0.6.1：把风箱注册进第三方模组的鼓风类别
-        registerThirdPartyFanCatalysts(registration);
-    }
-
-    /**
- * 把 {@code ModItems.BELLOWS} 注册成第三方模组鼓风类别的催化剂。
- *
- * <p>遍历 Create 的 {@code FAN_PROCESSING_TYPE} 注册表，把每个类型 id
- * ({@code <ns>:<name>}) 拼成候选 UID {@code <ns>:fan_<name>}，
- * 找不到再退回 {@code <ns>:<name>}，用 {@link IJeiHelpers#getRecipeType} 反查。</p>
- *
- * <p>Create 自带的 4 类跳过：它们由本模组自己的 4 个风箱类别负责。</p>
- *
- * <p>除了风箱本身，还会把该类型的介质物品（{@link BellowsMediaRegistry#getMediaFor}）
- * 一并注册成催化剂，玩家打开第三方类别时左侧能直接看到"该拿什么介质"。</p>
- */
-private void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
-    ItemStack bellows = new ItemStack(ModItems.BELLOWS.get());
-    Set<ResourceLocation> registered = new HashSet<>();
-
-    for (ResourceLocation fanTypeId : com.simibubi.create.api.registry.CreateBuiltInRegistries
-            .FAN_PROCESSING_TYPE.keySet()) {
-        String ns = fanTypeId.getNamespace();
-        String name = fanTypeId.getPath();
-
-        // 跳过 Create 自带 4 类（由本模组自己的风箱类别负责）
-        if (ns.equals("create") && List.of("blasting", "smoking", "haunting", "splashing").contains(name)) {
-            continue;
-        }
-
-        // 候选 UID：<ns>:fan_<name>，退回 <ns>:<name>
-        ResourceLocation fanUid = new ResourceLocation(ns, "fan_" + name);
-        ResourceLocation plainUid = new ResourceLocation(ns, name);
-
-        mezz.jei.api.recipe.RecipeType<?> found = null;
-        var fanOpt = registration.getJeiHelpers().getRecipeType(fanUid);
-        if (fanOpt.isPresent()) {
-            found = fanOpt.get();
-        } else {
-            var plainOpt = registration.getJeiHelpers().getRecipeType(plainUid);
-            if (plainOpt.isPresent()) found = plainOpt.get();
-        }
-
-        if (found == null) continue;
-        if (!registered.add(found.getUid())) continue;
-
-        registration.addRecipeCatalyst(bellows, found);
-
-        // 介质物品也注册成催化剂
-        for (ItemStack media : BellowsMediaRegistry.getMediaFor(fanTypeId)) {
-            if (!media.isEmpty()) {
-                registration.addRecipeCatalyst(media, found);
-            }
-        }
-    }
-
-    if (CreateHandMade.LOGGER.isDebugEnabled()) {
-        CreateHandMade.LOGGER.debug(
-                "[HandMade] Registered bellows catalyst into {} third-party fan categories: {}",
-                registered.size(), registered);
-    }
-}
+    // ==================== 风箱 · 第三方兼容 ====================
+CreateRecipeCategory.Info<HandMadeBellowsRecipe> bellowsExclusiveInfo =
+        new CreateRecipeCategory.Info<HandMadeBellowsRecipe>(
+                ModJeiTypes.BELLOWS_EXCLUSIVE,
+                Component.translatable("jei.create_hand_made.bellows_exclusive"),
+                new EmptyBackground(177, 85),
+                new DoubleItemIcon(
+                        () -> new ItemStack(ModItems.BELLOWS.get()),
+                        () -> ItemStack.EMPTY),
+                BellowsExclusiveCategory::collectThirdPartyRecipes,
+                List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
+        );
+allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));
 
     // ==================== 配方收集 ====================
 
