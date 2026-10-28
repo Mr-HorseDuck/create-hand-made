@@ -13,6 +13,7 @@ import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import net.minecraftforge.items.wrapper.RecipeWrapper;
 import mezz.jei.api.recipe.RecipeType;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
 
 /**
  * ★ Forge 1.20.1 版本。
@@ -101,9 +102,21 @@ public class ModJeiTypes {
     /** 风箱 · 洗涤 */
     public static final RecipeType<SplashingRecipe> BELLOWS_SPLASHING =
             RecipeType.create("create_hand_made", "bellows_splashing", SplashingRecipe.class);
-    /** 风箱 · 第三方兼容（fan_type 属于第三方模组的 bellows_recipe） */
-        @SuppressWarnings("unchecked")
-        public static final RecipeType<ProcessingRecipe<RecipeWrapper>> BELLOWS_THIRD_PARTY =
-                RecipeType.create("create_hand_made", "bellows_third_party",
                         (Class<ProcessingRecipe<RecipeWrapper>>) (Class<?>) ProcessingRecipe.class);
+    /**
+ * 风箱 · 第三方兼容：{@code create_hand_made:bellows_recipe} 里
+ * {@code fan_type} 属于<b>第三方模组</b>（命名空间不是 {@code create}）的配方。
+ *
+ * <p>与上面 4 个 {@code BELLOWS_*} 的区别：那 4 个绑定的是 Create 的配方类
+ * （{@code AbstractCookingRecipe} / {@code HauntingRecipe} / {@code SplashingRecipe}），
+ * 因为它们要复用 Create 的类别布局、并把本模组的 L3 配方包成显示代理；
+ * 本类别直接以 {@code HandMadeBellowsRecipe} 为泛型 —— 它本身是
+ * {@code ProcessingRecipe} 子类，能自己提供原料与产物，无需代理。</p>
+ *
+ * <p>原版 4 种类型<b>不收</b>：它们在各自的类别里已经显示过，重复收会变成两页同样的配方。</p>
+ */
+public static final RecipeType<HandMadeBellowsRecipe> BELLOWS_EXCLUSIVE =
+        RecipeType.create(
+                "create_hand_made", "bellows_exclusive",
+                HandMadeBellowsRecipe.class);
 }
