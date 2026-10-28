@@ -20,6 +20,7 @@ import com.simibubi.create.foundation.damageTypes.CreateDamageSources;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import com.simibubi.create.foundation.recipe.RecipeApplier;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -35,10 +36,10 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -161,9 +162,11 @@ public class BellowsItem extends Item {
         if (usedTicks < Config.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
+        // ★ 1. 拿副手介质的候选类型
         ItemStack media = player.getOffhandItem();
-        FanProcessingType type = media.isEmpty() ? null : BellowsMediaRegistry.resolve(media);
-        String typeId = getTypeId(type);
+        BellowsMediaRegistry.EffectiveTypes effective = media.isEmpty()
+                ? new BellowsMediaRegistry.EffectiveTypes(List.of(), null)
+                : BellowsMediaRegistry.resolveEffective(media);
 
         double reach = player.getAttributeValue(ForgeMod.BLOCK_REACH.get());
         Vec3 eye = player.getEyePosition(1);
@@ -182,6 +185,10 @@ public class BellowsItem extends Item {
         List<ItemStack> particleItems = (pos != null)
                 ? findTargetItems(level, pos)
                 : List.of();
+
+        // ★ 2. 从候选类型里选一个能加工目标的；没有方块目标时选优先级最高的（用于实体效果）
+        FanProcessingType type = selectTypeForTargets(level, effective, particleItems);
+        String typeId = getTypeId(type);
 
         boolean processed = false;
         if (pos != null && !particleItems.isEmpty() && type != null) {
@@ -219,6 +226,58 @@ public class BellowsItem extends Item {
                 processed ? pos : null,
                 processed ? particleItems : List.of(),
                 origin, rayTarget, typeId, processed);
+    }
+
+    // ================= 从候选里选类型 =================
+
+    /**
+     * 从副手介质的候选类型里选一个用于本次加工。
+     *
+     * <ul>
+     *   <li>候选为空 → null</li>
+     *   <li>配置指定了 preferred，且 preferred 能加工任意一个目标 → preferred</li>
+     *   <li>否则按生效优先级从高到低，选第一个能加工任意一个目标的</li>
+     *   <li>没有方块目标（只对实体吹）时，返回优先级最高的类型</li>
+     * </ul>
+     */
+    @Nullable
+    private static FanProcessingType selectTypeForTargets(Level level,
+                                                          BellowsMediaRegistry.EffectiveTypes effective,
+                                                          List<ItemStack> targets) {
+        if (effective.ids().isEmpty()) return null;
+
+        // preferred 优先
+        if (effective.preferred() != null) {
+            FanProcessingType preferred = BellowsMediaRegistry.getType(effective.preferred());
+            if (preferred != null && matchesAnyTarget(level, preferred, targets)) {
+                return preferred;
+            }
+        }
+
+        // 按生效优先级从高到低
+        List<ResourceLocation> sorted = new ArrayList<>(effective.ids());
+        sorted.sort((a, b) -> Integer.compare(
+                BellowsMediaRegistry.getEffectivePriority(b),
+                BellowsMediaRegistry.getEffectivePriority(a)));
+
+        for (ResourceLocation id : sorted) {
+            FanProcessingType candidate = BellowsMediaRegistry.getType(id);
+            if (candidate == null) continue;
+            if (matchesAnyTarget(level, candidate, targets)) {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /** targets 为空视为"匹配"（只对实体吹的场景）；否则任一物品能被 type 加工即匹配。 */
+    private static boolean matchesAnyTarget(Level level, FanProcessingType type, List<ItemStack> targets) {
+        if (targets.isEmpty()) return true;
+        for (ItemStack t : targets) {
+            if (canProcess(level, t, type)) return true;
+        }
+        return false;
     }
 
     // ================= 射线实体检测 =================
@@ -274,41 +333,156 @@ public class BellowsItem extends Item {
 
     // ================= 效果施加 =================
 
-    private static void applyFanEffect(Entity entity, Level level, FanProcessingType type) {
-        if (level.isClientSide) return;
+    /**
+     * 实体效果。当前只处理 Create 4 种内置类型。
+     * 第三方类型的实体转化（DnD / 龙+ 等）暂不处理。
+     */
+    // 在 BellowsItem 类中，找到 applyFanEffect 方法，替换为以下版本：
 
-        if (type == AllFanProcessingTypes.BLASTING) {
-            if (!entity.fireImmune()) {
-                entity.setSecondsOnFire(BLASTING_FIRE_TICKS / 20);
-                entity.hurt(CreateDamageSources.fanLava(level), 4);
+private static void applyFanEffect(Entity entity, Level level, FanProcessingType type) {
+    if (level.isClientSide) return;
+
+    ResourceLocation typeId = BellowsMediaRegistry.getTypeId(type);
+    if (typeId == null) return;
+
+    String ns = typeId.getNamespace();
+    String path = typeId.getPath();
+
+    // ========== Create 原版 4 种 ==========
+    if (type == AllFanProcessingTypes.BLASTING) {
+        if (!entity.fireImmune()) {
+            entity.setSecondsOnFire(BLASTING_FIRE_TICKS / 20);
+            entity.hurt(CreateDamageSources.fanLava(level), 4);
+        }
+        return;
+    }
+    if (type == AllFanProcessingTypes.HAUNTING) {
+        if (entity instanceof LivingEntity living) {
+            living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, HAUNTING_EFFECT_TICKS, 0, false, false));
+            living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, HAUNTING_EFFECT_TICKS, 1, false, false));
+        }
+        return;
+    }
+    if (type == AllFanProcessingTypes.SMOKING) {
+        if (!entity.fireImmune()) {
+            entity.setSecondsOnFire(SMOKING_FIRE_TICKS / 20);
+            entity.hurt(CreateDamageSources.fanFire(level), 2);
+        }
+        return;
+    }
+    if (type == AllFanProcessingTypes.SPLASHING) {
+        if (entity instanceof EnderMan
+                || entity.getType() == EntityType.SNOW_GOLEM
+                || entity.getType() == EntityType.BLAZE) {
+            entity.hurt(entity.damageSources().drown(), 2);
+        }
+        if (entity.isOnFire()) {
+            entity.clearFire();
+            level.playSound(null, entity.blockPosition(), SoundEvents.GENERIC_EXTINGUISH_FIRE,
+                    SoundSource.NEUTRAL, 0.7F,
+                    1.6F + (level.random.nextFloat() - level.random.nextFloat()) * 0.4F);
+        }
+        return;
+    }
+
+    // ========== CMC (Create: More Catalysts) ==========
+    if (ns.equals("create_more_catalysts")) {
+        switch (path) {
+            case "withering" -> {
+                if (entity instanceof LivingEntity living && entity.getType() != EntityType.WITHER) {
+                    living.addEffect(new MobEffectInstance(MobEffects.WITHER, 100, 0));
+                }
+                if (entity.getType() == EntityType.SKELETON) {
+                    transformEntity(entity, EntityType.WITHER_SKELETON, level);
+                }
             }
-        } else if (type == AllFanProcessingTypes.HAUNTING) {
-            if (entity instanceof LivingEntity living) {
-                living.addEffect(new MobEffectInstance(
-                        MobEffects.BLINDNESS, HAUNTING_EFFECT_TICKS, 0, false, false));
-                living.addEffect(new MobEffectInstance(
-                        MobEffects.MOVEMENT_SLOWDOWN, HAUNTING_EFFECT_TICKS, 1, false, false));
+            case "snow_flow" -> {
+                if (entity instanceof LivingEntity living) {
+                    living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 120, 0));
+                }
+                if (entity.getType() == EntityType.SKELETON) {
+                    transformEntity(entity, EntityType.STRAY, level);
+                }
+                if (entity.getType() == EntityType.VILLAGER) {
+                    transformEntity(entity, EntityType.SNOW_GOLEM, level);
+                }
             }
-        } else if (type == AllFanProcessingTypes.SMOKING) {
-            if (!entity.fireImmune()) {
-                entity.setSecondsOnFire(SMOKING_FIRE_TICKS / 20);
-                entity.hurt(CreateDamageSources.fanFire(level), 2);
+            case "purifying" -> {
+                if (entity instanceof LivingEntity living && entity.getType() != EntityType.WITHER) {
+                    living.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 120, 0));
+                }
+                if (entity.getType() == EntityType.ZOMBIE_VILLAGER) {
+                    transformEntity(entity, EntityType.VILLAGER, level);
+                }
             }
-        } else if (type == AllFanProcessingTypes.SPLASHING) {
-            if (entity instanceof EnderMan
-                    || entity.getType() == EntityType.SNOW_GOLEM
-                    || entity.getType() == EntityType.BLAZE) {
-                entity.hurt(entity.damageSources().drown(), 2);
+            case "sculking" -> {
+                if (entity instanceof LivingEntity living) {
+                    living.addEffect(new MobEffectInstance(MobEffects.DARKNESS, 120, 0));
+                    living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 120, 0));
+                }
+                if (entity.getType() == EntityType.IRON_GOLEM) {
+                    transformEntity(entity, EntityType.WARDEN, level);
+                }
             }
-            if (entity.isOnFire()) {
-                entity.clearFire();
-                level.playSound(null, entity.blockPosition(),
-                        SoundEvents.GENERIC_EXTINGUISH_FIRE,
-                        SoundSource.NEUTRAL, 0.7F,
-                        1.6F + (level.random.nextFloat() - level.random.nextFloat()) * 0.4F);
+            case "sand_blow" -> {
+                if (entity instanceof LivingEntity living) {
+                    living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 120, 0));
+                }
+                if (entity.getType() == EntityType.ZOMBIE) {
+                    transformEntity(entity, EntityType.HUSK, level);
+                }
+            }
+            case "exploding" -> {
+                if (entity.getType() == EntityType.CREEPER) {
+                    level.explode(null, entity.getX(), entity.getY(), entity.getZ(),
+                            3.0F, Level.ExplosionInteraction.NONE);
+                }
+            }
+            case "tidal" -> {
+                if (entity instanceof LivingEntity living) {
+                    living.addEffect(new MobEffectInstance(MobEffects.CONDUIT_POWER, 120, 0));
+                }
+            }
+            case "tear" -> {
+                if (entity instanceof LivingEntity living) {
+                    living.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 120, 0));
+                }
+                if (entity.getType() == EntityType.PHANTOM) {
+                    transformEntity(entity, EntityType.GHAST, level);
+                }
+            }
+            default -> {
+                // 其余 CMC 类型对实体无明确效果，留空
             }
         }
+        return;
     }
+
+    // 其他第三方类型（龙+ 的 coloring 等）暂时不处理实体效果
+}
+
+/**
+ * 把实体替换为目标类型，保留位置、朝向、血量。
+ */
+private static void transformEntity(Entity entity, EntityType<?> targetType, Level level) {
+    if (level.isClientSide) return;
+    if (entity.getType() == targetType) return;
+
+    Entity newEntity = targetType.create(level);
+    if (newEntity == null) return;
+
+    newEntity.moveTo(entity.getX(), entity.getY(), entity.getZ(),
+            entity.getYRot(), entity.getXRot());
+    if (entity instanceof LivingEntity living && newEntity instanceof LivingEntity newLiving) {
+        newLiving.setHealth(Math.min(living.getHealth(), newLiving.getMaxHealth()));
+    }
+
+    entity.discard();
+    level.addFreshEntity(newEntity);
+}
+
+    // 其他第三方类型（龙+ 的 coloring 等）暂时不处理实体效果
+}
 
     // ================= 风箱喷嘴世界坐标 =================
 
@@ -372,8 +546,8 @@ public class BellowsItem extends Item {
      */
     @Nullable
     private static List<ItemStack> findL3Results(Level level, ItemStack single, FanProcessingType type) {
-        FanType fanType = toFanType(type);
-        if (fanType == null) return null;
+        ResourceLocation typeId = BellowsMediaRegistry.getTypeId(type);
+        if (typeId == null) return null;
 
         ItemStackHandler handler = new ItemStackHandler(1);
         handler.setStackInSlot(0, single);
@@ -382,12 +556,12 @@ public class BellowsItem extends Item {
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
             if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
-            if (recipe.getFanType() != fanType) continue;
+            if (!typeId.equals(recipe.getFanType())) continue;
             if (!recipe.matches(wrapper, level)) continue;
             return RecipeApplier.applyRecipeOn(level, single, recipe, true);
         }
         return null;
-    }
+        }
 
     /**
      * 判断某个物品能否被指定鼓风类型加工。女仆行为用它区分"原料"和"产物"。
@@ -485,12 +659,10 @@ public class BellowsItem extends Item {
         }
     }
 
+    /** 反查类型 id。第三方类型也走 BellowsMediaRegistry，不再硬编码 4 种。 */
     private static String getTypeId(@Nullable FanProcessingType type) {
         if (type == null) return "";
-        if (type == AllFanProcessingTypes.BLASTING) return "create:blasting";
-        if (type == AllFanProcessingTypes.HAUNTING) return "create:haunting";
-        if (type == AllFanProcessingTypes.SMOKING) return "create:smoking";
-        if (type == AllFanProcessingTypes.SPLASHING) return "create:splashing";
-        return "";
+        ResourceLocation id = BellowsMediaRegistry.getTypeId(type);
+        return id == null ? "" : id.toString();
     }
 }
