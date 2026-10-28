@@ -9,6 +9,8 @@ import com.simibubi.create.content.kinetics.fan.processing.SplashingRecipe;
 import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
+import net.minecraftforge.items.wrapper.RecipeWrapper;
 import mezz.jei.api.recipe.RecipeType;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
 
@@ -99,4 +101,9 @@ public class ModJeiTypes {
     /** 风箱 · 洗涤 */
     public static final RecipeType<SplashingRecipe> BELLOWS_SPLASHING =
             RecipeType.create("create_hand_made", "bellows_splashing", SplashingRecipe.class);
+    /** 风箱 · 第三方兼容（fan_type 属于第三方模组的 bellows_recipe） */
+        @SuppressWarnings("unchecked")
+        public static final RecipeType<ProcessingRecipe<RecipeWrapper>> BELLOWS_THIRD_PARTY =
+                RecipeType.create("create_hand_made", "bellows_third_party",
+                        (Class<ProcessingRecipe<RecipeWrapper>>) (Class<?>) ProcessingRecipe.class);
 }

@@ -19,6 +19,8 @@ import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.compat.jei.category.BellowsThirdPartyCategory;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.AllRecipeTypes;
@@ -60,6 +62,8 @@ import net.minecraftforge.items.wrapper.RecipeWrapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @JeiPlugin
 public class CreateHandMadeJEI implements IModPlugin {
@@ -295,6 +299,20 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
                 () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SPLASHING)));
 
+            // ==================== 风箱 · 第三方兼容 ====================
+        CreateRecipeCategory.Info<ProcessingRecipe<RecipeWrapper>> bellowsThirdPartyInfo =
+                new CreateRecipeCategory.Info<ProcessingRecipe<RecipeWrapper>>(
+                        ModJeiTypes.BELLOWS_THIRD_PARTY,
+                        Component.translatable("jei.create_hand_made.bellows_third_party"),
+                        new EmptyBackground(177, 70),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.BELLOWS.get()),
+                                () -> ItemStack.EMPTY),
+                        BellowsThirdPartyCategory::collectThirdPartyRecipes,
+                        List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
+                );
+        allCategories.add(new BellowsThirdPartyCategory(bellowsThirdPartyInfo));
+
         registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
     }
 
@@ -306,7 +324,98 @@ public class CreateHandMadeJEI implements IModPlugin {
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
+        // 本模组自己的类别
         allCategories.forEach(c -> c.registerCatalysts(registration));
+
+        // ★ 0.6.1：把风箱注册进第三方模组的鼓风类别
+        registerThirdPartyFanCatalysts(registration);
+    }
+
+    /**
+    * 0.6.1：把风箱注册为第三方鼓风类别（DnD / 龙+ / CMC / 创意传动）的 JEI 催化剂。
+    *
+    * <p>四层匹配：
+    * <ol>
+    *   <li>精确候选 UID</li>
+    *   <li>{@code fan_<name>} 前缀</li>
+    *   <li>{@code *_fan_<name>} 包含</li>
+    *   <li>已知鼓风名称后缀</li>
+    * </ol>
+    * 已注册的不重复注册。</p>
+    */
+    private void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
+    ItemStack bellows = new ItemStack(ModItems.BELLOWS.get());
+    Set<ResourceLocation> registered = new HashSet<>();
+
+    // 第 1 层：精确候选（1.20.1 实际 UID）
+    List<ResourceLocation> exactCandidates = List.of(
+            // DnD：注册在 create 命名空间下
+            new ResourceLocation("create", "fan_seething"),
+            new ResourceLocation("create", "fan_sanding"),
+            new ResourceLocation("create", "fan_freezing"),
+            new ResourceLocation("create", "fan_dragon_breathing"),
+            // 龙+
+            new ResourceLocation("create_dragons_plus", "sanding"),
+            new ResourceLocation("create_dragons_plus", "freezing"),
+            new ResourceLocation("create_dragons_plus", "ending"),
+            new ResourceLocation("create_dragons_plus", "coloring")
+    );
+
+    for (mezz.jei.api.recipe.RecipeType<?> type : registration.getJeiHelpers().getAllRecipeTypes().toList()) {
+        ResourceLocation uid = type.getUid();
+        if (exactCandidates.contains(uid)) {
+            registration.addRecipeCatalyst(bellows, type);
+            registered.add(uid);
+        }
+    }
+
+    // 第 2-4 层：遍历所有类别按规律匹配
+    for (mezz.jei.api.recipe.RecipeType<?> type : registration.getJeiHelpers().getAllRecipeTypes().toList()) {
+        ResourceLocation uid = type.getUid();
+        if (registered.contains(uid)) continue;
+        if (isThirdPartyFanCategory(uid)) {
+            registration.addRecipeCatalyst(bellows, type);
+            registered.add(uid);
+        }
+    }
+
+    if (CreateHandMade.LOGGER.isDebugEnabled()) {
+        CreateHandMade.LOGGER.debug("[HandMade] Registered bellows catalyst into {} third-party fan categories: {}",
+                registered.size(), registered);
+    }
+    }
+
+    /**
+    * 四层匹配的 2-4 层：判断一个 JEI 类别 UID 是否是第三方鼓风类别。
+     */
+    private boolean isThirdPartyFanCategory(ResourceLocation uid) {
+    String ns = uid.getNamespace();
+    String path = uid.getPath();
+
+    // 排除本模组自己的类别
+    if (ns.equals(CreateHandMade.MODID)) return false;
+
+    // 排除 Create 原版 4 个鼓风类别
+    if (ns.equals("create") && List.of(
+            "fan_blasting", "fan_smoking", "fan_haunting", "fan_splashing").contains(path)) {
+        return false;
+    }
+
+    // 第 2 层：fan_<name>
+    if (path.startsWith("fan_")) return true;
+
+    // 第 3 层：*_fan_<name>
+    if (path.contains("_fan_")) return true;
+
+    // 第 4 层：已知鼓风名称后缀
+    for (String name : List.of(
+            "sanding", "freezing", "ending", "coloring",
+            "seething", "dragon_breathing",
+            "salout", "preservation", "withering")) {
+        if (path.equals(name) || path.endsWith("_" + name)) return true;
+    }
+
+    return false;
     }
 
     // ==================== 配方收集 ====================
