@@ -737,12 +737,12 @@ public class BellowsMediaRegistry {
     }
 
     @Nullable
-    private static FanProcessingType getType(ResourceLocation id) {
+    public static FanProcessingType getType(ResourceLocation id) {
         return CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(id);
     }
 
     @Nullable
-    private static ResourceLocation getTypeId(FanProcessingType type) {
+    public static ResourceLocation getTypeId(FanProcessingType type) {
         if (type == null) return null;
         for (ResourceLocation id : CreateBuiltInRegistries.FAN_PROCESSING_TYPE.keySet()) {
             if (CreateBuiltInRegistries.FAN_PROCESSING_TYPE.get(id) == type) return id;
@@ -759,5 +759,16 @@ public class BellowsMediaRegistry {
         out.addAll(DATA_FLUID_MEDIA.getOrDefault(typeId, List.of()));
         out.addAll(AUTO_FLUID_MEDIA.getOrDefault(typeId, List.of()));
         return List.copyOf(out);
+    }
+
+    
+    /**
+    * 取某个类型的"生效优先级"：数据包 priority 覆盖 > 配置 type override > 类型自身的 getPriority()。
+    * 类型未注册时返回 {@link Integer#MIN_VALUE}。
+    */
+    public static int getEffectivePriority(ResourceLocation typeId) {
+        FanProcessingType type = getType(typeId);
+        if (type == null) return Integer.MIN_VALUE;
+        return getPriority(type, typeId);
     }
 }
