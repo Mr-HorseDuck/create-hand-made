@@ -481,9 +481,6 @@ private static void transformEntity(Entity entity, EntityType<?> targetType, Lev
     level.addFreshEntity(newEntity);
 }
 
-    // 其他第三方类型（龙+ 的 coloring 等）暂时不处理实体效果
-}
-
     // ================= 风箱喷嘴世界坐标 =================
 
     private static Vec3 getItemMuzzlePos(Player player, boolean rightArm, Vec3 offset) {
