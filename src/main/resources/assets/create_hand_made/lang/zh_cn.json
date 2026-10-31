@@ -89,6 +89,8 @@
   "jei.create_hand_made.bellows_smoking": "风箱烟熏",
   "jei.create_hand_made.bellows_haunting": "风箱缠魂",
   "jei.create_hand_made.bellows_splashing": "风箱洗涤",
+  "jei.create_hand_made.bellows_exclusive": "风箱 · 第三方兼容",
+  "jei.create_hand_made.bellows_exclusive.type": "类型: %s",
 
   "enchantment.create_hand_made.batch_crafting": "批量加工",
   "enchantment.create_hand_made.batch_crafting.desc": "一次加工多份原料。等级越高，一次加工的份数越多（2 / 4 / 8）。",

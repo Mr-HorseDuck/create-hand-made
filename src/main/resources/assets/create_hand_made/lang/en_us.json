@@ -89,6 +89,8 @@
   "jei.create_hand_made.bellows_smoking": "Bellows Smoking",
   "jei.create_hand_made.bellows_haunting": "Bellows Haunting",
   "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
+  "jei.create_hand_made.bellows_exclusive": "Bellows · Third-Party",
+  "jei.create_hand_made.bellows_exclusive.type": "Type: %s",
 
   "enchantment.create_hand_made.batch_crafting": "Batch Crafting",
   "enchantment.create_hand_made.batch_crafting.desc": "Process multiple items at once. Higher levels process more items per action (2 / 4 / 8).",
