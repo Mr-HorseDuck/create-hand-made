@@ -102,7 +102,6 @@ public class ModJeiTypes {
     /** 风箱 · 洗涤 */
     public static final RecipeType<SplashingRecipe> BELLOWS_SPLASHING =
             RecipeType.create("create_hand_made", "bellows_splashing", SplashingRecipe.class);
-                        (Class<ProcessingRecipe<RecipeWrapper>>) (Class<?>) ProcessingRecipe.class);
     /**
  * 风箱 · 第三方兼容：{@code create_hand_made:bellows_recipe} 里
  * {@code fan_type} 属于<b>第三方模组</b>（命名空间不是 {@code create}）的配方。

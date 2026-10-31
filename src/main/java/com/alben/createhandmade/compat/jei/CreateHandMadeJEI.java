@@ -20,6 +20,7 @@ import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.compat.jei.category.BellowsExclusiveCategory;
+import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
@@ -82,7 +83,6 @@ public class CreateHandMadeJEI implements IModPlugin {
     @Override
     public void registerCategories(IRecipeCategoryRegistration registration) {
         allCategories.clear();
-
         // ==================== 手锯切削 ====================
         CreateRecipeCategory.Info<CuttingRecipe> handSawInfo = new CreateRecipeCategory.Info<>(
                 ModJeiTypes.HAND_SAW_CUTTING,
@@ -296,24 +296,95 @@ public class CreateHandMadeJEI implements IModPlugin {
                 CreateHandMadeJEI::collectBellowsSplashingRecipes,
                 List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
         );
-        allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
+                allCategories.add(new BellowsSplashingCategory(bellowsSplashingInfo,
                 () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SPLASHING)));
 
-    // ==================== 风箱 · 第三方兼容 ====================
-CreateRecipeCategory.Info<HandMadeBellowsRecipe> bellowsExclusiveInfo =
-        new CreateRecipeCategory.Info<HandMadeBellowsRecipe>(
-                ModJeiTypes.BELLOWS_EXCLUSIVE,
-                Component.translatable("jei.create_hand_made.bellows_exclusive"),
-                new EmptyBackground(177, 85),
-                new DoubleItemIcon(
-                        () -> new ItemStack(ModItems.BELLOWS.get()),
-                        () -> ItemStack.EMPTY),
-                BellowsExclusiveCategory::collectThirdPartyRecipes,
-                List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
-        );
-allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));
+            // ==================== 风箱 · 第三方兼容 ====================
+        CreateRecipeCategory.Info<HandMadeBellowsRecipe> bellowsExclusiveInfo =
+                new CreateRecipeCategory.Info<HandMadeBellowsRecipe>(
+                        ModJeiTypes.BELLOWS_EXCLUSIVE,
+                        Component.translatable("jei.create_hand_made.bellows_exclusive"),
+                        new EmptyBackground(177, 85),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(ModItems.BELLOWS.get()),
+                                () -> new ItemStack(Items.FIRE_CHARGE)),
+                        BellowsExclusiveCategory::collectThirdPartyRecipes,
+                        List.of(() -> new ItemStack(ModItems.BELLOWS.get()))
+                );
+        CreateHandMade.LOGGER.info("[HandMade-JEI] before exclusive add, size={}", allCategories.size());
+        allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));  
+        CreateHandMade.LOGGER.info("[HandMade-JEI] after exclusive add, size={}", allCategories.size());      
+        CreateHandMade.LOGGER.info("[HandMade-JEI] before register, size={}", allCategories.size());
+        registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
+        
+    }
+
+        @Override
+    public void registerRecipes(IRecipeRegistration registration) {
+        this.ingredientManager = registration.getIngredientManager();
+        allCategories.forEach(c -> c.registerRecipes(registration));
+    }
 
     // ==================== 配方收集 ====================
+        @Override
+    public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
+        allCategories.forEach(c -> c.registerCatalysts(registration));
+        registerThirdPartyFanCatalysts(registration);
+    }
+
+    
+    /**
+     * 把风箱注册成第三方模组鼓风类别的催化剂。
+     *
+     * <p>遍历 Create 的 FAN_PROCESSING_TYPE 注册表拼候选 UID
+     * （{@code <ns>:fan_<name>} 和 {@code <ns>:<name>}），
+     * 再用 {@code getAllRecipeTypes} 匹配 JEI 已注册的类别。</p>
+     *
+     * <p>不用 {@code getRecipeType(uid)}：JEI 15.20.0.106 对不存在的 UID 可能抛异常。</p>
+     */
+    private void registerThirdPartyFanCatalysts(IRecipeCatalystRegistration registration) {
+        ItemStack bellows = new ItemStack(ModItems.BELLOWS.get());
+        Set<ResourceLocation> registered = new HashSet<>();
+
+        // 候选 UID
+        Set<ResourceLocation> candidates = new HashSet<>();
+        for (ResourceLocation fanTypeId : com.simibubi.create.api.registry.CreateBuiltInRegistries
+                .FAN_PROCESSING_TYPE.keySet()) {
+            String ns = fanTypeId.getNamespace();
+            String name = fanTypeId.getPath();
+            if (ns.equals("create") && List.of("blasting", "smoking", "haunting", "splashing").contains(name)) {
+                continue;
+            }
+            candidates.add(new ResourceLocation(ns, "fan_" + name));
+            candidates.add(new ResourceLocation(ns, name));
+        }
+
+        // 遍历 JEI 已注册类别，用候选集合匹配
+        for (mezz.jei.api.recipe.RecipeType<?> type : registration.getJeiHelpers()
+                .getAllRecipeTypes().toList()) {
+            ResourceLocation uid = type.getUid();
+            if (!candidates.contains(uid)) continue;
+            if (!registered.add(uid)) continue;
+
+            registration.addRecipeCatalyst(bellows, type);
+
+            // 反推 fan_type id，注册介质
+            ResourceLocation fanTypeId = uid.getPath().startsWith("fan_")
+                    ? new ResourceLocation(uid.getNamespace(), uid.getPath().substring(4))
+                    : uid;
+            for (ItemStack media : BellowsMediaRegistry.getMediaFor(fanTypeId)) {
+                if (!media.isEmpty()) {
+                    registration.addRecipeCatalyst(media, type);
+                }
+            }
+        }
+
+        if (CreateHandMade.LOGGER.isDebugEnabled()) {
+            CreateHandMade.LOGGER.debug(
+                    "[HandMade] Registered bellows catalyst into {} third-party fan categories: {}",
+                    registered.size(), registered);
+        }
+    }
 
     /**
      * 手锯切削：L1（CuttingRecipe）+ L3（HandMadeCuttingRecipe extends CuttingRecipe）。
