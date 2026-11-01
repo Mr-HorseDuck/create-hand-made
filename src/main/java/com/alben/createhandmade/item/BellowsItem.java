@@ -25,6 +25,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -36,7 +37,12 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.animal.Cat;
+import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.crafting.Recipe;
@@ -202,12 +208,13 @@ public class BellowsItem extends Item {
                 : eye.add(look.scale(reach));
 
         List<Entity> hitEntities = findEntitiesInRay(level, player, origin, rayTarget);
-        for (Entity e : hitEntities) {
-            pushEntity(e, origin, rayTarget);
-            if (type != null) {
-                applyFanEffect(e, level, type);
-            }
+        List<FanProcessingType> entityTypes = selectTypesForEntities(effective);
+    for (Entity e : hitEntities) {
+        pushEntity(e, origin, rayTarget);
+        for (FanProcessingType t : entityTypes) {
+            applyFanEffect(e, level, t);
         }
+    }
 
         if (processed) {
             level.playSound(null, player.blockPosition(), SoundEvents.PHANTOM_FLAP,
@@ -242,8 +249,8 @@ public class BellowsItem extends Item {
      */
     @Nullable
     private static FanProcessingType selectTypeForTargets(Level level,
-                                                          BellowsMediaRegistry.EffectiveTypes effective,
-                                                          List<ItemStack> targets) {
+            BellowsMediaRegistry.EffectiveTypes effective,
+            List<ItemStack> targets) {
         if (effective.ids().isEmpty()) return null;
 
         // preferred 优先
@@ -271,6 +278,27 @@ public class BellowsItem extends Item {
         return null;
     }
 
+    /**
+    * 返回副手介质所有能对实体生效的类型，按生效优先级从高到低。
+    * 用于"共用触媒"场景：沙子同时是 splashing 和 sanding，对羊吹时两个效果都该生效。
+    */
+    private static List<FanProcessingType> selectTypesForEntities(
+        BellowsMediaRegistry.EffectiveTypes effective) {
+    if (effective.ids().isEmpty()) return List.of();
+
+    List<ResourceLocation> sorted = new ArrayList<>(effective.ids());
+    sorted.sort((a, b) -> Integer.compare(
+            BellowsMediaRegistry.getEffectivePriority(b),
+            BellowsMediaRegistry.getEffectivePriority(a)));
+
+    List<FanProcessingType> result = new ArrayList<>();
+    for (ResourceLocation id : sorted) {
+        FanProcessingType t = BellowsMediaRegistry.getType(id);
+        if (t != null) result.add(t);
+    }
+    return result;
+    }
+
     /** targets 为空视为"匹配"（只对实体吹的场景）；否则任一物品能被 type 加工即匹配。 */
     private static boolean matchesAnyTarget(Level level, FanProcessingType type, List<ItemStack> targets) {
         if (targets.isEmpty()) return true;
@@ -282,7 +310,7 @@ public class BellowsItem extends Item {
 
     // ================= 射线实体检测 =================
 
-    private static List<Entity> findEntitiesInRay(Level level, Player player, Vec3 origin, Vec3 target) {
+    public static List<Entity> findEntitiesInRay(Level level, Player player, Vec3 origin, Vec3 target) {
         double lenSqr = origin.distanceToSqr(target);
         if (lenSqr < 1e-6 || lenSqr > BELLOWS_RAY_MAX_DISTANCE_SQR) {
             return List.of();
@@ -331,6 +359,23 @@ public class BellowsItem extends Item {
         entity.hurtMarked = true;
     }
 
+    
+    /**
+    * 从龙+ 染色类型的 path 提取 DyeColor。
+    * 支持两种写法：{@code coloring_red} / {@code red}。
+    * 不是染色类型或颜色名不认识时返回 null。
+    */
+    @Nullable
+    private static DyeColor extractDyeColor(String path) {
+    String colorName = path.startsWith("coloring_")
+            ? path.substring("coloring_".length())
+            : path;
+
+    for (DyeColor color : DyeColor.values()) {
+        if (color.getName().equals(colorName)) return color;
+    }
+    return null;
+    }
     // ================= 效果施加 =================
 
     /**
@@ -339,11 +384,18 @@ public class BellowsItem extends Item {
      */
     // 在 BellowsItem 类中，找到 applyFanEffect 方法，替换为以下版本：
 
-private static void applyFanEffect(Entity entity, Level level, FanProcessingType type) {
+    private static void applyFanEffect(Entity entity, Level level, FanProcessingType type) {
     if (level.isClientSide) return;
 
     ResourceLocation typeId = BellowsMediaRegistry.getTypeId(type);
     if (typeId == null) return;
+
+    // ★ 同一 tick 内同一个 type 只施加一次
+    CompoundTag data = entity.getPersistentData();
+    String key = "HandMadeFanApplied_" + typeId;
+    long now = level.getGameTime();
+    if (data.getLong(key) == now) return;
+    data.putLong(key, now);
 
     String ns = typeId.getNamespace();
     String path = typeId.getPath();
@@ -458,7 +510,16 @@ private static void applyFanEffect(Entity entity, Level level, FanProcessingType
         return;
     }
 
-    // 其他第三方类型（龙+ 的 coloring 等）暂时不处理实体效果
+    // ========== 龙+ 染色 ==========
+    if (ns.equals("create_dragons_plus")) {
+    DyeColor color = extractDyeColor(path);
+    if (color != null) {
+        applyDyeColor(entity, color, level);
+    }
+    return;
+}
+
+// 其他第三方类型不处理实体效果
 }
 
 /**
@@ -479,6 +540,30 @@ private static void transformEntity(Entity entity, EntityType<?> targetType, Lev
 
     entity.discard();
     level.addFreshEntity(newEntity);
+}
+
+    /**
+ * 龙+ 染色对生物：羊改羊毛，猫/狼改项圈。
+ * 其他实体不变。
+ */
+private static void applyDyeColor(Entity entity, DyeColor color, Level level) {
+    if (entity instanceof Sheep sheep) {
+        if (sheep.getColor() != color) {
+            sheep.setColor(color);
+        }
+        return;
+    }
+    if (entity instanceof Cat cat) {
+        if (cat.getCollarColor() != color) {
+            cat.setCollarColor(color);
+        }
+        return;
+    }
+    if (entity instanceof Wolf wolf) {
+        if (wolf.getCollarColor() != color) {
+            wolf.setCollarColor(color);
+        }
+    }
 }
 
     // ================= 风箱喷嘴世界坐标 =================
@@ -571,6 +656,52 @@ private static void transformEntity(Entity entity, EntityType<?> targetType, Lev
         return type.canProcess(single, level);
     }
 
+    /**
+ * 容器物品 → 对应的空壳物品。水桶类→空桶，药水类→玻璃瓶。
+ * 用于过滤加工结果里的"多出来的空容器"。
+ */
+@Nullable
+private static Item emptyShellOf(Item item) {
+    if (item == Items.WATER_BUCKET
+            || item == Items.LAVA_BUCKET
+            || item == Items.MILK_BUCKET
+            || item == Items.POWDER_SNOW_BUCKET
+            || item == Items.PUFFERFISH_BUCKET
+            || item == Items.SALMON_BUCKET
+            || item == Items.COD_BUCKET
+            || item == Items.TROPICAL_FISH_BUCKET
+            || item == Items.AXOLOTL_BUCKET
+            || item == Items.TADPOLE_BUCKET) {
+        return Items.BUCKET;
+    }
+    if (item == Items.POTION
+            || item == Items.SPLASH_POTION
+            || item == Items.LINGERING_POTION
+            || item == Items.HONEY_BOTTLE) {
+        return Items.GLASS_BOTTLE;
+    }
+    return null;
+}
+
+/**
+ * 过滤掉结果中"输入对应的空容器"。
+ * 例如输入水桶，结果里如果有空桶，删掉；其他结果保留。
+ */
+private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemStack> results) {
+    if (results == null || results.isEmpty()) return results;
+
+    Item shell = emptyShellOf(input.getItem());
+    if (shell == null) return results;
+
+    List<ItemStack> filtered = new ArrayList<>(results.size());
+    for (ItemStack r : results) {
+        if (r.isEmpty()) continue;
+        if (r.getItem() == shell) continue;
+        filtered.add(r);
+    }
+    return filtered;
+}
+    
     // ================= 加工 =================
 
     public static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
@@ -588,18 +719,24 @@ private static void transformEntity(Entity entity, EntityType<?> targetType, Lev
             ItemStack single = stack.copyWithCount(1);
 
             // L3 优先
-            List<ItemStack> results = findL3Results(level, single, type);
+    List<ItemStack> results = findL3Results(level, single, type);
 
-            // L1 兜底
-            if (results == null) {
-                if (!type.canProcess(single, level)) return TransportedResult.doNothing();
-                results = type.process(single, level);
-                if (results == null) return TransportedResult.doNothing();
-            }
+    // L1 兜底
+    if (results == null) {
+    if (!type.canProcess(single, level)) return TransportedResult.doNothing();
+    results = type.process(single, level);
+    if (results == null) return TransportedResult.doNothing();
+    }
 
-            success[0] = true;
-            ItemStack left = stack.copy();
-            left.shrink(1);
+    // ★ 过滤容器空壳
+    results = filterContainerShells(single, results);
+
+    // 过滤后可能全空（比如只有空桶产出）→ 视为"没加工"，不消耗输入
+    if (results.isEmpty()) return TransportedResult.doNothing();
+
+    success[0] = true;
+    ItemStack left = stack.copy();
+    left.shrink(1);
 
             List<TransportedItemStack> outputs = new ArrayList<>();
             for (ItemStack r : results) {

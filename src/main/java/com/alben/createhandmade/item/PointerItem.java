@@ -126,7 +126,7 @@ public class PointerItem extends Item {
 
     // ================= 置物台加工 =================
 
-    private static void executeDepotProcess(Player player, Level level, BlockPos pos,
+    public static void executeDepotProcess(Player player, Level level, BlockPos pos,
                                             ItemStack tool, ItemStack held, Recipe<?> recipe,
                                             DepotBlockEntity depot) {
         TransportedItemStackHandlerBehaviour handler =

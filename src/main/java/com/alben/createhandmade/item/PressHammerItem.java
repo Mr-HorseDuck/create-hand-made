@@ -232,7 +232,7 @@ public class PressHammerItem extends Item {
     }
 
     @Nullable
-    private static EntityHitResult findEntityHit(Player player, Vec3 eye, Vec3 look, double reach) {
+    public static EntityHitResult findEntityHit(Player player, Vec3 eye, Vec3 look, double reach) {
         Vec3 end = eye.add(look.scale(reach));
         AABB box = player.getBoundingBox().expandTowards(end.subtract(eye)).inflate(1.0);
         return ProjectileUtil.getEntityHitResult(
@@ -315,7 +315,7 @@ public class PressHammerItem extends Item {
 
     // ================= 探测目标物品 =================
 
-    private static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
+    public static List<ItemStack> findTargetItems(Level level, BlockPos pos) {
         List<ItemStack> result = new ArrayList<>();
 
         if (level.getBlockEntity(pos) instanceof DepotBlockEntity depot) {
@@ -346,7 +346,7 @@ public class PressHammerItem extends Item {
 
     // ================= 广播粒子 =================
 
-    private static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
+    public static void broadcastParticles(Level level, BlockPos pos, List<ItemStack> stacks) {
         if (!(level instanceof ServerLevel serverLevel)) return;
         if (stacks.isEmpty()) return;
 

@@ -59,4 +59,21 @@ public record MortarContents(ItemStack stack) {
     public static void clearFromStack(ItemStack holder) {
         holder.removeTagKey(NBT_KEY);
     }
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof MortarContents other)) return false;
+        return ItemStack.isSameItemSameTags(this.stack(), other.stack())
+                && this.stack().getCount() == other.stack().getCount();
+    }
+
+    @Override
+    public int hashCode() {
+        ItemStack s = this.stack();
+        return java.util.Objects.hash(
+                net.minecraft.world.item.Item.getId(s.getItem()),
+                s.getCount(),
+                s.getTag()
+        );
+    }
 }

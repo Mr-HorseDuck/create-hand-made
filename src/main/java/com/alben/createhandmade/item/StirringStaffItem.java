@@ -222,7 +222,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         }
     }
 
-    private static void broadcastStirParticles(Level level, BlockPos pos, BasinBlockEntity basin) {
+    public static void broadcastStirParticles(Level level, BlockPos pos, BasinBlockEntity basin) {
         List<ItemStack> stacks = new ArrayList<>();
         for (int i = 0; i < basin.inputInventory.getSlots(); i++) {
             ItemStack s = basin.inputInventory.getItem(i);

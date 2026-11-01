@@ -318,7 +318,7 @@ public class InfusionGunItem extends Item {
         return state.isSource() && state.getType() != Fluids.EMPTY;
     }
 
-    private static FluidStack getFluidFromSource(Level level, BlockPos pos) {
+    public static FluidStack getFluidFromSource(Level level, BlockPos pos) {
         FluidState state = level.getFluidState(pos);
         if (!state.isSource() || state.getType() == Fluids.EMPTY) return FluidStack.EMPTY;
         return new FluidStack(state.getType(), FLUID_BLOCK_AMOUNT);

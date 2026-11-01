@@ -125,6 +125,24 @@ public class HandSawItem extends Item {
     public HandSawItem(Properties properties) {
         super(properties);
     }
+    
+    @Override
+    public void inventoryTick(ItemStack stack, Level level,
+                              net.minecraft.world.entity.Entity entity,
+                              int slot, boolean selected) {
+        if (level.isClientSide) return;
+        if (level.getGameTime() % 100 != 0) return;
+
+        net.minecraft.nbt.CompoundTag tag = stack.getTag();
+        if (tag == null) return;
+        if (!tag.contains(NBT_RECIPE_INDEX)) return;
+        if (tag.getInt(NBT_RECIPE_INDEX) != 0) return;
+
+        tag.remove(NBT_RECIPE_INDEX);
+        if (tag.isEmpty()) {
+            stack.setTag(null);
+        }
+    }
 
     @Override
     public int getEnchantmentValue(ItemStack stack) {
@@ -712,7 +730,11 @@ public class HandSawItem extends Item {
 
         int current = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
         int next = (current + 1) % recipes.size();
-        saw.getOrCreateTag().putInt(NBT_RECIPE_INDEX, next);
+        if (next == 0) {
+    saw.removeTagKey(NBT_RECIPE_INDEX);
+} else {
+    saw.getOrCreateTag().putInt(NBT_RECIPE_INDEX, next);
+}
 
         // ★ 同时存配方 ID，客户端按 ID 查找，不依赖列表顺序
         Recipe<?> nextRecipe = recipes.get(next);

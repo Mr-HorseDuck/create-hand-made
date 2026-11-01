@@ -48,14 +48,20 @@ import java.util.function.Consumer;
 
 public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
-    int windupTicks = Config.INSTANCE.mortarWindupTicks.get();   // 碾钵用 crusherMortarWindupTicks
-    int processingTicks = Config.INSTANCE.mortarProcessingTicks.get();   // 碾钵用 crusherMortarProcessingTicks
-
-    /** ★ 保底音标记：本次加工是否已经播过常规研磨音 */
-    private static final String NBT_SOUND_PLAYED = "HandMadeGrindSoundPlayed";
+    // 加工时长每次从 Config 读取，支持 /chm reload 热重载；不要改回构造期快照字段。
 
     public CrusherMortarItem(Properties properties) {
         super(properties);
+    }
+
+    /** 起手时长；碾钵读自己的配置段。 */
+    protected int getWindupTicks() {
+        return Config.INSTANCE.crusherMortarWindupTicks.get();
+    }
+
+    /** 加工时长；碾钵读自己的配置段。 */
+    protected int getProcessingTicks() {
+        return Config.INSTANCE.crusherMortarProcessingTicks.get();
     }
 
     @Override
@@ -100,7 +106,7 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         new MortarContents(toGrind).writeToStack(stack);
 
         // ★ 重置保底音标记：新一轮加工开始
-        stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, false);
+        stack.getOrCreateTag().putBoolean(MortarGrindEffects.NBT_SOUND_PLAYED, false);
 
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
@@ -108,12 +114,10 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
     @Override
     public int getUseDuration(ItemStack stack) {
-    MortarContents contents = MortarContents.fromStack(stack);
-    if (contents == null || contents.stack().isEmpty()) return 0;
-    int windupTicks = Config.INSTANCE.crusherMortarWindupTicks.get();
-    int processingTicks = Config.INSTANCE.crusherMortarProcessingTicks.get();
-    return windupTicks + processingTicks;
-}
+        MortarContents contents = MortarContents.fromStack(stack);
+        if (contents == null || contents.stack().isEmpty()) return 0;
+        return getWindupTicks() + getProcessingTicks();
+    }
 
     /**
      * ★ 批量加工：MortarContents 里的数量即实际加工份数，产物 × count。
@@ -152,13 +156,13 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         }
 
         // ★ 保底音：加工确实产出了东西，但常规音效一次都没播
-        if (produced && !stack.getOrCreateTag().getBoolean(NBT_SOUND_PLAYED)) {
+        if (produced && !stack.getOrCreateTag().getBoolean(MortarGrindEffects.NBT_SOUND_PLAYED)) {
             level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
                     SoundSource.PLAYERS, 0.8f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
         }
 
         MortarContents.clearFromStack(stack);
-        stack.removeTagKey(NBT_SOUND_PLAYED);
+        stack.removeTagKey(MortarGrindEffects.NBT_SOUND_PLAYED);
 
         EquipmentSlot slot = entity.getUsedItemHand() == InteractionHand.MAIN_HAND
                 ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
@@ -179,7 +183,7 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
             player.getInventory().placeItemBackInInventory(input);
         }
         MortarContents.clearFromStack(stack);
-        stack.removeTagKey(NBT_SOUND_PLAYED);
+        stack.removeTagKey(MortarGrindEffects.NBT_SOUND_PLAYED);
     }
 
     /**
@@ -369,47 +373,13 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         return SoundEvents.EMPTY;
     }
 
-    /**
-     * ★ 播了常规研磨音后，标记 NBT_SOUND_PLAYED = true，供 finishUsingItem 判断是否需要保底音。
-     */
+    /** 公共研磨音/粒子逻辑在 MortarGrindEffects，这里只提供碾钵自己的 windupTicks。 */
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         MortarContents contents = MortarContents.fromStack(stack);
         if (contents == null || contents.stack().isEmpty()) return;
-        ItemStack input = contents.stack();
-
-        int totalDuration = getUseDuration(stack);
-        int usedTicks = totalDuration - remainingTicks;
-
-        if (usedTicks < Config.INSTANCE.mortarWindupTicks.get() || usedTicks % 4 != 0) return;
-
-        if (!level.isClientSide) {
-            level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
-                    SoundSource.PLAYERS, 1f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
-
-            // ★ 标记：本次加工已经播过常规音
-            stack.getOrCreateTag().putBoolean(NBT_SOUND_PLAYED, true);
-
-            if (level instanceof ServerLevel serverLevel) {
-                Vec3 eye = entity.getEyePosition(1f);
-                Vec3 look = entity.getLookAngle();
-                Vec3 spawnPos = eye.add(look.scale(0.5)).add(0, -0.3, 0);
-
-                for (int i = 0; i < 2; i++) {
-                    double angle = level.random.nextDouble() * Math.PI * 2;
-                    double horizSpeed = 0.05 + level.random.nextDouble() * 0.1;
-                    double vx = Math.cos(angle) * horizSpeed;
-                    double vz = Math.sin(angle) * horizSpeed;
-                    double vy = 0.15 + level.random.nextDouble() * 0.15;
-
-                    serverLevel.sendParticles(
-                            new ItemParticleOption(ParticleTypes.ITEM, input),
-                            spawnPos.x, spawnPos.y, spawnPos.z,
-                            1, vx, vy, vz, 0.0
-                    );
-                }
-            }
-        }
+        MortarGrindEffects.tick(level, entity, stack, contents.stack(),
+                getUseDuration(stack) - remainingTicks, getWindupTicks());
     }
 
     @Override
