@@ -189,6 +189,8 @@
   "config.create_hand_made.maid.mortar_cooldown": "研钵/碾钵冷却",
   "config.create_hand_made.maid.mortar_cooldown.tooltip": "女仆使用研钵或碾钵后的冷却时间（tick），两者共用",
   "config.create_hand_made.maid.particle_level": "粒子数量等级",
-  "config.create_hand_made.maid.particle_level.tooltip": "女仆加工粒子数量等级（1-5），1 最少、3 默认、5 最多"
+  "config.create_hand_made.maid.particle_level.tooltip": "女仆加工粒子数量等级（1-5），1 最少、3 默认、5 最多",
+  
+  "item.create_hand_made.hand_saw.recipe_index": "当前切削配方序号：#%s"
 
 }

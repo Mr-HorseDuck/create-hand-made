@@ -181,6 +181,8 @@
   "config.create_hand_made.maid.mortar_cooldown": "Mortar / Crusher Mortar Cooldown",
   "config.create_hand_made.maid.mortar_cooldown.tooltip": "Cooldown (ticks) after maid uses mortar or crusher mortar, shared by both",
   "config.create_hand_made.maid.particle_level": "Particle Level",
-  "config.create_hand_made.maid.particle_level.tooltip": "Maid processing particle level (1-5), 1 = least, 3 = default, 5 = most"
+  "config.create_hand_made.maid.particle_level.tooltip": "Maid processing particle level (1-5), 1 = least, 3 = default, 5 = most",
+  
+  "item.create_hand_made.hand_saw.recipe_index": "Current cutting recipe: #%s"
 
 }
