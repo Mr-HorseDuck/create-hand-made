@@ -7,7 +7,7 @@
 ![Mod Loader Forge](https://img.shields.io/badge/Loader-Forge%7cNeoForge-red)
 ![CurseForge Downloads](https://img.shields.io/curseforge/dt/1712724?logo=curseforge&label=CurseForge%20%E4%B8%8B%E8%BD%BD%E9%87%8F&color=orange)
 
-以下为forge1.20.1版本介绍，[点击跳转到neoforge1.21.1分支](https://github.com/Mr-HorseDuck/create-hand-made/tree/main)。
+以下为Forge1.20.1版本介绍，[点击跳转到Neoforge1.21.1分支](https://github.com/Mr-HorseDuck/create-hand-made/tree/main)。
 
 为 [Create](https://www.curseforge.com/minecraft/mc-mods/create) 添加一系列手工工具，
 让玩家可以在没有机械的情况下完成部分加工流程。
@@ -26,7 +26,10 @@
 | **手锯** | 切削、砍树、剥皮、刮铜 |
 
 ## 功能列表
-- 女仆现可支持使用部分工具（除指杆，搅拌杖）
+- 女仆现可支持使用手搓工具进行加工
+- 需要指杆指定工作方块（Shift+右键）Ctrl+滚轮切换模式 Shift+右键应用于女仆
+- 有附魔「批量加工亅可以一次性加工多个物品 一级2个 二级 4个 三级8个
+- /chm reload可以热重载
 
 ## 依赖
 
@@ -40,7 +43,8 @@
 | TLM | 1.5.3+ | 可选 |
 | Cloth Config API | 11.1.136+ | 可选 |
 
-
+## 补充
+- 和女仆流水线有联动
 
 ## 安装
 
@@ -65,8 +69,7 @@
 **KubeJS**
 
 ## 未来展望
-- 支持女仆使用更多工具及优化使用体验
-- 支持瓦基的物理结构（跟1.21.1支持Sable类似）
+- 支持帕秋莉手册
 
 ## 构建（开发者）
 
