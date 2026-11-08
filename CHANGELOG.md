@@ -7,18 +7,18 @@
 
 ## 0.6.2-beta — 2026-11-08
 
-基准：仓库当前的 `0.6.0-beta`。这一版以「把遗留问题修干净、把女仆兼容补完整」为主，没有推倒既有玩法。
+基准：`0.6.1-beta`（仓库 `1.20.1` 分支的上一个 release）。这一版以「把遗留问题修干净、把女仆兼容补完整」为主，没有推倒既有玩法。
+
+> 说明：仓库里 `gradle.properties` 的 `mod_version` 在 0.6.1 发布时漏改了，代码是 0.6.1 但版本号仍写着 0.6.0，本次一并修正。
 
 ### 新增
 
-- **女仆：灌注枪自动注液 / 存液**。女仆手持灌注枪、且没有被指杆指定目标时，会自己找附近的置物台注液、工作盆存液。可在配置里用 `maid.passive_infusion_gun` 关掉（默认开），避免和玩家手搓抢同一个置物台。
-- **女仆行为补全至 9 种**：冲压锤、液体搬运、灌注枪、搅拌杖、手锯、研钵、碾钵、风箱、指杆部署，各自有独立冷却，并随好感度等级缩短（-7.5% / -15% / -22.5%）。
-- **女仆首次使用气泡**：女仆第一次拿某件手搓工具时弹一条提示，每个女仆每件工具只弹一次。
-- **批量加工附魔**：1 级 2 份、2 级 4 份、3 级 8 份；宝藏附魔，附魔台不出，只走宝箱/交易/钓鱼。
-- **指杆模式**：`Ctrl + 滚轮` 切换模式，`Shift + 右键` 标记工作方块 / 输入 / 输出；液体搬运模式额外多一个「过剩输出」标记，`Shift + 右键女仆` 把标记套用到女仆身上。
-- **JEI 补全**：14 个分类页（手锯、切石、冲压·工作盆/置物台、搅拌、研钵、碾钵、灌注枪、指杆、风箱五类），且与工具使用同一套 L2 过滤口径。
-- **对外 Java API**：`CreateHandMadeApi` 共 31 个方法（23 个查询/组件读写 + 8 个写操作），供 KubeJS / 附属模组调用，详见 `docs/api.md`。
-- **Cloth Config 图形界面**：手锯、冲压锤、风箱、研钵、碾钵、搅拌杖、调试、女仆共 8 个分类，参数改动即时生效。
+- **女仆：灌注枪行为启用**（行为表第 9 项，优先级 7）。女仆手持灌注枪、且没有被指杆指定目标时，会自己找附近的置物台注液、工作盆存液；玩家用指杆指定过抽 / 注 / 过剩目标时自动让位给优先级 6 的液体搬运，避免两边抢同一个容器。可用 `maid.passive_infusion_gun = false` 关掉（默认开）。附近找不到目标时先扣冷却再扫描，不会每 tick 全量扫方块。
+- **女仆：好感度加成真正生效**。冷却按好感度等级 ×0.925 / ×0.85 / ×0.775（即 −7.5% / −15% / −22.5%），另有 5% / 10% / 15% 概率不消耗工具耐久。此前 `adjustCooldown` 写好了却没有任何调用点，「好感度缩短冷却」实际一直没生效。
+- **女仆：首次使用气泡**。女仆第一次拿某件手搓工具时冒一条提示，每个女仆每件工具只提示一次。
+- **配置同步**：主配置的 14 个时间参数由服务端统一下发给客户端（见「变更」里的协议版本），多人服里客户端看到的就是服务端实际生效的值；退出世界时清空镜像。
+- **对外 Java API 扩充**：`CreateHandMadeApi` 从 13 个方法扩到 31 个（新增 18 个，其中 8 个是带副作用的写操作：`pressBasin` / `pressTransported` / `grindMortarOnce` / `injectItems` / `storeFluid` / `extractFluidTick` / `applyBellows` / `damageTool`），并补上 `recipesForFiltered`（走 L2）、`findRecipeFor`、`recipeIdOf` 等；`API_VERSION` 仍为 1。
+- **文档**：新增 `docs/RECIPE_API.md`（三层配方与数据包 / KubeJS 写法）、`docs/TOOL_REFERENCE.md`（每工具操作与配方来源速查），并重写 `docs/api.md`。
 
 ### 修复
 
@@ -37,16 +37,41 @@
 - **主配置改为 SERVER 类型**：文件位于存档的 `serverconfig/create_hand_made-server.toml`，14 个时间参数由服务端同步给客户端；单人可改、多人只读。
 - **女仆配置拆分为两份**：运行时数值走 SERVER 配置（`serverconfig/create_hand_made-maid-server.toml`），`blocked_mods` 单独留在 `config/create_hand_made-maid.toml`（它要在模组初始化阶段读取，改动需重启）。女仆配置界面与主配置一致，非单人环境只读。
 - **网络协议版本升到 2**：客户端与服务端需同一版本，否则无法连接。
-- **文档**：新增 `docs/RECIPE_API.md`（三层配方与数据包/KubeJS 写法）、`docs/TOOL_REFERENCE.md`（每工具操作与配方来源速查）、`docs/api.md`（Java API 参考）。
 
 ### 内部
 
-- 源码文件合并重构，`131 → 101` 个 `.java`（同类的小类收进一个文件的嵌套类，行为与注册逻辑不变）。
+- 源码文件合并重构，`.java` 文件 `131 → 101`（131 含本版新增的 8 个文件；对比 0.6.1 的 123 个，实际净减 22）。同类的小类收进宿主文件的嵌套类，行为与注册逻辑不变。
 - 删除死代码 `MaidCutHelper`（62 行，重构后已无引用）。
+- 删除 resources 下重复错位的 `data/create_hand_made/data/create_hand_made/` 目录（12 个文件）。它的 namespace 实际是 `data`，从未被游戏加载过，正确路径上的同名文件一直存在。
 
 ### 升级注意
 
 - 如果你在 `config/create_hand_made-maid.toml` 里调过冷却、搜索半径、粒子等级等，这些键在 0.6.2 之后不再生效：请进单人世界一次，改存档里的 `serverconfig/create_hand_made-maid-server.toml`（或直接在游戏内的模组配置界面改）。
 - 旧版的客户端与服务端不能混用（协议版本已升）。
+
+---
+
+## 0.6.1-beta — 2026-11-01
+
+补上本文件建立前就已经发布过的版本，方便对照。
+
+### 修复
+
+- 灌注枪、研钵内容物的 `equals` / `hashCode` 改为值语义，修复带内容物的工具被物流请求打包时静默失败。
+- 手锯切回默认配方不再写 `NBT_RECIPE_INDEX = 0`，存量手锯进背包一 tick 自动自愈。
+- 碾钵起手判断改用 `crusherMortarWindupTicks`，不再误读研钵配置。
+- 研钵 / 碾钵的音效与粒子逻辑抽到 `MortarGrindEffects`，消除复制粘贴错位。
+- 修复 Issues #2。
+
+### 新增
+
+- `CreateHandMadeApi` 稳定 API 入口（`API_VERSION = 1`，13 个方法）与 `docs/api.md`。
+- 开放 6 个工具类的 `public static` 方法（`PointerItem.executeDepotProcess`、`PressHammerItem` 5 个）。
+- 手锯 tooltip 显示当前切削配方序号。
+
+### 变更
+
+- 灌注枪液体层改由 BEWLR 渲染，仓储管理员的 3D 物品网格正常显示。
+- 删除 `GuiGraphicsMixin`，mixin 列表只剩 `BasinBlockEntityMixin`。
 
 ---

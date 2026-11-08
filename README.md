@@ -62,9 +62,10 @@
 
 | 文档 | 内容 |
 |---|---|
-| [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 完整写法、数据包 + KubeJS 示例、字段矩阵 |
-| [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
-| [Java API](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/api.md) | `CreateHandMadeApi` 的 31 个方法、写操作副作用、1.20.1 / 1.21 差异 |
+| [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/1.20.1/docs/RECIPE_API.md) | L1/L2/L3 完整写法、数据包 + KubeJS 示例、字段矩阵 |
+| [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/1.20.1/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
+| [Java API](https://github.com/Mr-HorseDuck/create-hand-made/blob/1.20.1/docs/api.md) | `CreateHandMadeApi` 的 31 个方法、写操作副作用、1.20.1 / 1.21 差异 |
+| [更新日志](https://github.com/Mr-HorseDuck/create-hand-made/blob/1.20.1/CHANGELOG.md) | 每个版本的新增、修复、破坏性变更与升级须知 |
 
 支持**数据包**
 **KubeJS**
