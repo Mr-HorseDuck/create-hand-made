@@ -4,8 +4,7 @@ import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.recipe.serializer.HandMadeBellowsRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeStonecuttingRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeToolRecipeSerializer;
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
-import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.recipe.IRecipeTypeInfo;
 import net.minecraft.core.registries.Registries;
@@ -30,11 +29,11 @@ public class HandMadeRecipeTypes {
 
     // ==================== stonecutting ====================
 
-    public static final RegistryObject<RecipeType<HandMadeStonecuttingRecipe>> STONECUTTING_RECIPE =
+    public static final RegistryObject<RecipeType<HandMadeRecipes.Stonecutting>> STONECUTTING_RECIPE =
             RECIPE_TYPES.register("stonecutting_recipe", () -> RecipeType.simple(
                     new ResourceLocation(CreateHandMade.MODID, "stonecutting_recipe")));
 
-    public static final RegistryObject<RecipeSerializer<HandMadeStonecuttingRecipe>> STONECUTTING_SERIALIZER =
+    public static final RegistryObject<RecipeSerializer<HandMadeRecipes.Stonecutting>> STONECUTTING_SERIALIZER =
             RECIPE_SERIALIZERS.register("stonecutting_recipe",
                     HandMadeStonecuttingRecipeSerializer::new);
 
@@ -44,7 +43,7 @@ public class HandMadeRecipeTypes {
      * create_hand_made:tool_recipe —— 通用 L3 独占类型。
      *
      * 泛型升到 ProcessingRecipe<RecipeWrapper>，同时容纳所有家族：
-     * HandMadeCuttingRecipe / HandMadePressingRecipe / ...
+     * HandMadeRecipes.Cutting / HandMadeRecipes.Pressing / ...
      * 按 JSON 的 tool 字段分派。
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -79,11 +78,11 @@ public class HandMadeRecipeTypes {
 
     // ==================== bellows（风箱独立 type） ====================
 
-    public static final RegistryObject<RecipeType<HandMadeBellowsRecipe>> BELLOWS_RECIPE =
+    public static final RegistryObject<RecipeType<HandMadeRecipes.Bellows>> BELLOWS_RECIPE =
         RECIPE_TYPES.register("bellows_recipe", () -> RecipeType.simple(
                 new ResourceLocation(CreateHandMade.MODID, "bellows_recipe")));
 
-    public static final RegistryObject<RecipeSerializer<HandMadeBellowsRecipe>> BELLOWS_SERIALIZER =
+    public static final RegistryObject<RecipeSerializer<HandMadeRecipes.Bellows>> BELLOWS_SERIALIZER =
         RECIPE_SERIALIZERS.register("bellows_recipe",
                 HandMadeBellowsRecipeSerializer::new);
 

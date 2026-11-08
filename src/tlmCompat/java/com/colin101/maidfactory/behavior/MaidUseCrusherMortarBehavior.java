@@ -2,7 +2,10 @@ package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
 import com.colin101.maidfactory.MaidConfig;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.PointerDataHelper;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.CrusherMortarItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
@@ -60,10 +63,12 @@ public class MaidUseCrusherMortarBehavior implements BehaviorControl<EntityMaid>
         IItemHandler inputInv = readItemHandler(level, inputPos);
         IItemHandler outputInv = readItemHandler(level, outputPos);
 
-        FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+        FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
         if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, true)) {
-            cooldown = MaidConfig.INSTANCE.maidMortarCooldown.get();
+            MaidBubbleHelper.tryShowFirstUse(maid, ToolType.CRUSHER_MORTAR, tool); 
+            MaidBubbleHelper.tryShow(maid, ToolType.CRUSHER_MORTAR, tool);            
+            cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidMortarCooldown, maid);
             status = Behavior.Status.RUNNING;
             return true;
         }

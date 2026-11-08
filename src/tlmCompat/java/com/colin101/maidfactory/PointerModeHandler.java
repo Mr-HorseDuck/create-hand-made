@@ -70,8 +70,8 @@ public class PointerModeHandler {
         ItemStack stack = player.getMainHandItem();
         if (!(stack.getItem() instanceof PointerItem)) return;
 
-        PointerModeHelper.cycleMode(stack);
-        int mode = PointerModeHelper.getMode(stack);
+        PointerDataHelper.Mode.cycleMode(stack);
+        int mode = PointerDataHelper.Mode.getMode(stack);
 
         CreateHandMade.LOGGER.info("[HandMade] Pointer mode cycled to {}", mode);
 
@@ -80,7 +80,7 @@ public class PointerModeHandler {
                         .withStyle(ChatFormatting.YELLOW),
                 true);
 
-        MaidNetwork.CHANNEL.sendToServer(new PointerModePacket(mode));
+        MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.ModePacket(mode));
 
         event.setCanceled(true);
     }
@@ -122,8 +122,8 @@ public class PointerModeHandler {
         ItemStack mainHand = player.getMainHandItem();
         if (!(mainHand.getItem() instanceof PointerItem)) return;
 
-        int mode = PointerModeHelper.getMode(mainHand);
-        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
+        int mode = PointerDataHelper.Mode.getMode(mainHand);
+        if (mode != PointerDataHelper.Mode.MODE_MARK && mode != PointerDataHelper.Mode.MODE_LIQUID) return;
 
         HitResult hit = mc.hitResult;
         if (hit == null) return;
@@ -133,7 +133,7 @@ public class PointerModeHandler {
             Entity target = entityHit.getEntity();
             if (isMaid(target)) {
                 CreateHandMade.LOGGER.info("[HandMade] Apply marks to maid id={}", target.getId());
-                MaidNetwork.CHANNEL.sendToServer(new PointerApplyToMaidPacket(target.getId()));
+                MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.ApplyToMaidPacket(target.getId()));
             }
             return;
         }
@@ -144,7 +144,7 @@ public class PointerModeHandler {
         BlockPos pos = blockHit.getBlockPos().immutable();
         if (mc.level == null) return;
 
-        if (mode == PointerModeHelper.MODE_MARK) {
+        if (mode == PointerDataHelper.Mode.MODE_MARK) {
             handleMarkMode(mc, pos);
         } else {
             handleLiquidMode(mc, pos);
@@ -173,18 +173,18 @@ public class PointerModeHandler {
         int color;
         if (isWorkBlock) {
             clientWork = pos;
-            color = PointerColors.WORK;
+            color = PointerDataHelper.Colors.WORK;
         } else {
             if (clientInput == null) {
                 clientInput = pos;
-                color = PointerColors.INPUT;
+                color = PointerDataHelper.Colors.INPUT;
             } else if (clientOutput == null) {
                 clientOutput = pos;
-                color = PointerColors.OUTPUT;
+                color = PointerDataHelper.Colors.OUTPUT;
             } else {
                 clientInput = pos;
                 clientOutput = null;
-                color = PointerColors.INPUT;
+                color = PointerDataHelper.Colors.INPUT;
             }
         }
 
@@ -193,7 +193,7 @@ public class PointerModeHandler {
         MaidDebug.log("Marker client: pos={}, color={}, isWorkBlock={}",
                 pos, Integer.toHexString(color), isWorkBlock);
 
-        MaidNetwork.CHANNEL.sendToServer(new PointerMarkerPacket(pos));
+        MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.MarkerPacket(pos));
     }
 
     // ================= MODE_LIQUID 的标记逻辑 =================
@@ -220,24 +220,24 @@ public class PointerModeHandler {
             // 第 1 个：输入，必须是 Basin
             if (!isBasin) return;
             clientLiquidInput = pos;
-            color = PointerColors.INPUT;
+            color = PointerDataHelper.Colors.INPUT;
         } else if (clientLiquidOutput == null) {
             // 第 2 个：输出，Basin / Depot / 传送带都可以
             if (!isBasin && !isDepot && !isBelt) return;
             clientLiquidOutput = pos;
-            color = PointerColors.OUTPUT;
+            color = PointerDataHelper.Colors.OUTPUT;
         } else if (clientLiquidOverflow == null) {
             // 第 3 个：过剩输出，必须是 Basin
             if (!isBasin) return;
             clientLiquidOverflow = pos;
-            color = PointerColors.OVERFLOW;
+            color = PointerDataHelper.Colors.OVERFLOW;
         } else {
             // 三个都标完了，再右键重置为输入
             if (!isBasin) return;
             clientLiquidInput = pos;
             clientLiquidOutput = null;
             clientLiquidOverflow = null;
-            color = PointerColors.INPUT;
+            color = PointerDataHelper.Colors.INPUT;
         }
 
         PointerHighlightClient.setHighlight(color, pos);
@@ -247,7 +247,7 @@ public class PointerModeHandler {
         MaidDebug.log("liquid fields now: input={}, output={}, overflow={}",
                 clientLiquidInput, clientLiquidOutput, clientLiquidOverflow);
 
-        MaidNetwork.CHANNEL.sendToServer(new PointerLiquidMarkerPacket(pos));
+        MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.LiquidMarkerPacket(pos));
     }
 
     private static boolean isMaid(Entity entity) {
@@ -268,8 +268,8 @@ public class PointerModeHandler {
         if (!player.isShiftKeyDown()) return;
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) return;
 
-        int mode = PointerModeHelper.getMode(player.getMainHandItem());
-        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
+        int mode = PointerDataHelper.Mode.getMode(player.getMainHandItem());
+        if (mode != PointerDataHelper.Mode.MODE_MARK && mode != PointerDataHelper.Mode.MODE_LIQUID) return;
 
         event.setCanceled(true);
     }

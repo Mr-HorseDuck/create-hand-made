@@ -3,6 +3,9 @@ package com.colin101.maidfactory.behavior;
 import com.alben.createhandmade.api.CreateHandMadeApi;
 import com.colin101.maidfactory.MaidConfig;
 import com.colin101.maidfactory.PointerDataHelper;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.PressHammerItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -78,7 +81,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        if (!MaidRangeHelper.isWithinRange(maid, workPos)) {
+        if (!MaidHelpers.Range.isWithinRange(maid, workPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -91,8 +94,8 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                 status = Behavior.Status.STOPPED;
                 return false;
             }
-            MaidLookHelper.lookAtBlock(maid, workPos);
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
             if (CreateHandMadeApi.pressBasin(level, workPos, filter)) {
                 // 反馈
                 ItemStack particleItem = ItemStack.EMPTY;
@@ -100,11 +103,13 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                     ItemStack s = basin.inputInventory.getItem(i);
                     if (!s.isEmpty()) { particleItem = s.copy(); break; }
                 }
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.PRESS_HAMMER_BASIN, tool);
+                MaidBubbleHelper.tryShow(maid, ToolType.PRESS_HAMMER_BASIN, tool);
                 MaidFeedback.pressSound(level, workPos);
                 MaidFeedback.itemParticles(level, workPos, particleItem, 6);
 
-                tool.hurtAndBreak(1, maid, e -> {});
-                cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -120,7 +125,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                 status = Behavior.Status.STOPPED;
                 return false;
             }
-            if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+            if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
                 status = Behavior.Status.STOPPED;
                 return false;
             }
@@ -132,15 +137,15 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                 return false;
             }
 
-            MaidLookHelper.lookAtBlock(maid, workPos);
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
             ItemStack held = depot.getHeldItem();
 
             if (held.isEmpty()) {
                 // 空 → 从输入取 1 个（取料不播反馈）
                 if (fillDepotOne(level, depot, inputInv)) {
-                    cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
@@ -155,15 +160,19 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                     MaidFeedback.pressSound(level, workPos);
                     MaidFeedback.itemParticles(level, workPos, held, 6);
 
-                    tool.hurtAndBreak(1, maid, e -> {});
-                    cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                    MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
+                    // ★ Depot 分支属于冲压锤，不是指杆：以前误传 POINTER，
+                    //   既让冲压锤的首次气泡永远不弹，又把指杆的首次标记提前烧掉。
+                    MaidBubbleHelper.tryShowFirstUse(maid, ToolType.PRESS_HAMMER_DEPOT, held);
+                    MaidBubbleHelper.tryShow(maid, ToolType.PRESS_HAMMER_DEPOT, held);
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
             } else {
                 // 无配方 → 视为产物 → 移到输出（移产物不播反馈）
                 if (moveToOutput(depot, outputInv)) {
-                    cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
@@ -176,16 +185,18 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
         // ---- Belt：只冲压，不取料不输出 ----
         if (BlockEntityBehaviour.get(level, workPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
-            MaidLookHelper.lookAtBlock(maid, workPos);
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
             if (CreateHandMadeApi.pressTransported(level, workPos, filter)) {
                 // 反馈：Belt 上没有现成 item 引用，从 handler 里取第一个非空物品做粒子
                 ItemStack particleItem = findFirstBeltItem(level, workPos);
                 MaidFeedback.pressSound(level, workPos);
                 MaidFeedback.itemParticles(level, workPos, particleItem, 6);
 
-                tool.hurtAndBreak(1, maid, e -> {});
-                cooldown = MaidConfig.INSTANCE.maidPressHammerCooldown.get();
+                MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.PRESS_HAMMER_DEPOT, tool);
+                MaidBubbleHelper.tryShow(maid, ToolType.PRESS_HAMMER_DEPOT, tool);
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }

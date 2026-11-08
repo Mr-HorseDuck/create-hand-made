@@ -1,6 +1,6 @@
 package com.alben.createhandmade;
 
-import com.alben.createhandmade.client.InfusionGunFluidDecorator;
+import com.alben.createhandmade.client.HandRenderHandlers;
 import com.alben.createhandmade.registry.ModItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -45,7 +45,7 @@ public class CreateHandMadeClient {
      */
     @SubscribeEvent
     public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
-        event.register(ModItems.INFUSION_GUN.get(), new InfusionGunFluidDecorator());
+        event.register(ModItems.INFUSION_GUN.get(), new HandRenderHandlers.InfusionGunDecorator());
         CreateHandMade.LOGGER.info("[HandMade] Infusion gun fluid decorator registered.");
     }
 

@@ -31,25 +31,25 @@ public class HandMadeToolRecipeSerializer
 
     static {
         DELEGATES.put(ToolType.HAND_SAW,
-                new ProcessingRecipeSerializer<>(HandMadeCuttingRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Cutting::new));
         DELEGATES.put(ToolType.PRESS_HAMMER_DEPOT,
-                new ProcessingRecipeSerializer<>(HandMadePressingRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Pressing::new));
         // 碾磨家族：研钵 + 碾钵共用同一个配方类
         DELEGATES.put(ToolType.MORTAR,
-                new ProcessingRecipeSerializer<>(HandMadeCrushingRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Crushing::new));
         DELEGATES.put(ToolType.CRUSHER_MORTAR,
-                new ProcessingRecipeSerializer<>(HandMadeCrushingRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Crushing::new));
         // 注液家族：灌注枪
         DELEGATES.put(ToolType.INFUSION_GUN,
-                new ProcessingRecipeSerializer<>(HandMadeFillingRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Filling::new));
         // 应用家族：指杆
         DELEGATES.put(ToolType.POINTER,
-                new ProcessingRecipeSerializer<>(HandMadeApplicationRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Application::new));
         // ★ 工作盆家族：冲压锤 · 工作盆 + 搅拌杖
         DELEGATES.put(ToolType.PRESS_HAMMER_BASIN,
-                new ProcessingRecipeSerializer<>(HandMadeToolRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Tool::new));
         DELEGATES.put(ToolType.STIRRING_STAFF,
-                new ProcessingRecipeSerializer<>(HandMadeToolRecipe::new));
+                new ProcessingRecipeSerializer<>(HandMadeRecipes.Tool::new));
     }
 
     @SuppressWarnings("unchecked")

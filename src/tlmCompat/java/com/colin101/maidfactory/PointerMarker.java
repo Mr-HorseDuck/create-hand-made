@@ -13,6 +13,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -25,6 +26,20 @@ import net.minecraftforge.network.PacketDistributor;
  * 这里只提供服务端 doMark 和切换物品清除标记的逻辑。
  */
 public class PointerMarker {
+
+    /**
+     * 指杆网络包的距离上限（平方）。
+     *
+     * <p>实际伸手距离约 5 格，这里放到 8 格给网络延迟和站姿变化留余量 —— 目的不是
+     * 精确复刻 reach，而是堵掉"客户端随便报一个远处坐标"这种改包玩法。
+     */
+    public static final double POINTER_REACH_SQR = 64.0D;
+
+    /** 目标方块是否在玩家够得着的范围内。坐标来自客户端，服务端必须自己核一遍。 */
+    public static boolean isWithinReach(Player player, BlockPos pos) {
+        if (pos == null) return false;
+        return player.distanceToSqr(Vec3.atCenterOf(pos)) <= POINTER_REACH_SQR;
+    }
 
     /**
      * 服务端标记逻辑。由 MaidNetwork.handlePointerMarker 调用。
@@ -49,21 +64,21 @@ public class PointerMarker {
 
         if (isWorkBlock) {
             PointerDataHelper.setWork(player, level, pos);
-            sendHighlight(level, pos, PointerColors.WORK);
+            sendHighlight(level, pos, PointerDataHelper.Colors.WORK);
         } else {
             BlockPos inputPos = PointerDataHelper.getInput(player, level);
             BlockPos outputPos = PointerDataHelper.getOutput(player, level);
 
             if (inputPos == null) {
                 PointerDataHelper.setInput(player, level, pos);
-                sendHighlight(level, pos, PointerColors.INPUT);
+                sendHighlight(level, pos, PointerDataHelper.Colors.INPUT);
             } else if (outputPos == null) {
                 PointerDataHelper.setOutput(player, level, pos);
-                sendHighlight(level, pos, PointerColors.OUTPUT);
+                sendHighlight(level, pos, PointerDataHelper.Colors.OUTPUT);
             } else {
                 PointerDataHelper.setInput(player, level, pos);
                 PointerDataHelper.setOutput(player, level, null);
-                sendHighlight(level, pos, PointerColors.INPUT);
+                sendHighlight(level, pos, PointerDataHelper.Colors.INPUT);
             }
         }
 

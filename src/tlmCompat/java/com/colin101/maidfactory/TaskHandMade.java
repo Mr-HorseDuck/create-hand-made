@@ -3,6 +3,7 @@ package com.colin101.maidfactory;
 import com.colin101.maidfactory.behavior.MaidUseBellowsBehavior;
 import com.colin101.maidfactory.behavior.MaidUseCrusherMortarBehavior;
 import com.colin101.maidfactory.behavior.MaidUseHandSawBehavior;
+import com.colin101.maidfactory.behavior.MaidUseInfusionGunBehavior;
 import com.colin101.maidfactory.behavior.MaidUseLiquidTransferBehavior;
 import com.colin101.maidfactory.behavior.MaidUseMortarBehavior;
 import com.colin101.maidfactory.behavior.MaidUsePointerDeployBehavior;
@@ -42,6 +43,9 @@ public class TaskHandMade implements IMaidTask {
         return Lists.newArrayList(
                 Pair.of(5, new MaidUsePressHammerBehavior()),
                 Pair.of(6, new MaidUseLiquidTransferBehavior()),
+                // 灌注枪的"自己找附近置物台/工作盆注液"兜底：6 号行为管玩家用指杆指定的目标，
+                // 这条管没指定时的就近加工；两者互斥（本行为在指定过目标时直接让位）。
+                Pair.of(7, new MaidUseInfusionGunBehavior()),
                 Pair.of(8, new MaidUseStirringStaffBehavior()),
                 Pair.of(9, new MaidUseHandSawBehavior()),
                 Pair.of(10, new MaidUseMortarBehavior()),

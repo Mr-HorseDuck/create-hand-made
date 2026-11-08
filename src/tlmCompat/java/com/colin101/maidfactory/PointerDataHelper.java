@@ -139,4 +139,67 @@ public final class PointerDataHelper {
         if (root.isEmpty()) return;
         target.getPersistentData().put(NBT_ROOT, root.copy());
     }
+
+    // ==================== 颜色键 ====================
+
+    /**
+     * 指杆标记的颜色键。
+     * ★ 值必须与 main 的 HighlightBlockPacket 保持一致的 int 编码（0xRRGGBB，无 alpha）。
+     */
+    public static final class Colors {
+
+        /** 工作方块（MODE_MARK）—— 黄 */
+        public static final int WORK = 0xFFFF00;
+
+        /** 输入（MODE_MARK / MODE_LIQUID 共用）—— 绿 */
+        public static final int INPUT = 0x00FF00;
+
+        /** 输出（MODE_MARK / MODE_LIQUID 共用）—— 蓝 */
+        public static final int OUTPUT = 0x0080FF;
+
+        /** ★ 过剩输出（MODE_LIQUID 专用，独立颜色键避免覆盖 OUTPUT）—— 橙 */
+        public static final int OVERFLOW = 0xFF8000;
+
+        private Colors() {}
+    }
+
+    // ==================== 指杆模式 NBT ====================
+
+    /**
+     * 指杆模式 NBT 读写。
+     * ★ 完全属于 tlmCompat，main 不知道这个 NBT 的存在。
+     */
+    public static final class Mode {
+
+        public static final int MODE_DEFAULT = 0;
+        public static final int MODE_MARK = 1;
+        /** ★ 液体搬运模式 */
+        public static final int MODE_LIQUID = 2;
+
+        /** 模式总数，用于循环 */
+        private static final int MODE_COUNT = 3;
+
+        private static final String NBT_MODE = "HandMadePointerMode";
+
+        private Mode() {}
+
+        public static int getMode(net.minecraft.world.item.ItemStack stack) {
+            if (stack.isEmpty()) return MODE_DEFAULT;
+            return stack.getOrCreateTag().getInt(NBT_MODE);
+        }
+
+        public static void setMode(net.minecraft.world.item.ItemStack stack, int mode) {
+            if (stack.isEmpty()) return;
+            stack.getOrCreateTag().putInt(NBT_MODE, mode);
+        }
+
+        public static void cycleMode(net.minecraft.world.item.ItemStack stack) {
+            setMode(stack, (getMode(stack) + 1) % MODE_COUNT);
+        }
+
+        /** ★ 是否为液体模式 */
+        public static boolean isLiquidMode(net.minecraft.world.item.ItemStack stack) {
+            return getMode(stack) == MODE_LIQUID;
+        }
+    }
 }

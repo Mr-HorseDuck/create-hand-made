@@ -41,10 +41,11 @@ public class HandMadeClothConfigIntegration {
         if (ModList.get().isLoaded("touhou_little_maid")) {
             try {
                 Class<?> maidIntegration = Class.forName(
-                        "com.alben.createhandmade.compat.tlm.client.MaidClothConfigIntegration");
+                        "com.colin101.maidfactory.client.MaidClothConfigIntegration");
                 java.lang.reflect.Method addMaidCategory = maidIntegration.getMethod(
-                        "addMaidCategory", ConfigBuilder.class, ConfigEntryBuilder.class);
-                addMaidCategory.invoke(null, builder, entry);
+                        "addMaidCategory", ConfigBuilder.class, ConfigEntryBuilder.class,
+                        boolean.class);
+                addMaidCategory.invoke(null, builder, entry, singleplayer);
             } catch (Throwable t) {
                 CreateHandMade.LOGGER.warn(
                         "Failed to add maid config category to Cloth Config screen", t);
@@ -305,13 +306,17 @@ public class HandMadeClothConfigIntegration {
     /** 通过反射保存女仆配置 SPEC，避免 main 直接依赖 tlmCompat。 */
     private static void saveMaidSpec() {
         if (!ModList.get().isLoaded("touhou_little_maid")) return;
-        try {
-            Class<?> maidConfig = Class.forName(
-                    "com.alben.createhandmade.compat.tlm.MaidConfig");
-            Object spec = maidConfig.getField("SPEC").get(null);
-            spec.getClass().getMethod("save").invoke(spec);
-        } catch (Throwable t) {
-            CreateHandMade.LOGGER.warn("Failed to save maid config", t);
+        // MaidConfig（SERVER，运行时数值） + MaidStartupConfig（COMMON，blocked_mods）
+        for (String className : new String[] {
+                "com.colin101.maidfactory.MaidConfig",
+                "com.colin101.maidfactory.MaidStartupConfig" }) {
+            try {
+                Class<?> maidConfig = Class.forName(className);
+                Object spec = maidConfig.getField("SPEC").get(null);
+                spec.getClass().getMethod("save").invoke(spec);
+            } catch (Throwable t) {
+                CreateHandMade.LOGGER.warn("Failed to save maid config ({})", className, t);
+            }
         }
     }
 }

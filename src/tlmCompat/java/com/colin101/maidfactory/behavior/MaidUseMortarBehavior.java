@@ -2,7 +2,10 @@ package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
 import com.colin101.maidfactory.MaidConfig;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.PointerDataHelper;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.MortarItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.logistics.filter.FilterItemStack;
@@ -60,14 +63,18 @@ public class MaidUseMortarBehavior implements BehaviorControl<EntityMaid> {
         IItemHandler inputInv = readItemHandler(level, inputPos);
         IItemHandler outputInv = readItemHandler(level, outputPos);
 
-        FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+        FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
         if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, false)) {
-            cooldown = MaidConfig.INSTANCE.maidMortarCooldown.get();
+            // ★ 这里是研钵，不是碾钵：以前误传 CRUSHER_MORTAR，导致
+            //   "maidfactory_used_crusher_mortar" 被提前烧掉、而研钵自己的首次标记
+            //   永远没人写 —— 表现为研钵第一次用不弹气泡，碾钵的首次气泡也跟着丢。
+            MaidBubbleHelper.tryShowFirstUse(maid, ToolType.MORTAR, tool);
+            MaidBubbleHelper.tryShow(maid, ToolType.MORTAR, tool);
+            cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidMortarCooldown, maid);
             status = Behavior.Status.RUNNING;
             return true;
         }
-
         status = Behavior.Status.STOPPED;
         return false;
     }

@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.CreateHandMade;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.item.renderer.StirringStaffRenderer;
 import com.alben.createhandmade.network.PressParticlesPacket;
@@ -7,7 +9,7 @@ import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.network.StirringStatePacket;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.HandMadeToolRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.ToolType;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
@@ -66,8 +68,10 @@ import java.util.function.Consumer;
 public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
     private static final Object MIXING_RECIPE_KEY = new Object();
-    private static final int STIR_DURATION = 60;
-    private static final int WINDUP_TICKS = 8;
+
+    // 起手/加工时长不写死、也不做构造期快照：每次从同步镜像里取（服务端权威，
+    // 客户端拿到的是服务端下发的值），这样 StirringStaffRenderer 的动画周期
+    // 和实际搅拌节奏永远是同一个数。
 
     /** 玩家 → 搅拌目标 Basin 位置。use 时缓存，onUseTick / finishUsingItem 复用。 */
     private static final Map<UUID, BlockPos> STIRRING_TARGET = new HashMap<>();
@@ -164,7 +168,9 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         if (!(entity instanceof Player player)) return;
 
         int usedTicks = getUseDuration(stack) - remainingTicks;
-        if (usedTicks < WINDUP_TICKS) return;
+        int windupTicks = Math.max(0, SyncedServerConfig.stirringStaffWindup());
+        int stirDurationTicks = Math.max(1, SyncedServerConfig.stirringStaffProcessing());
+        if (usedTicks < windupTicks) return;
 
         BlockPos pos = STIRRING_TARGET.get(player.getUUID());
         if (pos == null) {
@@ -184,8 +190,8 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
         // ---- 服务端：按周期应用配方 ----
         if (!level.isClientSide
-                && usedTicks >= WINDUP_TICKS + STIR_DURATION
-                && (usedTicks - WINDUP_TICKS) % STIR_DURATION == 0) {
+                && usedTicks >= windupTicks + stirDurationTicks
+                && (usedTicks - windupTicks) % stirDurationTicks == 0) {
 
             Recipe<?> recipe = findMatchingRecipe(level, basin);
             if (recipe == null) {
@@ -272,8 +278,9 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
-            if (!(r instanceof HandMadeToolRecipe htr)) continue;
+            if (!(r instanceof HandMadeRecipes.Tool htr)) continue;
             if (htr.getTool() != ToolType.STIRRING_STAFF) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.STIRRING_STAFF, level, r)) continue;
             if (BasinRecipe.match(basin, htr)) {
                 return htr;
             }
@@ -290,7 +297,11 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
                 return recipe;
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            // Create 的配方匹配对畸形配方会抛；这里退化为"没有匹配"，
+            // 但留一条 debug 线索，免得"搅拌找不到配方"完全无从查起。
+            CreateHandMade.LOGGER.debug(
+                    "[HandMade] Stirring-staff recipe match failed, treating as no match", ex);
         }
 
         return null;

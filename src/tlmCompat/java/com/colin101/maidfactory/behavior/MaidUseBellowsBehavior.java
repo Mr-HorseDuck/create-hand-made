@@ -3,7 +3,11 @@ package com.colin101.maidfactory.behavior;
 import com.alben.createhandmade.api.CreateHandMadeApi;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.colin101.maidfactory.MaidConfig;
+import com.colin101.maidfactory.MaidDebug;
 import com.colin101.maidfactory.PointerDataHelper;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.BellowsItem;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -87,7 +91,7 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        if (!MaidRangeHelper.isWithinRange(maid, workPos)) {
+        if (!MaidHelpers.Range.isWithinRange(maid, workPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -98,13 +102,15 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
         if (BlockEntityBehaviour.get(level, workPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null
                 && !(be instanceof DepotBlockEntity)) {
-            MaidLookHelper.lookAtBlock(maid, workPos);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
             if (CreateHandMadeApi.applyBellows(level, workPos, type)) {
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.BELLOWS, tool);
+                MaidBubbleHelper.tryShow(maid, ToolType.BELLOWS, tool);
                 MaidFeedback.bellowsSound(level, workPos);
                 MaidFeedback.windParticles(level, workPos, 6);
 
-                tool.hurtAndBreak(1, maid, e -> {});
-                cooldown = MaidConfig.INSTANCE.maidBellowsCooldown.get();
+                MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -124,7 +130,7 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
             status = Behavior.Status.STOPPED;
             return false;
         }
-        if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+        if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -136,13 +142,13 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        MaidLookHelper.lookAtBlock(maid, workPos);
+        MaidHelpers.Look.lookAtBlock(maid, workPos);
 
         ItemStack held = depot.getHeldItem();
 
         if (held.isEmpty()) {
             if (fillDepotOne(level, depot, inputInv, type)) {
-                cooldown = MaidConfig.INSTANCE.maidBellowsCooldown.get();
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -152,17 +158,19 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
 
         if (CreateHandMadeApi.bellowsCanProcess(level, held, type)) {
             if (CreateHandMadeApi.applyBellows(level, workPos, type)) {
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.BELLOWS, held);
+                MaidBubbleHelper.tryShow(maid, ToolType.BELLOWS, held);
                 MaidFeedback.bellowsSound(level, workPos);
                 MaidFeedback.windParticles(level, workPos, 6);
 
-                tool.hurtAndBreak(1, maid, e -> {});
-                cooldown = MaidConfig.INSTANCE.maidBellowsCooldown.get();
+                MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
         } else {
             if (moveToOutput(depot, outputInv)) {
-                cooldown = MaidConfig.INSTANCE.maidBellowsCooldown.get();
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -231,6 +239,9 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
 
     @Nullable
     private static IItemHandler getMaidInventory(EntityMaid maid) {
+        // TLM 各版本的背包访问器名字不一致，按候选表逐个试。
+        // NoSuchMethodException 属预期（换成下一个名字继续），但别的反射异常意味着
+        // TLM 改了签名/可见性，必须留痕 —— 否则"女仆找不到背包"是彻底哑掉的失败。
         String[] methodNames = {"getMaidInv", "getMaidInventory", "getInventory"};
         for (String name : methodNames) {
             try {
@@ -238,7 +249,11 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
                 if (result instanceof IItemHandler handler) {
                     return handler;
                 }
-            } catch (Exception ignored) {}
+            } catch (NoSuchMethodException ignored) {
+                // 预期：这个版本没有该访问器
+            } catch (ReflectiveOperationException ex) {
+                MaidDebug.log("maid inventory accessor '{}' failed", name, ex);
+            }
         }
         return null;
     }

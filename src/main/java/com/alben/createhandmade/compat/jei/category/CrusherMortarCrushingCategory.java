@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * ★ 泛型用 AbstractCrushingRecipe（CrushingRecipe / MillingRecipe /
- *   HandMadeCrushingRecipe 的公共父类）。
+ *   HandMadeRecipes.Crushing 的公共父类）。
  */
 @ParametersAreNonnullByDefault
 public class CrusherMortarCrushingCategory extends CreateRecipeCategory<AbstractCrushingRecipe> {

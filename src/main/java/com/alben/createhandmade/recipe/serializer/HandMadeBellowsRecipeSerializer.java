@@ -1,6 +1,6 @@
 package com.alben.createhandmade.recipe.serializer;
 
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.google.gson.JsonObject;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeSerializer;
 import net.minecraft.network.FriendlyByteBuf;
@@ -16,15 +16,15 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
  * 支持任意第三方鼓风类型。旧短名（如 blasting）不再接受。
  */
 public class HandMadeBellowsRecipeSerializer
-        implements RecipeSerializer<HandMadeBellowsRecipe> {
+        implements RecipeSerializer<HandMadeRecipes.Bellows> {
 
     private static final String FAN_TYPE_FIELD = "fan_type";
 
-    private static final ProcessingRecipeSerializer<HandMadeBellowsRecipe> DELEGATE =
-            new ProcessingRecipeSerializer<>(HandMadeBellowsRecipe::new);
+    private static final ProcessingRecipeSerializer<HandMadeRecipes.Bellows> DELEGATE =
+            new ProcessingRecipeSerializer<>(HandMadeRecipes.Bellows::new);
 
     @Override
-    public HandMadeBellowsRecipe fromJson(ResourceLocation id, JsonObject json) {
+    public HandMadeRecipes.Bellows fromJson(ResourceLocation id, JsonObject json) {
         // 1) 先读 fan_type：必填，必须是完整 ResourceLocation
         String fanTypeStr = GsonHelper.getAsString(json, FAN_TYPE_FIELD);
         ResourceLocation fanType;
@@ -37,7 +37,7 @@ public class HandMadeBellowsRecipeSerializer
         }
 
         // 2) 其余字段委托给 Create
-        HandMadeBellowsRecipe recipe = DELEGATE.fromJson(id, json);
+        HandMadeRecipes.Bellows recipe = DELEGATE.fromJson(id, json);
 
         // 3) 写入 fan_type
         recipe.setFanType(fanType);
@@ -45,7 +45,7 @@ public class HandMadeBellowsRecipeSerializer
     }
 
     @Override
-    public void toNetwork(FriendlyByteBuf buf, HandMadeBellowsRecipe recipe) {
+    public void toNetwork(FriendlyByteBuf buf, HandMadeRecipes.Bellows recipe) {
         ResourceLocation fanType = recipe.getFanType();
         buf.writeBoolean(fanType != null);
         if (fanType != null) {
@@ -55,9 +55,9 @@ public class HandMadeBellowsRecipeSerializer
     }
 
     @Override
-    public HandMadeBellowsRecipe fromNetwork(ResourceLocation id, FriendlyByteBuf buf) {
+    public HandMadeRecipes.Bellows fromNetwork(ResourceLocation id, FriendlyByteBuf buf) {
         ResourceLocation fanType = buf.readBoolean() ? buf.readResourceLocation() : null;
-        HandMadeBellowsRecipe recipe = DELEGATE.fromNetwork(id, buf);
+        HandMadeRecipes.Bellows recipe = DELEGATE.fromNetwork(id, buf);
         recipe.setFanType(fanType);
         return recipe;
     }

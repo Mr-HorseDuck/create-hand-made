@@ -9,6 +9,9 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraftforge.event.AddReloadListenerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import java.io.BufferedReader;
 import java.util.ArrayList;
@@ -16,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 手搓配方数据包加载器 —— L2 过滤层。
+ * 手搓配方数据包加载器 —— L2 过滤层，同时充当"注册自己到 /reload 列表"的事件订阅者。
  *
  * <pre>
  *   L2 过滤:  data/&lt;ns&gt;/handmade/filter/&lt;tool&gt;.json
@@ -25,11 +28,17 @@ import java.util.Map;
  * <p>L3 独占配方已迁移到独立 RecipeType（{@code create_hand_made:tool_recipe} 等），
  * 由 Minecraft 原生加载 {@code data/<ns>/recipes/*.json}，不再经过本类。</p>
  */
+@Mod.EventBusSubscriber(modid = CreateHandMade.MODID)
 public class HandMadeRecipeLoader extends SimplePreparableReloadListener<Void> {
 
     private static final Gson GSON = new Gson();
 
     private static final String FILTER_DIR = "handmade/filter";
+
+    @SubscribeEvent
+    public static void onAddReloadListener(AddReloadListenerEvent event) {
+        event.addListener(new HandMadeRecipeLoader());
+    }
 
     @Override
     protected Void prepare(ResourceManager manager, ProfilerFiller profiler) {
@@ -38,7 +47,8 @@ public class HandMadeRecipeLoader extends SimplePreparableReloadListener<Void> {
 
     @Override
     protected void apply(Void unused, ResourceManager manager, ProfilerFiller profiler) {
-        HandMadeRecipePool.reset();
+        // 只重建数据包那一层：不要把 KubeJS 的过滤一起清掉
+        HandMadeRecipePool.resetData();
         loadFilters(manager);
     }
 

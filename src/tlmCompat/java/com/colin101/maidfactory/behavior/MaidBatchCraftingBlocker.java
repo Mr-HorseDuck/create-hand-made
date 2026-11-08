@@ -1,7 +1,7 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.CreateHandMade;
-import com.alben.createhandmade.enchantment.BatchCraftingHelper;
+import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -51,10 +51,10 @@ public final class MaidBatchCraftingBlocker {
      */
     public static boolean checkAndRefuse(EntityMaid maid, ItemStack tool) {
         if (tool.isEmpty()) return false;
-        if (BatchCraftingHelper.getBatchSize(tool) <= 1) return false;
+        if (BatchCrafting.getBatchSize(tool) <= 1) return false;
 
         // TLM 1.5.3 移除了 EntityMaid 对 Entity 方法的覆写。
-        // 直接调 maid.level() / maid.getUUID() 编译能过，运行抛 NoSuchMethodError。
+        // 直接调 maid.level() / ((Entity) maid).getUUID() 编译能过，运行抛 NoSuchMethodError。
         // 所有 Entity 基类方法必须强转。
         Entity entity = (Entity) maid;
 

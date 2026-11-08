@@ -1,7 +1,6 @@
 package com.alben.createhandmade;
 
-import com.alben.createhandmade.registry.ModCreativeModeTabs;
-import com.alben.createhandmade.registry.ModEnchantments;
+import com.alben.createhandmade.registry.ModRegistries;
 import com.alben.createhandmade.registry.ModItems;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.particle.ModParticleTypes;
@@ -30,6 +29,8 @@ import org.slf4j.Logger;
 public class CreateHandMade {
     public static final String MODID = "create_hand_made";
     public static final Logger LOGGER = LogUtils.getLogger();
+        /** 保存 mod 事件总线，供 addMaidTask 在资源加载阶段安全访问。 */
+    public static IEventBus MOD_EVENT_BUS;
 
     public static final CreateRegistrate REGISTRATE = CreateRegistrate.create(MODID)
             .defaultCreativeTab((ResourceKey<CreativeModeTab>) null)
@@ -38,10 +39,11 @@ public class CreateHandMade {
 
     public CreateHandMade() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+                MOD_EVENT_BUS = modEventBus;
 
         modEventBus.addListener(this::commonSetup);
 
-        ModCreativeModeTabs.register(modEventBus);
+        ModRegistries.CreativeTabs.register(modEventBus);
 
         REGISTRATE.registerEventListeners(modEventBus);
         ModItems.register();
@@ -51,7 +53,7 @@ public class CreateHandMade {
         ModNetwork.register();
 
         // ★ 附魔注册
-        ModEnchantments.register(modEventBus);
+        ModRegistries.Enchantments.register(modEventBus);
 
         // ★ 配方类型注册（tool_recipe / stonecutting_recipe / bellows_recipe）
         HandMadeRecipeTypes.register(modEventBus);
@@ -71,16 +73,29 @@ public class CreateHandMade {
         if (ModList.get().isLoaded("touhou_little_maid")) {
             try {
                 Class<?> maidNetworkClass = Class.forName(
-                        "com.alben.createhandmade.compat.tlm.MaidNetwork");
+                        "com.colin101.maidfactory.MaidNetwork");
                 java.lang.reflect.Method initMethod = maidNetworkClass.getMethod("init");
                 initMethod.invoke(null);
 
-                // ★ 女仆配置 SPEC 注册
-                Class<?> maidConfigClass = Class.forName(
-                        "com.alben.createhandmade.compat.tlm.MaidConfig");
-                java.lang.reflect.Method registerSpecMethod =
-                        maidConfigClass.getMethod("registerSpec");
-                registerSpecMethod.invoke(null);
+                // ★ 女仆配置 SPEC 注册（两份）：
+                //   1) MaidConfig        = SERVER，运行时数值（与主配置同类型，存档 serverconfig 内）
+                //   2) MaidStartupConfig = COMMON，blocked_mods（mod 初始化阶段就要读）
+                for (String maidConfigClassName : new String[] {
+                        "com.colin101.maidfactory.MaidConfig",
+                        "com.colin101.maidfactory.MaidStartupConfig" }) {
+                    Class<?> maidConfigClass = Class.forName(maidConfigClassName);
+                    java.lang.reflect.Method registerSpecMethod =
+                            maidConfigClass.getMethod("registerSpec");
+                    registerSpecMethod.invoke(null);
+                }
+
+                // ★ API 钩子：让对外 API 的 damageTool 对女仆也走好感度免耐久
+                //   （api 包在主 sourceSet，不能直接引用 EntityMaid，只能反射注册）
+                Class<?> favorabilityClass = Class.forName(
+                        "com.colin101.maidfactory.MaidFavorabilityHelper");
+                java.lang.reflect.Method registerApiHookMethod =
+                        favorabilityClass.getMethod("registerApiHook");
+                registerApiHookMethod.invoke(null);
 
             } catch (ClassNotFoundException e) {
                 // tlmCompat 未编译，正常跳过
@@ -96,6 +111,8 @@ public class CreateHandMade {
      *   调用处无需重复写 "[HandMade-Debug]" 前缀，本方法自动加。
      */
     public static void debug(String format, Object... args) {
+        // Config 是 SERVER 配置，初始化/主菜单阶段可能还没加载；开发环境 get() 会抛异常
+        if (!Config.SPEC.isLoaded()) return;
         if (Config.INSTANCE.debugEnabled.get()) {
             LOGGER.info("[HandMade-Debug] " + format, args);
         }

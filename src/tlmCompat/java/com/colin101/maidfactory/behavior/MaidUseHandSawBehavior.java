@@ -1,9 +1,12 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.MaidConfig;
 import com.colin101.maidfactory.PointerDataHelper;
 import com.alben.createhandmade.item.HandSawItem;
+import com.alben.createhandmade.recipe.ToolType;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
@@ -78,7 +81,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        if (!MaidRangeHelper.isWithinRange(maid, workPos)) {
+        if (!MaidHelpers.Range.isWithinRange(maid, workPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -93,7 +96,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
                 status = Behavior.Status.STOPPED;
                 return false;
             }
-            if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+            if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
                 status = Behavior.Status.STOPPED;
                 return false;
             }
@@ -105,14 +108,14 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
                 return false;
             }
 
-            MaidLookHelper.lookAtBlock(maid, workPos);
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
             ItemStack held = depot.getHeldItem();
 
             if (held.isEmpty()) {
                 if (fillDepotOne(level, depot, inputInv)) {
-                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
@@ -123,13 +126,15 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             List<Recipe<?>> recipes = CreateHandMadeApi.handSawRecipes(level, held);
             if (!recipes.isEmpty()) {
                 if (cutDepotItem(level, depot, outputInv, tool, maid, filter)) {
-                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    MaidBubbleHelper.tryShowFirstUse(maid, ToolType.HAND_SAW, tool);
+                    MaidBubbleHelper.tryShow(maid, ToolType.HAND_SAW, tool);
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
             } else {
                 if (moveToOutput(depot, outputInv)) {
-                    cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                    cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
@@ -142,10 +147,12 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         // ---- Belt：只切削，不取料不输出 ----
         if (BlockEntityBehaviour.get(level, workPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
-            MaidLookHelper.lookAtBlock(maid, workPos);
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
             if (cutBeltItems(level, workPos, tool, maid, filter)) {
-                cooldown = MaidConfig.INSTANCE.maidHandSawCooldown.get();
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.HAND_SAW, tool);
+                MaidBubbleHelper.tryShow(maid, ToolType.HAND_SAW, tool);
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -209,7 +216,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         });
 
         if (success[0]) {
-            saw.hurtAndBreak(1, maid, e -> {});
+            MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
             MaidFeedback.cutSound(level, pos);
             MaidFeedback.itemParticles(level, pos, particleItem[0], 8);
         }
@@ -303,7 +310,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             } else {
                 depot.notifyUpdate();
                 depot.sendData();
-                saw.hurtAndBreak(1, maid, e -> {});
+                MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
                 MaidFeedback.cutSound(level, depot.getBlockPos());
                 MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);
                 net.minecraft.world.Containers.dropItemStack(level,
@@ -318,7 +325,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         depot.notifyUpdate();
         depot.sendData();
 
-        saw.hurtAndBreak(1, maid, e -> {});
+        MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
 
         MaidFeedback.cutSound(level, depot.getBlockPos());
         MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);

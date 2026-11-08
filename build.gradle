@@ -21,6 +21,12 @@ tasks.named('wrapper', Wrapper).configure {
 }
 
 // ------------------ Mixin 配置 ------------------
+// ★ refmap 说明：
+//   mixin 配置里**不要**写 "refmap" 字段，除非真有需要对 SRG 名做重映射的 mixin。
+//   当前唯一一个 mixin 全部成员都是 remap = false（目标都是 Create 自己的类/方法），
+//   注解处理器不会产出 refmap 文件；配置里却声明了 refmap，启动时就会报
+//   "refmap could not be found"。下面这行 add 保留着，以后加 remapped mixin 时
+//   再把 "refmap": "${mod_id}.refmap.json" 写回 mixins.json 即可。
 mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.mixins.json"
@@ -241,6 +247,10 @@ tasks.named('compileJava') {
 
 // ------------------ Jar 清单 ------------------
 jar {
+
+    // tlmCompat 依赖 main 输出，必须在 compileTlmCompatJava 之后打包
+    dependsOn tasks.named('compileTlmCompatJava')
+
     // ★ 把 tlmCompat sourceSet 的输出合并到同一个 jar
     from sourceSets.tlmCompat.output
 

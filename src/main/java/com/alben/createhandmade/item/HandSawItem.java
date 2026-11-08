@@ -1,12 +1,13 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.Config;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.CreateHandMade;
-import com.alben.createhandmade.enchantment.BatchCraftingHelper;
+import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.item.renderer.HandSawItemRenderer;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
@@ -42,7 +43,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -60,6 +60,7 @@ import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -72,7 +73,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -93,33 +93,19 @@ public class HandSawItem extends Item {
     private static final Set<UUID> CUTTING_PLAYERS = new HashSet<>();
     private static final Map<UUID, BlockPos> FELL_PENDING = new HashMap<>();
 
-    // ================= 配方 ID 缓存 =================
-
-    private static final Map<Recipe<?>, ResourceLocation> RECIPE_ID_CACHE = new IdentityHashMap<>();
-    @Nullable
-    private static RecipeManager cachedRecipeManager = null;
+    // ================= 配方 ID 反查 =================
 
     /**
-     * 反查配方 ID。客户端和服务端的 RecipeManager 不同，缓存按 manager 隔离。
-     * 找不到（例如 SequencedAssemblyRecipe 的动态配方）返回 null，调用方回退到索引。
+     * 反查配方 ID。找不到（例如 SequencedAssemblyRecipe 的动态配方）返回 null，调用方回退到索引。
+     *
+     * <p>以前这里自带一份 {@code IdentityHashMap} 缓存，只在 RecipeManager <b>实例</b>变化时清空；
+     * 客户端 {@code /reload} 走的是 {@code replaceRecipes}——实例不变、内容全换，
+     * 缓存因此会一直返回重载前的旧 ID。现在统一委托给 {@link HandMadeRecipePool#recipeIdOf}，
+     * 由它在资源重载时一并失效。</p>
      */
     @Nullable
     public static ResourceLocation getRecipeId(Level level, Recipe<?> recipe) {
-        RecipeManager manager = level.getRecipeManager();
-        if (manager != cachedRecipeManager) {
-            cachedRecipeManager = manager;
-            RECIPE_ID_CACHE.clear();
-        }
-        ResourceLocation cached = RECIPE_ID_CACHE.get(recipe);
-        if (cached != null) return cached;
-
-        for (ResourceLocation id : manager.getRecipeIds().toList()) {
-            if (manager.byKey(id).orElse(null) == recipe) {
-                RECIPE_ID_CACHE.put(recipe, id);
-                return id;
-            }
-        }
-        return null;
+        return HandMadeRecipePool.recipeIdOf(level, recipe);
     }
 
     public HandSawItem(Properties properties) {
@@ -207,6 +193,24 @@ public class HandSawItem extends Item {
         if (offHand.getItem() instanceof HandSawItem) {
             offHand.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.OFFHAND));
         }
+    }
+
+    // ================= 玩家离开：清掉按 UUID 记的运行期状态 =================
+
+    /**
+     * 断线/退服时清掉 {@link #CUTTING_PLAYERS} 与 {@link #FELL_PENDING} 里属于该玩家的条目。
+     *
+     * <p>两个表都按 UUID 记录，正常情况下退出使用 / 松开按键会自己移除，
+     * 但玩家在「正在连续切削」或「正在潜行砍树」的状态下直接断线时不会走到那些清理路径，
+     * 残留条目会一直占着内存（UUID → 数据），并在同一 UUID 下次登录时表现为
+     * 「一进服就在单手锯贴图」的假状态。</p>
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        Player player = event.getEntity();
+        UUID id = player.getUUID();
+        CUTTING_PLAYERS.remove(id);
+        FELL_PENDING.remove(id);
     }
 
     // ================= 左键 START：潜行 + 可锯方块 → 记录候选目标 =================
@@ -365,8 +369,9 @@ public class HandSawItem extends Item {
             return;
         }
 
-        int windupTicks = Config.INSTANCE.handSawWindupTicks.get();
-        int cutTicks = Config.INSTANCE.handSawCutTicks.get();
+        // ★ 两侧都跑：客户端用服务端同步下来的切削节奏，音效/粒子才不会抢先或迟到
+        int windupTicks = SyncedServerConfig.handSawWindup();
+        int cutTicks = Math.max(1, SyncedServerConfig.handSawCut());
 
         int usedTicks = getUseDuration(stack) - remainingTicks;
 
@@ -458,8 +463,8 @@ public class HandSawItem extends Item {
         if (recipes.isEmpty()) return false;
 
         // ★ 批量：读附魔等级，受副手数量限制
-        int batchSize = BatchCraftingHelper.getBatchSize(saw);
-        int actual = BatchCraftingHelper.clampToAvailable(batchSize, off.getCount());
+        int batchSize = BatchCrafting.getBatchSize(saw);
+        int actual = BatchCrafting.clampToAvailable(batchSize, off.getCount());
         if (actual <= 0) return false;
 
         // ---- 选配方（一次选，应用 N 次） ----
@@ -579,6 +584,7 @@ public class HandSawItem extends Item {
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(recipe instanceof HandMadeToolRecipeLike like)) continue;
             if (like.getTool() != ToolType.HAND_SAW) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.HAND_SAW, level, recipe)) continue;
             if (!recipe.matches(customWrapper, level)) continue;
             custom.add(recipe);
         }
@@ -650,7 +656,7 @@ public class HandSawItem extends Item {
             }
         }
 
-        for (HandMadeStonecuttingRecipe recipe : level.getRecipeManager()
+        for (HandMadeRecipes.Stonecutting recipe : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.STONECUTTING_RECIPE.get())) {
             if (recipe.matches(container, level)) {
                 result.add(recipe);
@@ -682,7 +688,12 @@ public class HandSawItem extends Item {
 
         TreeCutter.Tree tree = TreeCutter.findTree(level, pos, brokenState);
         if (tree != TreeCutter.NO_TREE) {
-            tree.destroyBlocks(level, null, (dropPos, dropStack) -> {
+            // ★ 传玩家 + 工具栈，不要传 null：
+            //   - 玩家上下文让领地/保护插件、统计、进度、BreakEvent 系监听能看到剩下的木头
+            //   - 工具栈让 Create 按正常规则算掉落（附魔、精准采集等）
+            //   代价是耐久仍然只扣 1 点：TreeCutter.Tree 没有公开的方块数量接口，
+            //   想做"按块计价"得自己重走一遍树的遍历，收益有限，先不动。
+            tree.destroyBlocks(level, saw, player, (dropPos, dropStack) -> {
                 if (dropStack.isEmpty()) return;
                 Block.popResource(level, dropPos, dropStack);
             });

@@ -4,7 +4,7 @@ import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
-import com.alben.createhandmade.recipe.type.HandMadeApplicationRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.ToolType;
@@ -291,7 +291,7 @@ public class PointerItem extends Item {
     /**
      * 三层查询：L3 独立 type → L1 序列组装 → L1 DEPLOYING / ITEM_APPLICATION。
      *
-     * 返回类型是 Recipe<?>，因为 HandMadeApplicationRecipe 不是
+     * 返回类型是 Recipe<?>，因为 HandMadeRecipes.Application 不是
      * ItemApplicationRecipe 的子类。
      */
     @Nullable
@@ -306,8 +306,9 @@ public class PointerItem extends Item {
 
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
-            if (!(r instanceof HandMadeApplicationRecipe har)) continue;
+            if (!(r instanceof HandMadeRecipes.Application har)) continue;
             if (har.getTool() != ToolType.POINTER) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.POINTER, level, r)) continue;
             if (!har.matches(l3Wrapper, level)) continue;
             return har;
         }
@@ -351,14 +352,14 @@ public class PointerItem extends Item {
     /** 判断是否是应用家族的配方——同时接受 Create 的 ItemApplicationRecipe 和本模组的 L3 类。 */
     public static boolean isApplicationRecipe(@Nullable Recipe<?> recipe) {
         return recipe instanceof ItemApplicationRecipe
-                || recipe instanceof HandMadeApplicationRecipe;
+                || recipe instanceof HandMadeRecipes.Application;
     }
 
     private static void consumeTool(Player player, ItemStack tool, Recipe<?> recipe) {
         boolean keep = false;
         if (recipe instanceof ItemApplicationRecipe iar) {
             keep = iar.shouldKeepHeldItem();
-        } else if (recipe instanceof HandMadeApplicationRecipe har) {
+        } else if (recipe instanceof HandMadeRecipes.Application har) {
             keep = har.shouldKeepHeldItem();
         }
         if (keep) return;

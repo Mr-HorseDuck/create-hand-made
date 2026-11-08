@@ -2,7 +2,7 @@ package com.alben.createhandmade.compat.jei.category;
 
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.registry.ModItems;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
@@ -29,18 +29,18 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeBellowsRecipe> {
+public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeRecipes.Bellows> {
 
     private static final int LABEL_COLOR = 0xFF404040;
     private static final int LABEL_X = 50;
     private static final int LABEL_Y = 6;
 
-    public BellowsExclusiveCategory(Info<HandMadeBellowsRecipe> info) {
+    public BellowsExclusiveCategory(Info<HandMadeRecipes.Bellows> info) {
         super(info);
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, HandMadeBellowsRecipe recipe, IFocusGroup focuses) {
+    public void setRecipe(IRecipeLayoutBuilder builder, HandMadeRecipes.Bellows recipe, IFocusGroup focuses) {
         if (!recipe.getIngredients().isEmpty()) {
             builder.addSlot(RecipeIngredientRole.INPUT, 27, 51)
                     .setBackground(getRenderedSlot(), -1, -1)
@@ -76,18 +76,18 @@ public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeBello
         }
     }
 
-    private static List<ItemStack> mediaFor(HandMadeBellowsRecipe recipe) {
+    private static List<ItemStack> mediaFor(HandMadeRecipes.Bellows recipe) {
         @Nullable ResourceLocation fanTypeId = recipe.getFanType();
         return fanTypeId == null ? List.of() : BellowsMediaRegistry.getMediaFor(fanTypeId);
     }
 
-    private static List<Fluid> fluidsFor(HandMadeBellowsRecipe recipe) {
+    private static List<Fluid> fluidsFor(HandMadeRecipes.Bellows recipe) {
         @Nullable ResourceLocation fanTypeId = recipe.getFanType();
         return fanTypeId == null ? List.of() : BellowsMediaRegistry.getFluidsFor(fanTypeId);
     }
 
     @Override
-    public void draw(HandMadeBellowsRecipe recipe, IRecipeSlotsView slotsView,
+    public void draw(HandMadeRecipes.Bellows recipe, IRecipeSlotsView slotsView,
                      GuiGraphics graphics, double mouseX, double mouseY) {
         AllGuiTextures.JEI_SHADOW.render(graphics, 62, 57);
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 126, 29);
@@ -112,7 +112,7 @@ public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeBello
                 .render(graphics);
     }
 
-    private static String fanTypeLabel(HandMadeBellowsRecipe recipe) {
+    private static String fanTypeLabel(HandMadeRecipes.Bellows recipe) {
         @Nullable ResourceLocation fanTypeId = recipe.getFanType();
         return fanTypeId == null ? "?" : fanTypeId.toString();
     }
@@ -125,14 +125,14 @@ public class BellowsExclusiveCategory extends CreateRecipeCategory<HandMadeBello
     }
 
     /** 收集所有 fan_type 属于第三方模组的 bellows_recipe。 */
-    public static List<HandMadeBellowsRecipe> collectThirdPartyRecipes() {
-        List<HandMadeBellowsRecipe> result = new ArrayList<>();
+    public static List<HandMadeRecipes.Bellows> collectThirdPartyRecipes() {
+        List<HandMadeRecipes.Bellows> result = new ArrayList<>();
         var level = Minecraft.getInstance().level;
         if (level == null) return result;
 
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
-            if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
+            if (!(r instanceof HandMadeRecipes.Bellows recipe)) continue;
             ResourceLocation fanType = recipe.getFanType();
             if (fanType == null) continue;
             if ("create".equals(fanType.getNamespace())) continue;

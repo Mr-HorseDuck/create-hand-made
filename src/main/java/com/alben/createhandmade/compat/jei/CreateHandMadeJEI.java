@@ -15,12 +15,12 @@ import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.registry.ModItems;
+import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.compat.jei.category.BellowsExclusiveCategory;
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
@@ -300,8 +300,8 @@ public class CreateHandMadeJEI implements IModPlugin {
                 () -> BellowsMediaRegistry.getMediaFor(AllFanProcessingTypes.SPLASHING)));
 
             // ==================== 风箱 · 第三方兼容 ====================
-        CreateRecipeCategory.Info<HandMadeBellowsRecipe> bellowsExclusiveInfo =
-                new CreateRecipeCategory.Info<HandMadeBellowsRecipe>(
+        CreateRecipeCategory.Info<HandMadeRecipes.Bellows> bellowsExclusiveInfo =
+                new CreateRecipeCategory.Info<HandMadeRecipes.Bellows>(
                         ModJeiTypes.BELLOWS_EXCLUSIVE,
                         Component.translatable("jei.create_hand_made.bellows_exclusive"),
                         new EmptyBackground(177, 85),
@@ -387,7 +387,7 @@ public class CreateHandMadeJEI implements IModPlugin {
     }
 
     /**
-     * 手锯切削：L1（CuttingRecipe）+ L3（HandMadeCuttingRecipe extends CuttingRecipe）。
+     * 手锯切削：L1（CuttingRecipe）+ L3（HandMadeRecipes.Cutting extends CuttingRecipe）。
      */
     private static List<CuttingRecipe> collectHandSawRecipes() {
         List<CuttingRecipe> result = new ArrayList<>();
@@ -397,7 +397,7 @@ public class CreateHandMadeJEI implements IModPlugin {
             if (r instanceof CuttingRecipe c) result.add(c);
         }
 
-        // L3：独立 type（HandMadeCuttingRecipe 也是 CuttingRecipe 子类）
+        // L3：独立 type（HandMadeRecipes.Cutting 也是 CuttingRecipe 子类）
         var level = Minecraft.getInstance().level;
         if (level != null) {
             for (Recipe<?> r : level.getRecipeManager()
@@ -409,11 +409,11 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.HAND_SAW, result);
     }
 
     /**
-     * 手锯切石：L1（原版 minecraft:stonecutting）+ L3（HandMadeStonecuttingRecipe）。
+     * 手锯切石：L1（原版 minecraft:stonecutting）+ L3（HandMadeRecipes.Stonecutting）。
      */
     private static List<CondensedBlockCuttingRecipe> collectHandSawStonecuttingRecipes() {
         List<Recipe<?>> recipes = new ArrayList<>();
@@ -426,17 +426,18 @@ public class CreateHandMadeJEI implements IModPlugin {
         // L3：独立 type 的切石
         var level = Minecraft.getInstance().level;
         if (level != null) {
-            for (HandMadeStonecuttingRecipe r : level.getRecipeManager()
+            for (HandMadeRecipes.Stonecutting r : level.getRecipeManager()
                     .getAllRecipesFor(HandMadeRecipeTypes.STONECUTTING_RECIPE.get())) {
                 recipes.add(r);
             }
         }
 
-        return BlockCuttingCategory.condenseRecipes(recipes);
+        return BlockCuttingCategory.condenseRecipes(
+                filtered(ToolType.HAND_SAW_STONECUTTING, recipes));
     }
 
     /**
-     * 冲压锤 · 置物台：L1（PressingRecipe）+ L3（HandMadePressingRecipe extends PressingRecipe）。
+     * 冲压锤 · 置物台：L1（PressingRecipe）+ L3（HandMadeRecipes.Pressing extends PressingRecipe）。
      */
     private static List<PressingRecipe> collectPressingRecipes() {
         List<PressingRecipe> result = new ArrayList<>();
@@ -458,7 +459,7 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.PRESS_HAMMER_DEPOT, result);
     }
 
     private static List<BasinRecipe> collectCompactingRecipes() {
@@ -466,25 +467,33 @@ public class CreateHandMadeJEI implements IModPlugin {
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.COMPACTING.getType())) {
             if (r instanceof BasinRecipe b) result.add(b);
         }
-        return result;
+        return filtered(ToolType.PRESS_HAMMER_BASIN, result);
     }
 
     private static List<BasinRecipe> collectAutoSquareRecipes() {
         List<BasinRecipe> result = new ArrayList<>();
         if (!AllConfigs.server().recipes.allowShapedSquareInPress.get()) return result;
 
+        // 转换后的 BasinRecipe 是临时对象、不在 RecipeManager 里（反查不到 ID），
+        // 所以要在转换前按「原始合成配方」的 ID 过 L2。
+        var level = Minecraft.getInstance().level;
+
         for (Recipe<?> r : CreateJEI.getTypedRecipes(RecipeType.CRAFTING)) {
             if (!(r instanceof CraftingRecipe cr)) continue;
             if (cr instanceof MechanicalCraftingRecipe) continue;
             if (!MechanicalPressBlockEntity.canCompress(cr)) continue;
             if (AllRecipeTypes.shouldIgnoreInAutomation(cr)) continue;
+            if (level != null
+                    && !HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_BASIN, level, cr)) {
+                continue;
+            }
             result.add(BasinRecipe.convertShapeless(cr));
         }
         return result;
     }
 
     /**
-     * 灌注枪 · 注液：L1（FillingRecipe）+ L3（HandMadeFillingRecipe extends FillingRecipe）。
+     * 灌注枪 · 注液：L1（FillingRecipe）+ L3（HandMadeRecipes.Filling extends FillingRecipe）。
      */
     private List<FillingRecipe> collectInfusionGunRecipes() {
         List<FillingRecipe> result = new ArrayList<>();
@@ -509,11 +518,11 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.INFUSION_GUN, result);
     }
 
     /**
-     * 研钵研磨：L1（MillingRecipe）+ L3（HandMadeCrushingRecipe）
+     * 研钵研磨：L1（MillingRecipe）+ L3（HandMadeRecipes.Crushing）
      * 公共父类型是 AbstractCrushingRecipe。
      */
     private static List<AbstractCrushingRecipe> collectMillingRecipes() {
@@ -536,11 +545,11 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.MORTAR, result);
     }
 
     /**
-     * 碾钵粉碎：L1（CrushingRecipe + MillingRecipe）+ L3（HandMadeCrushingRecipe）。
+     * 碾钵粉碎：L1（CrushingRecipe + MillingRecipe）+ L3（HandMadeRecipes.Crushing）。
      */
     private static List<AbstractCrushingRecipe> collectCrushingRecipes() {
         List<AbstractCrushingRecipe> result = new ArrayList<>();
@@ -567,7 +576,7 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.CRUSHER_MORTAR, result);
     }
 
     private static List<BasinRecipe> collectMixingRecipes() {
@@ -575,12 +584,15 @@ public class CreateHandMadeJEI implements IModPlugin {
         for (Recipe<?> r : CreateJEI.getTypedRecipes(AllRecipeTypes.MIXING.getType())) {
             if (r instanceof BasinRecipe b) result.add(b);
         }
-        return result;
+        return filtered(ToolType.STIRRING_STAFF, result);
     }
 
     private static List<BasinRecipe> collectAutoShapelessRecipes() {
         List<BasinRecipe> result = new ArrayList<>();
         if (!AllConfigs.server().recipes.allowShapelessInMixer.get()) return result;
+
+        // 同 collectAutoSquareRecipes：转换产物没有配方 ID，按原始合成配方判 L2
+        var level = Minecraft.getInstance().level;
 
         for (Recipe<?> r : CreateJEI.getTypedRecipes(RecipeType.CRAFTING)) {
             if (!(r instanceof CraftingRecipe cr)) continue;
@@ -588,6 +600,10 @@ public class CreateHandMadeJEI implements IModPlugin {
             if (cr.getIngredients().size() <= 1) continue;
             if (MechanicalPressBlockEntity.canCompress(cr)) continue;
             if (AllRecipeTypes.shouldIgnoreInAutomation(cr)) continue;
+            if (level != null
+                    && !HandMadeRecipePool.isAvailable(ToolType.STIRRING_STAFF, level, cr)) {
+                continue;
+            }
             result.add(BasinRecipe.convertShapeless(cr));
         }
         return result;
@@ -602,7 +618,7 @@ public class CreateHandMadeJEI implements IModPlugin {
     }
 
     /**
-     * 指杆 · 应用：L1（ItemApplicationRecipe）+ L3（HandMadeApplicationRecipe extends ItemApplicationRecipe）。
+     * 指杆 · 应用：L1（ItemApplicationRecipe）+ L3（HandMadeRecipes.Application extends ItemApplicationRecipe）。
      */
     private static List<ItemApplicationRecipe> collectPointerRecipes() {
         List<ItemApplicationRecipe> result = new ArrayList<>();
@@ -628,7 +644,30 @@ public class CreateHandMadeJEI implements IModPlugin {
             }
         }
 
-        return result;
+        return filtered(ToolType.POINTER, result);
+    }
+
+    /**
+     * 按 tool id 过一遍 L2（数据包 + KubeJS 过滤器）。
+     *
+     * <p>JEI 类别是玩家"照着摆料"的依据。这里不过滤的话，整合包禁掉的配方仍然会显示，
+     * 玩家照做必然没反应 —— 工具侧早就按 L2 拒绝执行，两边口径必须一致。</p>
+     *
+     * <p>配方 ID 反查走 {@link HandMadeRecipePool#isAvailable}（内部有缓存表），
+     * 所以可以对整个列表逐条调用。{@code level == null}（主菜单 / 尚未进入世界）时原样返回：
+     * 那时没有类别在渲染，也没有 RecipeManager 可反查。</p>
+     */
+    private static <T extends Recipe<?>> List<T> filtered(ToolType tool, List<T> recipes) {
+        if (recipes.isEmpty()) return recipes;
+
+        var level = Minecraft.getInstance().level;
+        if (level == null) return recipes;
+
+        List<T> kept = new ArrayList<>(recipes.size());
+        for (T recipe : recipes) {
+            if (HandMadeRecipePool.isAvailable(tool, level, recipe)) kept.add(recipe);
+        }
+        return kept;
     }
 
     private static List<AbstractCookingRecipe> collectBellowsBlastingRecipes() {

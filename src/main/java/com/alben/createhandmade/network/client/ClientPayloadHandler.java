@@ -1,12 +1,14 @@
 package com.alben.createhandmade.network.client;
 
-import com.alben.createhandmade.client.ClientStirringState;
+import com.alben.createhandmade.client.ClientStates;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.network.BellowsBlastPacket;
+import com.alben.createhandmade.network.ConfigSyncPacket;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.StirringStatePacket;
-import com.alben.createhandmade.particle.BellowsAirParticleData;
+import com.alben.createhandmade.particle.BellowsAirParticle;
 import com.simibubi.create.AllSpecialTextures;
 import com.simibubi.create.content.fluids.FluidFX;
 import com.simibubi.create.content.kinetics.fan.processing.FanProcessingType;
@@ -155,7 +157,7 @@ public class ClientPayloadHandler {
 
             for (int i = 0; i < count; i++) {
                 level.addParticle(
-                        BellowsAirParticleData.blast(packet.typeId()),
+                        BellowsAirParticle.Data.blast(packet.typeId()),
                         center.x, center.y, center.z,
                         0, 0, 0
                 );
@@ -190,7 +192,7 @@ public class ClientPayloadHandler {
             Vec3 spawn = p.add(jitter);
 
             level.addParticle(
-                    BellowsAirParticleData.beam(
+                    BellowsAirParticle.Data.beam(
                             (float) dir.x, (float) dir.y, (float) dir.z,
                             speed, typeId
                     ),
@@ -212,6 +214,11 @@ public class ClientPayloadHandler {
     }
 
     public static void handleStirringState(StirringStatePacket packet) {
-        ClientStirringState.markStirring(packet.pos());
+        ClientStates.Stirring.markStirring(packet.pos());
+    }
+
+    /** 服务端配置镜像：所有客户端侧的时长参数都从这里取。 */
+    public static void handleConfigSync(ConfigSyncPacket packet) {
+        SyncedServerConfig.apply(packet.values());
     }
 }

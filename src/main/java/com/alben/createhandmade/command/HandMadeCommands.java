@@ -5,12 +5,15 @@ import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ConfigTracker;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.loading.FMLPaths;
+
+import java.nio.file.Path;
 
 @Mod.EventBusSubscriber(modid = CreateHandMade.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class HandMadeCommands {
@@ -36,9 +39,14 @@ public class HandMadeCommands {
 
     private static int reload(CommandSourceStack source) {
         try {
-            // 重新加载 COMMON 配置（Config 和 MaidConfig 都在这个类型下）
-            ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.SERVER, FMLPaths.CONFIGDIR.get());
-            CreateHandMade.LOGGER.info("[HandMade] Common configs reloaded from disk.");
+            // ★ SERVER 类型的配置（主配置 + 女仆配置）不在 .minecraft/config 下，
+            //   而是在存档目录的 serverconfig/ 里（Forge 自己的加载路径就是这样）。
+            //   以前传 FMLPaths.CONFIGDIR 会找不到文件，反而把内存里的值刷成默认值。
+            MinecraftServer server = source.getServer();
+            Path serverConfigDir = server.getWorldPath(new LevelResource("serverconfig"));
+            ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.SERVER, serverConfigDir);
+            CreateHandMade.LOGGER.info(
+                    "[HandMade] Server configs reloaded from {}", serverConfigDir);
         } catch (Throwable t) {
             CreateHandMade.LOGGER.error("[HandMade] Config reload failed", t);
             source.sendFailure(Component.translatable(

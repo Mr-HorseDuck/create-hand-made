@@ -5,7 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * 方块高亮包。
- * ★ 颜色语义由 tlmCompat 的 PointerColors 管理，main 侧只保留默认色。
+ * ★ 颜色语义由 tlmCompat 的 PointerDataHelper.Colors 管理，main 侧只保留默认色。
  */
 public class HighlightBlockPacket {
 

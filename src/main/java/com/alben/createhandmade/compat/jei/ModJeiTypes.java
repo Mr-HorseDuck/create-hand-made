@@ -13,23 +13,23 @@ import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import net.minecraftforge.items.wrapper.RecipeWrapper;
 import mezz.jei.api.recipe.RecipeType;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 
 /**
  * ★ Forge 1.20.1 版本。
  *
  * 泛型使用 Create 原配方类作为公共父类型：
- *   - HandMadeCuttingRecipe        extends CuttingRecipe
- *   - HandMadePressingRecipe       extends PressingRecipe
- *   - HandMadeFillingRecipe        extends FillingRecipe
- *   - HandMadeApplicationRecipe    extends ItemApplicationRecipe
- *   - HandMadeCrushingRecipe       extends AbstractCrushingRecipe
- *   - HandMadeToolRecipe（basin）  extends BasinRecipe
+ *   - HandMadeRecipes.Cutting        extends CuttingRecipe
+ *   - HandMadeRecipes.Pressing       extends PressingRecipe
+ *   - HandMadeRecipes.Filling        extends FillingRecipe
+ *   - HandMadeRecipes.Application    extends ItemApplicationRecipe
+ *   - HandMadeRecipes.Crushing       extends AbstractCrushingRecipe
+ *   - HandMadeRecipes.Tool（basin）  extends BasinRecipe
  * 因此 JEI 类别泛型无需升到 ProcessingRecipe<RecipeWrapper>。
  */
 public class ModJeiTypes {
 
-    /** 手锯切削（L1 Cutting + L3 HandMadeCuttingRecipe） */
+    /** 手锯切削（L1 Cutting + L3 HandMadeRecipes.Cutting） */
     public static final RecipeType<CuttingRecipe> HAND_SAW_CUTTING =
             RecipeType.create("create_hand_made", "hand_saw_cutting", CuttingRecipe.class);
 
@@ -38,7 +38,7 @@ public class ModJeiTypes {
             RecipeType.create("create_hand_made", "hand_saw_stonecutting",
                     CondensedBlockCuttingRecipe.class);
 
-    /** 冲压锤 · 置物台 / 传送带（L1 Pressing + L3 HandMadePressingRecipe） */
+    /** 冲压锤 · 置物台 / 传送带（L1 Pressing + L3 HandMadeRecipes.Pressing） */
     public static final RecipeType<PressingRecipe> HAND_PRESS_DEPOT =
             RecipeType.create("create_hand_made", "hand_press_depot", PressingRecipe.class);
 
@@ -50,12 +50,12 @@ public class ModJeiTypes {
     public static final RecipeType<BasinRecipe> HAND_PRESS_BASIN_AUTO_SQUARE =
             RecipeType.create("create_hand_made", "hand_press_basin_auto_square", BasinRecipe.class);
 
-    /** 灌注枪 · 注液（L1 Filling + L3 HandMadeFillingRecipe） */
+    /** 灌注枪 · 注液（L1 Filling + L3 HandMadeRecipes.Filling） */
     public static final RecipeType<FillingRecipe> HAND_INFUSION_GUN =
             RecipeType.create("create_hand_made", "hand_infusion_gun", FillingRecipe.class);
 
     /**
-     * 研钵 · 研磨（L1 Milling + L3 HandMadeCrushingRecipe）
+     * 研钵 · 研磨（L1 Milling + L3 HandMadeRecipes.Crushing）
      * 公共父类是 AbstractCrushingRecipe。
      */
     public static final RecipeType<AbstractCrushingRecipe> MORTAR_MILLING =
@@ -64,7 +64,7 @@ public class ModJeiTypes {
 
     /**
      * 碾钵 · 粉碎
-     * 同时容纳 CrushingRecipe / MillingRecipe / HandMadeCrushingRecipe，
+     * 同时容纳 CrushingRecipe / MillingRecipe / HandMadeRecipes.Crushing，
      * 公共父类是 AbstractCrushingRecipe。
      */
     public static final RecipeType<AbstractCrushingRecipe> CRUSHER_MORTAR_CRUSHING =
@@ -83,7 +83,7 @@ public class ModJeiTypes {
     public static final RecipeType<BasinRecipe> STIRRING_STAFF_AUTO_BREWING =
             RecipeType.create("create_hand_made", "stirring_staff_auto_brewing", BasinRecipe.class);
 
-    /** 指杆 · 物品应用（L1 ItemApplication + L3 HandMadeApplicationRecipe） */
+    /** 指杆 · 物品应用（L1 ItemApplication + L3 HandMadeRecipes.Application） */
     public static final RecipeType<ItemApplicationRecipe> POINTER_APPLICATION =
             RecipeType.create("create_hand_made", "pointer_application", ItemApplicationRecipe.class);
 
@@ -109,13 +109,13 @@ public class ModJeiTypes {
  * <p>与上面 4 个 {@code BELLOWS_*} 的区别：那 4 个绑定的是 Create 的配方类
  * （{@code AbstractCookingRecipe} / {@code HauntingRecipe} / {@code SplashingRecipe}），
  * 因为它们要复用 Create 的类别布局、并把本模组的 L3 配方包成显示代理；
- * 本类别直接以 {@code HandMadeBellowsRecipe} 为泛型 —— 它本身是
+ * 本类别直接以 {@code HandMadeRecipes.Bellows} 为泛型 —— 它本身是
  * {@code ProcessingRecipe} 子类，能自己提供原料与产物，无需代理。</p>
  *
  * <p>原版 4 种类型<b>不收</b>：它们在各自的类别里已经显示过，重复收会变成两页同样的配方。</p>
  */
-public static final RecipeType<HandMadeBellowsRecipe> BELLOWS_EXCLUSIVE =
+public static final RecipeType<HandMadeRecipes.Bellows> BELLOWS_EXCLUSIVE =
         RecipeType.create(
                 "create_hand_made", "bellows_exclusive",
-                HandMadeBellowsRecipe.class);
+                HandMadeRecipes.Bellows.class);
 }

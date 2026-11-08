@@ -1,6 +1,6 @@
 package com.alben.createhandmade.mixin;
 
-import com.alben.createhandmade.client.ClientStirringState;
+import com.alben.createhandmade.client.ClientStates;
 import com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -30,7 +30,7 @@ public class BasinBlockEntityMixin {
         BlockPos pos = basin.getBlockPos();
 
         // 手动搅拌杖正在作用 → 永远优先
-        if (ClientStirringState.isBeingStirred(pos)) {
+        if (ClientStates.Stirring.isBeingStirred(pos)) {
             // 上方有 mixer 且正在跑 → 让原版控制（它会传 true）
             // 上方无 mixer / mixer 停了 → 强制 true
             BlockEntity above = level.getBlockEntity(pos.above(2));

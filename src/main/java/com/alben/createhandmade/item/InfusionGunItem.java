@@ -1,12 +1,13 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.renderer.InfusionGunRenderer;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
-import com.alben.createhandmade.recipe.type.HandMadeFillingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.fluid.FluidIngredient;
@@ -53,6 +54,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.Event;
@@ -286,7 +288,20 @@ public class InfusionGunItem extends Item {
         BlockState sourceState = sourceFluid.defaultFluidState().createLegacyBlock();
         if (sourceState.isAir()) return false;
 
-        level.setBlockAndUpdate(target, sourceState);
+        // ★ 保护校验：出生点保护 / 领地插件 / mayInteract 类拦截
+        if (!player.mayInteract(level, target)) {
+            CreateHandMade.debug("tryPlaceFluidBlock: mayInteract denied at {}", target);
+            return false;
+        }
+        // ★ 走 Forge 的流体放置事件，让保护类 mod 有机会改状态或拒绝
+        BlockState hookedState = ForgeEventFactory.fireFluidPlaceBlockEvent(
+                level, target, target, sourceState);
+        if (hookedState.isAir()) {
+            CreateHandMade.debug("tryPlaceFluidBlock: FluidPlaceBlockEvent denied at {}", target);
+            return false;
+        }
+
+        level.setBlockAndUpdate(target, hookedState);
         setContents(gun, contents.withDrain(FLUID_BLOCK_AMOUNT));
         damageGun(gun, player);
 
@@ -302,6 +317,12 @@ public class InfusionGunItem extends Item {
 
         InfusionGunContents contents = getContents(gun);
         if (contents.remaining() < FLUID_BLOCK_AMOUNT) return false;
+
+        // ★ 保护校验：吸取等于"把别人的方块拆了"，同样要过 mayInteract
+        if (!player.mayInteract(level, pos)) {
+            CreateHandMade.debug("tryPickupFluidBlock: mayInteract denied at {}", pos);
+            return false;
+        }
 
         level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
         setContents(gun, contents.withFill(source));
@@ -570,7 +591,7 @@ public class InfusionGunItem extends Item {
      * 三层查询：L3 独立 type → L1 序列组装 → L1 FILLING。
      *
      * ★ 返回类型从 FillingRecipe 放宽到 Recipe<?>，
-     *   因为 HandMadeFillingRecipe 不是 FillingRecipe 的子类。
+     *   因为 HandMadeRecipes.Filling 不是 FillingRecipe 的子类。
      */
     @Nullable
     private static Recipe<?> findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
@@ -583,8 +604,9 @@ public class InfusionGunItem extends Item {
         // ---- 段 1：L3 独立 type ----
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
-            if (!(r instanceof HandMadeFillingRecipe hfr)) continue;
+            if (!(r instanceof HandMadeRecipes.Filling hfr)) continue;
             if (hfr.getTool() != ToolType.INFUSION_GUN) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.INFUSION_GUN, level, r)) continue;
             if (!hfr.matches(wrapper, level)) continue;
             if (!hfr.getRequiredFluid().test(fluid)) continue;
             return hfr;
@@ -614,11 +636,11 @@ public class InfusionGunItem extends Item {
                 ToolType.INFUSION_GUN, level, List.of(result));
         return filtered.isEmpty() ? null : filtered.get(0);
     }
-        /** 统一取 FillingRecipe / HandMadeFillingRecipe 的流体要求。 */
+        /** 统一取 FillingRecipe / HandMadeRecipes.Filling 的流体要求。 */
     @Nullable
     private static FluidIngredient getRequiredFluidOf(Recipe<?> recipe) {
         if (recipe instanceof FillingRecipe fr) return fr.getRequiredFluid();
-        if (recipe instanceof HandMadeFillingRecipe hfr) return hfr.getRequiredFluid();
+        if (recipe instanceof HandMadeRecipes.Filling hfr) return hfr.getRequiredFluid();
         return null;
     }
 
@@ -633,7 +655,9 @@ public class InfusionGunItem extends Item {
     }
 
     public static void setContents(ItemStack gun, InfusionGunContents contents) {
-        if (contents.isEmpty()) {
+        // null 与"空内容物"等价：公开 API（setInfusionGunContents）把 null 文档化成"清空"，
+        // 这里必须挡一下，否则传 null 会 NPE —— 而研钵侧 setMortarContents 是接受 null 的。
+        if (contents == null || contents.isEmpty()) {
             InfusionGunContents.clearFromStack(gun);
         } else {
             contents.writeToStack(gun);

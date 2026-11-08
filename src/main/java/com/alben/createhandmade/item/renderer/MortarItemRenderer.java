@@ -1,6 +1,6 @@
 package com.alben.createhandmade.item.renderer;
 
-import com.alben.createhandmade.Config;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.item.CrusherMortarItem;
 import com.alben.createhandmade.item.contents.MortarContents;
@@ -118,12 +118,13 @@ public class MortarItemRenderer extends CustomRenderedItemModelRenderer {
 
         if (using) {
             boolean crusher = isCrusherMortar(stack);
+            // ★ 读服务端同步下来的值（多人游戏里客户端读 SERVER 配置只有默认值）
             int windupTicks = crusher
-                    ? Config.INSTANCE.crusherMortarWindupTicks.get()
-                    : Config.INSTANCE.mortarWindupTicks.get();
+                    ? SyncedServerConfig.crusherMortarWindup()
+                    : SyncedServerConfig.mortarWindup();
             int cycleTicks = Math.max(1, crusher
-                    ? Config.INSTANCE.crusherMortarPoundCycleTicks.get()
-                    : Config.INSTANCE.mortarPoundCycleTicks.get());
+                    ? SyncedServerConfig.crusherMortarPoundCycle()
+                    : SyncedServerConfig.mortarPoundCycle());
 
             int usedTicks = player.getTicksUsingItem();
             windup = windupTicks <= 0 ? 1f : Math.min(1f, usedTicks / (float) windupTicks);

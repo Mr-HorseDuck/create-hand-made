@@ -1,13 +1,13 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.Config;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.item.renderer.BellowsItemRenderer;
 import com.alben.createhandmade.network.BellowsBlastPacket;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.FanType;
-import com.alben.createhandmade.recipe.type.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
@@ -151,7 +151,8 @@ public class BellowsItem extends Item {
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
         int usedTicks = getUseDuration(stack) - remainingTicks;
-        int chargeTicks = Config.INSTANCE.bellowsChargeTicks.get();
+        // ★ 两侧都跑：客户端必须用服务端同步下来的蓄力阈值，提示音才不会提前/滞后
+        int chargeTicks = SyncedServerConfig.bellowsCharge();
         if (usedTicks == chargeTicks && level.isClientSide) {
             player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
         }
@@ -227,7 +228,11 @@ public class BellowsItem extends Item {
                     SoundSource.PLAYERS, 0.6f, 0.8f);
         }
 
-        stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
+        // ★ 只有真吹到东西（方块被加工 / 实体吃到介质效果）才磨损：
+        //   对空吹、对着没反应的方块吹不该扣耐久
+        if (processed || (!hitEntities.isEmpty() && !entityTypes.isEmpty())) {
+            stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
+        }
 
         broadcastBellows(level,
                 processed ? pos : null,
@@ -610,14 +615,14 @@ private static void applyDyeColor(Entity entity, DyeColor color, Level level) {
         return result;
     }
 
-    // ================= FanProcessingType ↔ FanType =================
+    // ================= FanProcessingType ↔ HandMadeRecipes.FanType =================
 
     @Nullable
-    private static FanType toFanType(FanProcessingType createType) {
-        if (createType == AllFanProcessingTypes.BLASTING) return FanType.BLASTING;
-        if (createType == AllFanProcessingTypes.SMOKING) return FanType.SMOKING;
-        if (createType == AllFanProcessingTypes.HAUNTING) return FanType.HAUNTING;
-        if (createType == AllFanProcessingTypes.SPLASHING) return FanType.SPLASHING;
+    private static HandMadeRecipes.FanType toFanType(FanProcessingType createType) {
+        if (createType == AllFanProcessingTypes.BLASTING) return HandMadeRecipes.FanType.BLASTING;
+        if (createType == AllFanProcessingTypes.SMOKING) return HandMadeRecipes.FanType.SMOKING;
+        if (createType == AllFanProcessingTypes.HAUNTING) return HandMadeRecipes.FanType.HAUNTING;
+        if (createType == AllFanProcessingTypes.SPLASHING) return HandMadeRecipes.FanType.SPLASHING;
         return null;
     }
 
@@ -637,7 +642,7 @@ private static void applyDyeColor(Entity entity, DyeColor color, Level level) {
 
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.BELLOWS_RECIPE.get())) {
-            if (!(r instanceof HandMadeBellowsRecipe recipe)) continue;
+            if (!(r instanceof HandMadeRecipes.Bellows recipe)) continue;
             if (!typeId.equals(recipe.getFanType())) continue;
             if (!recipe.matches(wrapper, level)) continue;
             return RecipeApplier.applyRecipeOn(level, single, recipe, true);

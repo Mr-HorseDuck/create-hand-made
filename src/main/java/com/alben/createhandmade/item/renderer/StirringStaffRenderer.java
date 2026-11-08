@@ -1,6 +1,6 @@
 package com.alben.createhandmade.item.renderer;
 
-import com.alben.createhandmade.Config;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
@@ -63,8 +63,10 @@ public class StirringStaffRenderer extends CustomRenderedItemModelRenderer {
         if (firstPerson && player != null && player.isUsingItem()
                 && ItemStack.isSameItemSameTags(player.getUseItem(), stack)) {
             using = true;
-            int windupTicks = Math.max(1, Config.INSTANCE.stirringStaffWindupTicks.get());
-            processingTicks = Math.max(1, Config.INSTANCE.stirringStaffProcessingTicks.get());
+            // ★ 读服务端同步下来的值：多人游戏里客户端读 SERVER 配置只会拿到默认值，
+            //   动画周期就会和实际搅拌节奏脱节。
+            int windupTicks = Math.max(1, SyncedServerConfig.stirringStaffWindup());
+            processingTicks = Math.max(1, SyncedServerConfig.stirringStaffProcessing());
 
             int usedTicks = player.getTicksUsingItem();
             progress = Math.min(1f, usedTicks / (float) windupTicks);

@@ -28,7 +28,7 @@
 ## 功能列表
 - 女仆现可支持使用手搓工具进行加工
 - 需要指杆指定工作方块（Shift+右键）Ctrl+滚轮切换模式 Shift+右键应用于女仆
-- 有附魔「批量加工亅可以一次性加工多个物品 一级2个 二级 4个 三级8个
+- 有附魔「批量加工」可以一次性加工多个物品 一级2个 二级 4个 三级8个
 - /chm reload可以热重载
 
 ## 依赖
@@ -64,6 +64,7 @@
 |---|---|
 | [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 完整写法、数据包 + KubeJS 示例、字段矩阵 |
 | [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
+| [Java API](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/api.md) | `CreateHandMadeApi` 的 31 个方法、写操作副作用、1.20.1 / 1.21 差异 |
 
 支持**数据包**
 **KubeJS**

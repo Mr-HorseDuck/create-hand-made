@@ -1,10 +1,13 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.colin101.maidfactory.MaidBubbleHelper;
 import com.colin101.maidfactory.MaidConfig;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.PointerDataHelper;
 import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.InfusionGunItem;
+import com.alben.createhandmade.recipe.ToolType;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.logistics.depot.DepotBlockEntity;
@@ -59,7 +62,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
             status = Behavior.Status.STOPPED;
             return false;
         }
-        cooldown = MaidConfig.INSTANCE.maidInfusionGunCooldown.get();
+        cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidInfusionGunCooldown, maid);
 
         ItemStack gun = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
         if (!(gun.getItem() instanceof InfusionGunItem)) {
@@ -76,7 +79,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
             return false;
         }
 
-        if (!MaidRangeHelper.allWithinRange(maid, inputPos, outputPos, overflowPos)) {
+        if (!MaidHelpers.Range.allWithinRange(maid, inputPos, outputPos, overflowPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -93,7 +96,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
 
         InfusionGunContents contents = CreateHandMadeApi.infusionGunContents(gun);
 
-        MaidLookHelper.lookAtBlock(maid, contents.isEmpty() ? inputPos : outputPos);
+        MaidHelpers.Look.lookAtBlock(maid, contents.isEmpty() ? inputPos : outputPos);
 
         // ---- 枪空：从输入盆抽液 ----
         if (contents.isEmpty()) {
@@ -103,6 +106,9 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 InfusionGunContents after = CreateHandMadeApi.infusionGunContents(gun);
                 MaidFeedback.fluidDrainSound(level, inputPos);
                 MaidFeedback.fluidParticles(level, inputPos, after.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
             }
             status = ok ? Behavior.Status.RUNNING : Behavior.Status.STOPPED;
             return ok;
@@ -116,10 +122,14 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 && !(outBe instanceof BasinBlockEntity)
                 && BlockEntityBehaviour.get(level, outputPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
             if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter)) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -127,6 +137,10 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
             if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -136,16 +150,24 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
 
         // Depot 分支：对 Depot 上的物品注液
         if (outBe instanceof DepotBlockEntity) {
-            FilterItemStack filter = MaidFilterHelper.findFilterStack(maid);
+            FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
             if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter)) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }
             if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -158,12 +180,20 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
             if (CreateHandMadeApi.storeFluid(level, outputPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }
             if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
+
+                MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, gun);
+                MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, gun);
+
                 status = Behavior.Status.RUNNING;
                 return true;
             }

@@ -50,7 +50,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidInput(player, level, pos);
-            sendHighlight(level, pos, PointerColors.INPUT);
+            sendHighlight(level, pos, PointerDataHelper.Colors.INPUT);
             MaidDebug.log("LiquidMarker.doMark: set INPUT");
         } else if (outputPos == null) {
             // ★ 输出支持 Basin / Depot / Belt
@@ -59,7 +59,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidOutput(player, level, pos);
-            sendHighlight(level, pos, PointerColors.OUTPUT);
+            sendHighlight(level, pos, PointerDataHelper.Colors.OUTPUT);
             MaidDebug.log("LiquidMarker.doMark: set OUTPUT");
         } else if (overflowPos == null) {
             if (!isBasin) {
@@ -67,7 +67,7 @@ public class PointerLiquidMarker {
                 return;
             }
             PointerDataHelper.setLiquidOverflow(player, level, pos);
-            sendHighlight(level, pos, PointerColors.OVERFLOW);
+            sendHighlight(level, pos, PointerDataHelper.Colors.OVERFLOW);
             MaidDebug.log("LiquidMarker.doMark: set OVERFLOW");
         } else {
             if (!isBasin) {
@@ -76,7 +76,7 @@ public class PointerLiquidMarker {
             }
             PointerDataHelper.setLiquidInput(player, level, pos);
             PointerDataHelper.clearLiquidPartial(player);
-            sendHighlight(level, pos, PointerColors.INPUT);
+            sendHighlight(level, pos, PointerDataHelper.Colors.INPUT);
             MaidDebug.log("LiquidMarker.doMark: reset to INPUT");
         }
 

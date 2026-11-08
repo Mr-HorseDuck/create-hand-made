@@ -1,6 +1,7 @@
 package com.colin101.maidfactory.client;
 
 import com.colin101.maidfactory.MaidConfig;
+import com.colin101.maidfactory.MaidStartupConfig;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -16,9 +17,27 @@ import java.util.List;
  */
 public class MaidClothConfigIntegration {
 
-    public static void addMaidCategory(ConfigBuilder builder, ConfigEntryBuilder entry) {
+    /**
+     * @param singleplayer 是否单人游戏（集成服务端在跑）。
+     *                     与主配置各分类一致：非单人环境整页只读，只显示提示文字。
+     */
+    public static void addMaidCategory(ConfigBuilder builder, ConfigEntryBuilder entry,
+                                      boolean singleplayer) {
         ConfigCategory maid = builder.getOrCreateCategory(
                 Component.translatable("config.create_hand_made.category.maid"));
+
+        // ★ SERVER 配置：多人游戏里客户端改不了（也不该改），与普通配置同样处理
+        if (!singleplayer) {
+            maid.addEntry(entry
+                    .startTextDescription(
+                            Component.translatable("config.create_hand_made.multiplayer_hint"))
+                    .build());
+            maid.addEntry(entry
+                    .startTextDescription(
+                            Component.translatable("config.create_hand_made.server_config_hint"))
+                    .build());
+            return;
+        }
 
         // ---- 搜索半径（Double 值，用整数滑块 + 读写转换）----
         maid.addEntry(entry
@@ -36,7 +55,9 @@ public class MaidClothConfigIntegration {
         maid.addEntry(entry
                 .startIntSlider(
                         Component.translatable("config.create_hand_made.maid.press_hammer_cooldown"),
-                        MaidConfig.INSTANCE.maidPointerDeployCooldown.get(),
+                        // ★ 这里以前读的是 maidPointerDeployCooldown：默认值都是 16 所以看不出来，
+                        //   但玩家改过冷却后，滑块会显示成"指杆部署"的值。
+                        MaidConfig.INSTANCE.maidPressHammerCooldown.get(),
                         1, 200)
                 .setDefaultValue(16)
                 .setTooltip(Component.translatable(
@@ -54,6 +75,18 @@ public class MaidClothConfigIntegration {
                 .setTooltip(Component.translatable(
                         "config.create_hand_made.maid.infusion_gun_cooldown.tooltip"))
                 .setSaveConsumer(MaidConfig.INSTANCE.maidInfusionGunCooldown::set)
+                .build());
+
+        // ---- 灌注枪：是否允许就近自动注液 ----
+        maid.addEntry(entry
+                .startBooleanToggle(
+                        Component.translatable(
+                                "config.create_hand_made.maid.passive_infusion_gun"),
+                        MaidConfig.INSTANCE.maidPassiveInfusionGun.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable(
+                        "config.create_hand_made.maid.passive_infusion_gun.tooltip"))
+                .setSaveConsumer(MaidConfig.INSTANCE.maidPassiveInfusionGun::set)
                 .build());
 
         // ---- 手锯冷却 ----
@@ -128,8 +161,8 @@ public class MaidClothConfigIntegration {
         .setSaveConsumer(MaidConfig.INSTANCE.maidParticleLevel::set)
         .build());
 
-        // ---- 屏蔽模组列表 ----
-        List<String> blocked = new ArrayList<>(MaidConfig.INSTANCE.blockedMods.get());
+        // ---- 屏蔽模组列表（在 COMMON 的 MaidStartupConfig 里，改动需重启）----
+        List<String> blocked = new ArrayList<>(MaidStartupConfig.INSTANCE.blockedMods.get());
 
         maid.addEntry(entry
                 .startStrList(
@@ -140,7 +173,7 @@ public class MaidClothConfigIntegration {
                         Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.0"),
                         Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.1"),
                         Component.translatable("config.create_hand_made.maid.blocked_mods.tooltip.2"))
-                .setSaveConsumer(MaidConfig.INSTANCE.blockedMods::set)
+                .setSaveConsumer(MaidStartupConfig.INSTANCE.blockedMods::set)
                 .build());
     }
 }

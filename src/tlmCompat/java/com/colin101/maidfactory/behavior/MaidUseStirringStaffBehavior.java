@@ -1,9 +1,12 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.MaidConfig;
 import com.colin101.maidfactory.PointerDataHelper;
 import com.alben.createhandmade.item.StirringStaffItem;
+import com.alben.createhandmade.recipe.ToolType;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.processing.basin.BasinBlockEntity;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
@@ -48,7 +51,7 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
             status = Behavior.Status.STOPPED;
             return false;
         }
-        cooldown = MaidConfig.INSTANCE.maidStirringStaffCooldown.get();
+        cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidStirringStaffCooldown, maid);
 
         ItemStack tool = ((LivingEntity) maid).getItemInHand(InteractionHand.MAIN_HAND);
         if (!(tool.getItem() instanceof StirringStaffItem)) {
@@ -62,13 +65,13 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
         }
 
         BlockPos outputPos = PointerDataHelper.getLiquidOutput(maid, level);
-        MaidLookHelper.lookAtBlock(maid, outputPos);
+        MaidHelpers.Look.lookAtBlock(maid, outputPos);
         if (outputPos == null) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        if (!MaidRangeHelper.isWithinRange(maid, outputPos)) {
+        if (!MaidHelpers.Range.isWithinRange(maid, outputPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -102,9 +105,12 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
         MaidFeedback.stirParticles(level, outputPos, 8);
 
         // 扣耐久
-        tool.hurtAndBreak(1, maid, e -> {});
+        MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
 
-        cooldown = MaidConfig.INSTANCE.maidStirringStaffCooldown.get();
+        MaidBubbleHelper.tryShowFirstUse(maid, ToolType.STIRRING_STAFF, tool);
+        MaidBubbleHelper.tryShow(maid, ToolType.STIRRING_STAFF, tool);
+
+        cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidStirringStaffCooldown, maid);
         status = Behavior.Status.RUNNING;
         return true;
     }

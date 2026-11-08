@@ -3,8 +3,11 @@ package com.colin101.maidfactory.behavior;
 import com.alben.createhandmade.api.CreateHandMadeApi;
 import com.colin101.maidfactory.MaidConfig;
 import com.colin101.maidfactory.PointerDataHelper;
+import com.colin101.maidfactory.MaidBubbleHelper;
+import com.colin101.maidfactory.MaidFavorabilityHelper;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.PointerItem;
-import com.alben.createhandmade.recipe.type.HandMadeApplicationRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
@@ -84,7 +87,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
             return false;
         }
 
-        if (!MaidRangeHelper.allWithinRange(maid, workPos, inputPos, outputPos)) {
+        if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -101,12 +104,12 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         if (!(be instanceof DepotBlockEntity)
                 && BlockEntityBehaviour.get(level, workPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
-            MaidLookHelper.lookAtBlock(maid, workPos);
+            MaidHelpers.Look.lookAtBlock(maid, workPos);
             if (deployOnBelt(level, workPos, inputInv, tool, maid)) {
                 MaidFeedback.deploySound(level, workPos);
                 MaidFeedback.itemParticles(level, workPos, findFirstBeltItem(level, workPos), 6);
 
-                cooldown = MaidConfig.INSTANCE.maidPointerDeployCooldown.get();
+                cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPointerDeployCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
             }
@@ -132,7 +135,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
             return false;
         }
 
-        MaidLookHelper.lookAtBlock(maid, workPos);
+        MaidHelpers.Look.lookAtBlock(maid, workPos);
 
         // 尝试部署
         int inputSlot = findDeployableInputSlot(level, inputInv, held);
@@ -164,12 +167,14 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
                         depot.notifyUpdate();
                         depot.sendData();
                         returnOrConsumeInput(maid, inputInv, inputSlot, extracted, recipe);
-                        tool.hurtAndBreak(1, maid, e -> {});
+                        MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
 
                         MaidFeedback.deploySound(level, workPos);
                         MaidFeedback.itemParticles(level, workPos, held, 6);
 
-                        cooldown = MaidConfig.INSTANCE.maidPointerDeployCooldown.get();
+                        MaidBubbleHelper.tryShowFirstUse(maid, ToolType.POINTER, held);
+                        MaidBubbleHelper.tryShow(maid, ToolType.POINTER, held);
+                        cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPointerDeployCooldown, maid);
                         status = Behavior.Status.RUNNING;
                         return true;
                     }
@@ -182,7 +187,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
 
         // 没有匹配的部署配方 → 视为产物 → 移到输出
         if (moveToOutput(depot, outputInv)) {
-            cooldown = MaidConfig.INSTANCE.maidPointerDeployCooldown.get();
+            cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPointerDeployCooldown, maid);
             status = Behavior.Status.RUNNING;
             return true;
         }
@@ -248,7 +253,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         });
 
         if (success[0]) {
-            tool.hurtAndBreak(1, maid, e -> {});
+            MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
         }
         return success[0];
     }
@@ -286,12 +291,12 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         return nonEmpty;
     }
 
-    private static void returnOrConsumeInput(LivingEntity maid, IItemHandler inputInv,
+    private static void returnOrConsumeInput(EntityMaid maid, IItemHandler inputInv,
                                              int slot, ItemStack extracted, Recipe<?> recipe) {
         boolean keep = false;
         if (recipe instanceof ItemApplicationRecipe iar) {
             keep = iar.shouldKeepHeldItem();
-        } else if (recipe instanceof HandMadeApplicationRecipe har) {
+        } else if (recipe instanceof HandMadeRecipes.Application har) {
             keep = har.shouldKeepHeldItem();
         }
 
@@ -301,7 +306,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         }
 
         if (extracted.getMaxDamage() > 0) {
-            extracted.hurtAndBreak(1, maid, e -> {});
+            MaidFavorabilityHelper.damageToolWithLuck(extracted, maid, 1);
             inputInv.insertItem(slot, extracted, false);
         }
         // 非耐久物品：已取出，消耗掉

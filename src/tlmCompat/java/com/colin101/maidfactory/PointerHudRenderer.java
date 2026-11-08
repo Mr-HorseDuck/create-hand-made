@@ -19,8 +19,8 @@ public class PointerHudRenderer {
 
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) return;
 
-        int mode = PointerModeHelper.getMode(player.getMainHandItem());
-        if (mode != PointerModeHelper.MODE_MARK && mode != PointerModeHelper.MODE_LIQUID) return;
+        int mode = PointerDataHelper.Mode.getMode(player.getMainHandItem());
+        if (mode != PointerDataHelper.Mode.MODE_MARK && mode != PointerDataHelper.Mode.MODE_LIQUID) return;
 
         GuiGraphics graphics = event.getGuiGraphics();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
@@ -29,7 +29,7 @@ public class PointerHudRenderer {
         int lineHeight = 12;
         int startY = screenHeight - 60;
 
-        if (mode == PointerModeHelper.MODE_MARK) {
+        if (mode == PointerDataHelper.Mode.MODE_MARK) {
             renderMarkMode(graphics, mc, screenWidth, startY, lineHeight);
         } else {
             renderLiquidMode(graphics, mc, screenWidth, startY, lineHeight);
@@ -41,11 +41,11 @@ public class PointerHudRenderer {
     private static void renderMarkMode(GuiGraphics graphics, Minecraft mc,
                                         int screenWidth, int startY, int lineHeight) {
         renderLine(graphics, mc, screenWidth, startY,
-                "工作方块", PointerColors.WORK, true);
+                "工作方块", PointerDataHelper.Colors.WORK, true);
         renderLine(graphics, mc, screenWidth, startY + lineHeight,
-                "输入", PointerColors.INPUT, true);
+                "输入", PointerDataHelper.Colors.INPUT, true);
         renderLine(graphics, mc, screenWidth, startY + lineHeight * 2,
-                "输出", PointerColors.OUTPUT, true);
+                "输出", PointerDataHelper.Colors.OUTPUT, true);
     }
 
     // ================= MODE_LIQUID =================
@@ -55,17 +55,17 @@ public class PointerHudRenderer {
         renderPosLine(graphics, mc, screenWidth, startY,
                 "液体输入",
                 PointerModeHandler.getClientLiquidInput(),
-                0xFF000000 | PointerColors.INPUT, true);
+                0xFF000000 | PointerDataHelper.Colors.INPUT, true);
 
         renderPosLine(graphics, mc, screenWidth, startY + lineHeight,
                 "液体输出",
                 PointerModeHandler.getClientLiquidOutput(),
-                0xFF000000 | PointerColors.OUTPUT, true);
+                0xFF000000 | PointerDataHelper.Colors.OUTPUT, true);
 
         renderPosLine(graphics, mc, screenWidth, startY + lineHeight * 2,
                 "过剩输出",
                 PointerModeHandler.getClientLiquidOverflow(),
-                0xFF000000 | PointerColors.OVERFLOW, true);
+                0xFF000000 | PointerDataHelper.Colors.OVERFLOW, true);
     }
 
     // ================= 通用渲染 =================

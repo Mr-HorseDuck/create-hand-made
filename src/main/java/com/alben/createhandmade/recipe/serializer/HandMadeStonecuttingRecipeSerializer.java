@@ -1,6 +1,6 @@
 package com.alben.createhandmade.recipe.serializer;
 
-import com.alben.createhandmade.recipe.type.HandMadeStonecuttingRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.google.gson.JsonObject;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -21,30 +21,30 @@ import net.minecraft.world.item.crafting.ShapedRecipe;
  * { "group": "...", "ingredient": {...}, "result": { "item": "...", "count": 1 } }
  */
 public class HandMadeStonecuttingRecipeSerializer
-        implements RecipeSerializer<HandMadeStonecuttingRecipe> {
+        implements RecipeSerializer<HandMadeRecipes.Stonecutting> {
 
     @Override
-    public HandMadeStonecuttingRecipe fromJson(ResourceLocation id, JsonObject json) {
+    public HandMadeRecipes.Stonecutting fromJson(ResourceLocation id, JsonObject json) {
         String group = GsonHelper.getAsString(json, "group", "");
         Ingredient ingredient = Ingredient.fromJson(
                 GsonHelper.getAsJsonObject(json, "ingredient"));
         ItemStack result = ShapedRecipe.itemStackFromJson(
                 GsonHelper.getAsJsonObject(json, "result"));
-        return new HandMadeStonecuttingRecipe(id, group, ingredient, result);
+        return new HandMadeRecipes.Stonecutting(id, group, ingredient, result);
     }
 
     @Override
-    public void toNetwork(FriendlyByteBuf buf, HandMadeStonecuttingRecipe recipe) {
+    public void toNetwork(FriendlyByteBuf buf, HandMadeRecipes.Stonecutting recipe) {
         buf.writeUtf(recipe.getGroup());
         recipe.getIngredients().get(0).toNetwork(buf);
         buf.writeItem(recipe.getResultItem(null));
     }
 
     @Override
-    public HandMadeStonecuttingRecipe fromNetwork(ResourceLocation id, FriendlyByteBuf buf) {
+    public HandMadeRecipes.Stonecutting fromNetwork(ResourceLocation id, FriendlyByteBuf buf) {
         String group = buf.readUtf();
         Ingredient ingredient = Ingredient.fromNetwork(buf);
         ItemStack result = buf.readItem();
-        return new HandMadeStonecuttingRecipe(id, group, ingredient, result);
+        return new HandMadeRecipes.Stonecutting(id, group, ingredient, result);
     }
 }

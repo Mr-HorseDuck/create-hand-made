@@ -1,13 +1,13 @@
 package com.alben.createhandmade.item;
 
-import com.alben.createhandmade.enchantment.BatchCraftingHelper;
+import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.item.contents.MortarContents;
 import com.alben.createhandmade.item.renderer.MortarItemRenderer;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
-import com.alben.createhandmade.Config;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.crusher.CrushingRecipe;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
@@ -48,7 +48,8 @@ import java.util.function.Consumer;
 
 public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
-    // 加工时长每次从 Config 读取，支持 /chm reload 热重载；不要改回构造期快照字段。
+    // 加工时长每次从同步镜像读取（服务端权威 + 配置重载会重新下发），
+    // 既支持热重载，也让客户端 getUseDuration / onUseTick 与服务端一致；不要改回构造期快照字段。
 
     public CrusherMortarItem(Properties properties) {
         super(properties);
@@ -56,12 +57,12 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
 
     /** 起手时长；碾钵读自己的配置段。 */
     protected int getWindupTicks() {
-        return Config.INSTANCE.crusherMortarWindupTicks.get();
+        return SyncedServerConfig.crusherMortarWindup();
     }
 
     /** 加工时长；碾钵读自己的配置段。 */
     protected int getProcessingTicks() {
-        return Config.INSTANCE.crusherMortarProcessingTicks.get();
+        return SyncedServerConfig.crusherMortarProcessing();
     }
 
     @Override
@@ -94,8 +95,8 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         }
 
         // ★ 批量：读附魔等级，受副手数量限制
-        int batchSize = BatchCraftingHelper.getBatchSize(stack);
-        int take = BatchCraftingHelper.clampToAvailable(batchSize, input.getCount());
+        int batchSize = BatchCrafting.getBatchSize(stack);
+        int take = BatchCrafting.clampToAvailable(batchSize, input.getCount());
         if (take <= 0) take = 1;
 
         ItemStack toGrind = input.copyWithCount(take);
@@ -139,18 +140,14 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         boolean produced = false;
         Recipe<?> recipe = findRecipe(level, contents.stack());
         if (recipe instanceof ProcessingRecipe<?> pr) {
-            List<ItemStack> singleResults = pr.rollResults();
-            for (ItemStack single : singleResults) {
-                if (single.isEmpty()) continue;
-                produced = true;
-                int total = single.getCount() * count;
-                int max = single.getMaxStackSize();
-                while (total > 0) {
-                    int give = Math.min(total, max);
-                    ItemStack copy = single.copy();
-                    copy.setCount(give);
-                    player.getInventory().placeItemBackInInventory(copy);
-                    total -= give;
+            // ★ 逐份摇：chance / 加权产物必须每份独立判定。之前是 rollResults() 摇一次
+            //   再把数量乘 count，等于 N 份同生共死。
+            //   摇出空的那一份按"白磨"处理 —— 不退还原料，和机械研磨一致。
+            for (int i = 0; i < count; i++) {
+                for (ItemStack rolled : pr.rollResults()) {
+                    if (rolled.isEmpty()) continue;
+                    produced = true;
+                    player.getInventory().placeItemBackInInventory(rolled.copy());
                 }
             }
         }
@@ -203,6 +200,7 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
             if (!(r instanceof HandMadeToolRecipeLike like)) continue;
             ToolType owner = like.getTool();
             if (owner != ToolType.CRUSHER_MORTAR && owner != ToolType.MORTAR) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.CRUSHER_MORTAR, level, r)) continue;
             if (!r.matches(wrapper, level)) continue;
             return r;
         }

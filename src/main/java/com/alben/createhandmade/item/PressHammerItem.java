@@ -1,15 +1,17 @@
 package com.alben.createhandmade.item;
 
-import com.alben.createhandmade.enchantment.BatchCraftingHelper;
+import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
-import com.alben.createhandmade.recipe.type.HandMadeToolRecipe;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.Config;
+import com.alben.createhandmade.CreateHandMade;
+import com.alben.createhandmade.config.SyncedServerConfig;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -82,15 +84,23 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class PressHammerItem extends Item {
 
-    int chargeTicks = Config.INSTANCE.pressHammerChargeTicks.get();
     private static final Object COMPACTING_RECIPE_KEY = new Object();
-    int chargeWindowTicks = Config.INSTANCE.pressHammerChargeWindowTicks.get();
 
     private static final float CHARGED_CRIT_MULTIPLIER = 1.5F;
 
-    private static final Map<UUID, Long> CHARGE_SWING = new HashMap<>();
-    private static final Map<UUID, Long> CHARGE_TARGET = new HashMap<>();
+    /**
+     * 蓄力命中标记：目标 → (蓄力玩家, 蓄力时刻)。
+     *
+     * <p>只在 {@code player.attack()} 这次同步调用期间存在 —— 伤害/击退事件都在里面
+     * 同步触发，调用返回即清除，所以"一次蓄力只加成这一击"。记录攻击者是为了防止
+     * 同一窗口里别的来源（队友、宠物、岩浆）打在同一目标上蹭到加成。</p>
+     */
+    private static final Map<UUID, ChargeMark> CHARGE_TARGET = new HashMap<>();
+
     private static final Map<UUID, Long> CHARGED_ATTACK = new HashMap<>();
+
+    private record ChargeMark(UUID attacker, long gameTime) {
+    }
 
     public PressHammerItem(Properties properties) {
         super(properties);
@@ -149,35 +159,39 @@ public class PressHammerItem extends Item {
     // ================= 蓄力刚满：提示音 =================
 
     /**
-     * 蓄力刚满那一刻（usedTicks == CHARGE_TICKS）播一声提示音。
+     * 蓄力刚满那一刻（usedTicks == chargeTicks）播一声提示音。
      *
      * <p>与风箱同一套做法、同一个音效 {@link AllSoundEvents#CONFIRM}（Create 自带的
      * "确认叮"，语义是"就绪"）。只在客户端播：这是给操作者本人的即时反馈，
      * 服务端 {@code playSound(null, …)} 会广播给附近所有人，蓄力提示音不该如此。</p>
      *
-     * <p>用 {@code usedTicks == CHARGE_TICKS} 精确触发一次 —— 若写
-     * {@code usedTicks % CHARGE_TICKS} 会每 15 tick 重复响。</p>
+     * <p>用 {@code usedTicks == chargeTicks} 精确触发一次 —— 若写
+     * {@code usedTicks % chargeTicks} 会每 chargeTicks tick 重复响。</p>
      */
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
-    if (!(entity instanceof Player player)) return;
-    int usedTicks = getUseDuration(stack) - remainingTicks;
-    int chargeTicks = Config.INSTANCE.pressHammerChargeTicks.get();
-    if (usedTicks == chargeTicks && level.isClientSide) {
-        player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
+        if (!(entity instanceof Player player)) return;
+        int usedTicks = getUseDuration(stack) - remainingTicks;
+        // ★ 这里跑在两侧：客户端读的是服务端同步下来的值，才能和 releaseUsing 的判定对齐
+        int chargeTicks = SyncedServerConfig.pressHammerCharge();
+        if (usedTicks == chargeTicks && level.isClientSide) {
+            player.playSound(AllSoundEvents.CONFIRM.getMainEvent(), 1.0f, 1.0f);
+        }
     }
-}
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
-
-        int usedTicks = getUseDuration(stack) - timeLeft;
-        if (usedTicks < Config.INSTANCE.bellowsChargeTicks.get()) return;
         if (level.isClientSide) return;
 
+        int usedTicks = getUseDuration(stack) - timeLeft;
+        // ★ 冲压锤的蓄力阈值是 pressHammerChargeTicks（默认 15），不是风箱的 10。
+        //   之前误读 bellowsChargeTicks，导致 10~14 tick 松手时服务端照砸、
+        //   但客户端提示音（按 15 判定）没响，玩家以为没蓄够。
+        //   取值统一走 SyncedServerConfig：两侧拿到同一份服务端权威参数。
+        if (usedTicks < SyncedServerConfig.pressHammerCharge()) return;
+
         long gameTime = level.getGameTime();
-        CHARGE_SWING.put(player.getUUID(), gameTime);
         player.swing(player.getUsedItemHand(), true);
 
         double entityReach = player.getAttributeValue(ForgeMod.ENTITY_REACH.get());
@@ -186,11 +200,18 @@ public class PressHammerItem extends Item {
 
         EntityHitResult entityHit = findEntityHit(player, eye, look, entityReach);
         if (entityHit != null && entityHit.getEntity() instanceof LivingEntity target) {
-            CHARGE_TARGET.put(target.getUUID(), gameTime);
+            CHARGE_TARGET.put(target.getUUID(), new ChargeMark(player.getUUID(), gameTime));
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(
                     level, target.blockPosition(), 1f, 0.8f);
             CHARGED_ATTACK.put(player.getUUID(), gameTime);
-            player.attack(target);
+            try {
+                player.attack(target);
+            } finally {
+                // ★ 一次蓄力只作用于这一击：LivingHurtEvent / LivingKnockBackEvent
+                //   都在 attack() 里同步触发，返回后立刻撤标记，后续落在同一目标上的
+                //   伤害（含同 tick 内别的来源）就吃不到加成了。
+                CHARGE_TARGET.remove(target.getUUID());
+            }
             stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
             return;
         }
@@ -205,23 +226,26 @@ public class PressHammerItem extends Item {
             List<ItemStack> particleItems = findTargetItems(level, pos);
 
             // ★ 批量：读附魔等级
-            int batchSize = BatchCraftingHelper.getBatchSize(stack);
+            int batchSize = BatchCrafting.getBatchSize(stack);
 
-            tryPressBasin(level, pos, null);
-            tryPressTransported(level, pos, null, batchSize);
+            boolean basinPressed = tryPressBasin(level, pos, null);
+            boolean beltPressed = tryPressTransported(level, pos, null, batchSize);
 
             if (!particleItems.isEmpty()) {
                 broadcastParticles(level, pos, particleItems);
             }
             AllSoundEvents.MECHANICAL_PRESS_ACTIVATION.playOnServer(level, pos, 1f, 0.8f);
 
-            stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
+            // ★ 只有真压到东西才磨损：对着普通方块 / 空容器砸不该扣耐久
+            if (basinPressed || beltPressed) {
+                stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
+            }
         } else {
+            // ★ 对空挥只有动静，不扣耐久
             Vec3 soundPos = eye.add(look.scale(1.0));
             level.playSound(null, BlockPos.containing(soundPos),
                     SoundEvents.PLAYER_ATTACK_STRONG,
                     SoundSource.PLAYERS, 0.6f, 0.9f);
-            stack.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
         }
     }
 
@@ -267,19 +291,24 @@ public class PressHammerItem extends Item {
         LivingEntity target = event.getEntity();
         if (target.level().isClientSide) return;
 
-        Long targetTime = CHARGE_TARGET.get(target.getUUID());
-        if (targetTime == null) return;
+        ChargeMark mark = CHARGE_TARGET.get(target.getUUID());
+        if (mark == null) return;
 
-        long elapsed = target.level().getGameTime() - targetTime;
+        long elapsed = target.level().getGameTime() - mark.gameTime();
         if (elapsed > Config.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_TARGET.remove(target.getUUID());
             return;
         }
 
-        if (event.getSource().getEntity() instanceof Player attacker) {
-            if (isVanillaCritCondition(attacker)) {
-                return;
-            }
+        // ★ 只认蓄力玩家本人打出的这一击。之前只要目标有标记，窗口内任何来源
+        //   （队友 / 宠物 / 岩浆 / 摔落 / 玩家自己的第二下）都吃 1.5 倍。
+        if (!(event.getSource().getEntity() instanceof Player attacker)
+                || !attacker.getUUID().equals(mark.attacker())) {
+            return;
+        }
+
+        if (isVanillaCritCondition(attacker)) {
+            return;
         }
 
         float originalDamage = event.getAmount();
@@ -300,15 +329,17 @@ public class PressHammerItem extends Item {
     @SubscribeEvent
     public static void onKnockback(LivingKnockBackEvent event) {
         LivingEntity target = event.getEntity();
-        Long targetTime = CHARGE_TARGET.get(target.getUUID());
-        if (targetTime == null) return;
+        ChargeMark mark = CHARGE_TARGET.get(target.getUUID());
+        if (mark == null) return;
 
-        long elapsed = target.level().getGameTime() - targetTime;
+        long elapsed = target.level().getGameTime() - mark.gameTime();
         if (elapsed > Config.INSTANCE.pressHammerChargeWindowTicks.get()) {
             CHARGE_TARGET.remove(target.getUUID());
             return;
         }
 
+        // 击退事件不带攻击者（LivingKnockBackEvent 没有 getAttacker），来源校验交给
+        // "标记只存活于 player.attack() 这次同步调用期间"这条约束来保证。
         event.setStrength(event.getStrength() + 2.0F);
         CHARGE_TARGET.remove(target.getUUID());
     }
@@ -369,8 +400,9 @@ public class PressHammerItem extends Item {
         // L3：独立 type + tool=press_hammer_basin
         for (Recipe<?> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
-            if (!(r instanceof HandMadeToolRecipe htr)) continue;
+            if (!(r instanceof HandMadeRecipes.Tool htr)) continue;
             if (htr.getTool() != ToolType.PRESS_HAMMER_BASIN) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_BASIN, level, htr)) continue;
             if (!BasinRecipe.match(basin, htr)) continue;
             if (!resultsPassFilter(level, htr, filter)) continue;
             if (BasinRecipe.apply(basin, htr)) {
@@ -396,7 +428,10 @@ public class PressHammerItem extends Item {
                     return true;
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            // 配方数据有问题（缺流体、原料表畸形等）时 Create 会抛，按压应当只是失败而不是崩游戏；
+            // 但不能像以前那样直接吞掉——排查"按压没反应"时这是唯一的线索。
+            CreateHandMade.LOGGER.debug("[HandMade] Press-hammer basin apply failed, recipe skipped", ex);
         }
         return false;
     }
@@ -434,6 +469,7 @@ public class PressHammerItem extends Item {
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(r instanceof HandMadeToolRecipeLike like)) continue;
             if (like.getTool() != ToolType.PRESS_HAMMER_DEPOT) continue;
+            if (!HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_DEPOT, level, r)) continue;
             if (!r.matches(l3Wrapper, level)) continue;
             return r;
         }
@@ -499,21 +535,36 @@ public class PressHammerItem extends Item {
             int toProcess = Math.min(maxBatch - processed[0], stack.getCount());
             if (toProcess <= 0) return TransportedResult.doNothing();
 
-            // ★ 循环 toProcess 次，每次处理 1 个，累加产物
+            // ★ 循环 toProcess 次，每次处理 1 个，累加产物。
+            //   概率配方可能这一次什么都没摇出来 —— 那时这一份算"白磨"（料照扣，和研钵一致），
+            //   但整批一份都没命中就不动料：之前不看单次结果、直接按份数扣料，
+            //   整批都没命中时会变成"料没了、产物为零"。
             List<ItemStack> allResults = new ArrayList<>();
+            int produced = 0;
             for (int i = 0; i < toProcess; i++) {
                 List<ItemStack> one = RecipeApplier.applyRecipeOn(
                         level, stack.copyWithCount(1), recipe, true);
-                allResults.addAll(one);
+                boolean anyNonEmpty = false;
+                for (ItemStack result : one) {
+                    if (result.isEmpty()) continue;
+                    anyNonEmpty = true;
+                    allResults.add(result);
+                }
+                if (anyNonEmpty) produced++;
             }
 
+            if (produced == 0) {
+                CreateHandMade.debug("tryPressTransported: batch of {} rolled nothing, keep item at {}",
+                        toProcess, pos);
+                return TransportedResult.doNothing();
+            }
             if (!resultsPassFilter(level, allResults, filter)) {
                 return TransportedResult.doNothing();
             }
 
             processed[0] += toProcess;
 
-            // 堆叠剩余
+            // 堆叠剩余：摇空的份也照扣（白磨）
             ItemStack left = stack.copy();
             left.shrink(toProcess);
 
@@ -557,7 +608,10 @@ public class PressHammerItem extends Item {
                     if (!s.isEmpty() && filter.test(level, s)) return true;
                 }
                 return false;
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                // 摇不出结果（概率表为空等）时按"不过滤"处理，交给上层继续判
+                CreateHandMade.LOGGER.debug(
+                        "[HandMade] rollResults failed while filtering, treating as pass", ex);
             }
         }
 
