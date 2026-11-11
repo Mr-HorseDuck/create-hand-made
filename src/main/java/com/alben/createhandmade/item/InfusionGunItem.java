@@ -6,8 +6,9 @@ import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.recipe.HandMadeFillingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeTool;
+import com.simibubi.create.AllParticleTypes;
 import com.simibubi.create.AllRecipeTypes;
-import com.simibubi.create.content.fluids.FluidFX;
+import com.simibubi.create.content.fluids.particle.FluidParticleData;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.fluids.transfer.GenericItemFilling;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -597,7 +598,8 @@ public class InfusionGunItem extends Item {
         double fluidHeight = level.getFluidState(sourcePos).getOwnHeight();
         Vec3 center = Vec3.atBottomCenterOf(sourcePos).add(0, fluidHeight + 0.1, 0);
 
-        ParticleOptions particle = FluidFX.getFluidParticle(fluid);
+        // FluidFX also references client-only classes, so construct the common particle data directly.
+        ParticleOptions particle = new FluidParticleData(AllParticleTypes.FLUID_PARTICLE.get(), fluid);
         RandomSource random = level.getRandom();
 
         for (int i = 0; i < 3; i++) {
