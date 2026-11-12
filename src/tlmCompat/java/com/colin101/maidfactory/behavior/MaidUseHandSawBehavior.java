@@ -17,6 +17,7 @@ import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour
 import com.simibubi.create.foundation.recipe.RecipeApplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.behavior.Behavior;
@@ -24,8 +25,6 @@ import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
@@ -88,25 +87,13 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
 
         BlockEntity be = level.getBlockEntity(workPos);
 
-        // ---- Depot：完整物流 ----
+        // ---- Depot：标了输入/输出走完整物流，只标工作方块则纯切削 ----
         if (be instanceof DepotBlockEntity depot) {
-            BlockPos inputPos = PointerDataHelper.getInput(maid, level);
-            BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
-            if (inputPos == null || outputPos == null) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
-            if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
-
-            IItemHandler inputInv = getItemHandler(level, inputPos);
-            IItemHandler outputInv = getItemHandler(level, outputPos);
-            if (inputInv == null || outputInv == null) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
+            // ★ 只加工模式：input / output 是可选的。没标、够不着、不是容器，
+            //   就只切削玩家自己放在 Depot 上的物品，不取料也不搬产物。
+            IItemHandler inputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getInput(maid, level));
+            IItemHandler outputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getOutput(maid, level));
+            boolean logistics = inputInv != null && outputInv != null;
 
             MaidHelpers.Look.lookAtBlock(maid, workPos);
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
@@ -114,7 +101,8 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             ItemStack held = depot.getHeldItem();
 
             if (held.isEmpty()) {
-                if (fillDepotOne(level, depot, inputInv)) {
+                // 只有补齐了输入容器才能自己取料
+                if (logistics && fillDepotOne(level, depot, inputInv)) {
                     cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
@@ -132,7 +120,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
-            } else {
+            } else if (logistics) {
                 if (moveToOutput(depot, outputInv)) {
                     cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidHandSawCooldown, maid);
                     status = Behavior.Status.RUNNING;
@@ -273,7 +261,7 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
     }
 
     private static boolean cutDepotItem(ServerLevel level, DepotBlockEntity depot,
-                                         IItemHandler outputInv, ItemStack saw,
+                                         @Nullable IItemHandler outputInv, ItemStack saw,
                                          EntityMaid maid, FilterItemStack filter) {
         ItemStack held = depot.getHeldItem();
         if (held.isEmpty()) return false;
@@ -287,39 +275,23 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         // 只减 1 个，不是清空整组
         ItemStack remainingHeld = held.copy();
         remainingHeld.shrink(1);
-        if (remainingHeld.isEmpty()) {
-            depot.setHeldItem(ItemStack.EMPTY);
-        } else {
-            depot.setHeldItem(remainingHeld);
-        }
+        depot.setHeldItem(remainingHeld);
 
-        ItemStack leftover = ItemStack.EMPTY;
+        // ★ outputInv 为 null = 只加工模式：产物没地方放，先占回 Depot 槽位，
+        //   放不下的掉在 Depot 上方（与原先「输出塞不下就掉落」的处理一致）。
+        List<ItemStack> overflow = new ArrayList<>();
         for (ItemStack result : results) {
             if (result.isEmpty()) continue;
-            ItemStack remaining = insertAll(outputInv, result);
-            if (!remaining.isEmpty()) {
-                leftover = remaining;
-                break;
+            if (outputInv != null) {
+                ItemStack remaining = insertAll(outputInv, result);
+                if (!remaining.isEmpty()) overflow.add(remaining);
+            } else {
+                overflow.add(result);
             }
         }
 
-        if (!leftover.isEmpty()) {
-            ItemStack current = depot.getHeldItem();
-            if (current.isEmpty()) {
-                depot.setHeldItem(leftover);
-            } else {
-                depot.notifyUpdate();
-                depot.sendData();
-                MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
-                MaidFeedback.cutSound(level, depot.getBlockPos());
-                MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);
-                net.minecraft.world.Containers.dropItemStack(level,
-                        depot.getBlockPos().getX(),
-                        depot.getBlockPos().getY() + 1,
-                        depot.getBlockPos().getZ(),
-                        leftover);
-                return false;
-            }
+        if (!overflow.isEmpty() && depot.getHeldItem().isEmpty()) {
+            depot.setHeldItem(overflow.remove(0));
         }
 
         depot.notifyUpdate();
@@ -330,7 +302,15 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         MaidFeedback.cutSound(level, depot.getBlockPos());
         MaidFeedback.itemParticles(level, depot.getBlockPos(), held, 8);
 
-        return leftover.isEmpty();
+        for (ItemStack drop : overflow) {
+            Containers.dropItemStack(level,
+                    depot.getBlockPos().getX(),
+                    depot.getBlockPos().getY() + 1,
+                    depot.getBlockPos().getZ(),
+                    drop);
+        }
+
+        return true;
     }
 
     private static boolean moveToOutput(DepotBlockEntity depot, IItemHandler outputInv) {
@@ -356,14 +336,6 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
             remaining = inv.insertItem(i, remaining, false);
         }
         return remaining;
-    }
-
-    @Nullable
-    private static IItemHandler getItemHandler(ServerLevel level, BlockPos pos) {
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) return null;
-        LazyOptional<IItemHandler> opt = be.getCapability(ForgeCapabilities.ITEM_HANDLER, null);
-        return opt.orElse(null);
     }
 
     @Override

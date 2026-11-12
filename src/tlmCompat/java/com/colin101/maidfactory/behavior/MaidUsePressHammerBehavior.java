@@ -22,11 +22,7 @@ import net.minecraft.world.entity.ai.behavior.Behavior;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
-
-import javax.annotation.Nullable;
 
 /**
  * 女仆冲压锤行为。
@@ -117,25 +113,12 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        // ---- Depot：完整物流 ----
+        // ---- Depot：标了输入/输出走完整物流，只标工作方块则纯冲压 ----
         if (be instanceof DepotBlockEntity depot) {
-            BlockPos inputPos = PointerDataHelper.getInput(maid, level);
-            BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
-            if (inputPos == null || outputPos == null) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
-            if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
-
-            IItemHandler inputInv = getItemHandler(level, inputPos);
-            IItemHandler outputInv = getItemHandler(level, outputPos);
-            if (inputInv == null || outputInv == null) {
-                status = Behavior.Status.STOPPED;
-                return false;
-            }
+            // ★ 只加工模式：input / output 可选。缺失时只冲压玩家自己放在 Depot 上的物品。
+            IItemHandler inputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getInput(maid, level));
+            IItemHandler outputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getOutput(maid, level));
+            boolean logistics = inputInv != null && outputInv != null;
 
             MaidHelpers.Look.lookAtBlock(maid, workPos);
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
@@ -144,7 +127,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
 
             if (held.isEmpty()) {
                 // 空 → 从输入取 1 个（取料不播反馈）
-                if (fillDepotOne(level, depot, inputInv)) {
+                if (logistics && fillDepotOne(level, depot, inputInv)) {
                     cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
                     status = Behavior.Status.RUNNING;
                     return true;
@@ -169,7 +152,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                     status = Behavior.Status.RUNNING;
                     return true;
                 }
-            } else {
+            } else if (logistics) {
                 // 无配方 → 视为产物 → 移到输出（移产物不播反馈）
                 if (moveToOutput(depot, outputInv)) {
                     cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidPressHammerCooldown, maid);
@@ -268,14 +251,6 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
         depot.notifyUpdate();
         depot.sendData();
         return true;
-    }
-
-    @Nullable
-    private static IItemHandler getItemHandler(ServerLevel level, BlockPos pos) {
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) return null;
-        LazyOptional<IItemHandler> opt = be.getCapability(ForgeCapabilities.ITEM_HANDLER, null);
-        return opt.orElse(null);
     }
 
     @Override

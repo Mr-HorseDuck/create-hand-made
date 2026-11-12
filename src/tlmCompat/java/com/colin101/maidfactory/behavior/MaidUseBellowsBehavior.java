@@ -22,8 +22,6 @@ import net.minecraft.world.entity.ai.behavior.Behavior;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
@@ -118,36 +116,24 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
             return false;
         }
 
-        // ---- Depot：完整流程 ----
+        // ---- Depot：标了输入/输出走完整流程，只标工作方块则纯鼓风 ----
         if (!(be instanceof DepotBlockEntity depot)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
-        BlockPos inputPos = PointerDataHelper.getInput(maid, level);
-        BlockPos outputPos = PointerDataHelper.getOutput(maid, level);
-        if (inputPos == null || outputPos == null) {
-            status = Behavior.Status.STOPPED;
-            return false;
-        }
-        if (!MaidHelpers.Range.allWithinRange(maid, workPos, inputPos, outputPos)) {
-            status = Behavior.Status.STOPPED;
-            return false;
-        }
-
-        IItemHandler inputInv = getItemHandler(level, inputPos);
-        IItemHandler outputInv = getItemHandler(level, outputPos);
-        if (inputInv == null || outputInv == null) {
-            status = Behavior.Status.STOPPED;
-            return false;
-        }
+        // ★ 只加工模式：input / output 可选，缺失时只吹玩家自己放在 Depot 上的物品，
+        //   既不自己取料，也不把产物搬到输出容器。
+        IItemHandler inputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getInput(maid, level));
+        IItemHandler outputInv = MaidHelpers.Handler.resolve(level, maid, PointerDataHelper.getOutput(maid, level));
+        boolean logistics = inputInv != null && outputInv != null;
 
         MaidHelpers.Look.lookAtBlock(maid, workPos);
 
         ItemStack held = depot.getHeldItem();
 
         if (held.isEmpty()) {
-            if (fillDepotOne(level, depot, inputInv, type)) {
+            if (logistics && fillDepotOne(level, depot, inputInv, type)) {
                 cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
                 return true;
@@ -168,7 +154,7 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
                 status = Behavior.Status.RUNNING;
                 return true;
             }
-        } else {
+        } else if (logistics) {
             if (moveToOutput(depot, outputInv)) {
                 cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidBellowsCooldown, maid);
                 status = Behavior.Status.RUNNING;
@@ -256,14 +242,6 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
             }
         }
         return null;
-    }
-
-    @Nullable
-    private static IItemHandler getItemHandler(ServerLevel level, BlockPos pos) {
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) return null;
-        LazyOptional<IItemHandler> opt = be.getCapability(ForgeCapabilities.ITEM_HANDLER, null);
-        return opt.orElse(null);
     }
 
     @Override

@@ -11,7 +11,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
@@ -82,6 +84,33 @@ public final class MaidHelpers {
             return isWithinRange(maid, a)
                     && isWithinRange(maid, b)
                     && isWithinRange(maid, c);
+        }
+    }
+
+    /**
+     * 可选标记坐标的物品容器解析。
+     *
+     * <p>「只加工模式」下 input / output 是可以不标的，调用方要能区分
+     * 「没标」「标了但够不着」「标了但没有物品容器」这三种情况，统一返回 null 即可，
+     * 由调用方降级成纯加工（不取料、不搬产物）。</p>
+     */
+    public static final class Handler {
+
+        private Handler() {}
+
+        /**
+         * 解析一个可选标记坐标上的物品容器；任何一项不满足都返回 null。
+         *
+         * <p>坐标本身由调用方在做工作方块校验时一并覆盖，这里只补一条：必须也在搜索半径内。</p>
+         */
+        @Nullable
+        public static IItemHandler resolve(ServerLevel level, EntityMaid maid, @Nullable BlockPos pos) {
+            if (pos == null) return null;
+            if (!Range.isWithinRange(maid, pos)) return null;
+
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be == null) return null;
+            return be.getCapability(ForgeCapabilities.ITEM_HANDLER, null).orElse(null);
         }
     }
 

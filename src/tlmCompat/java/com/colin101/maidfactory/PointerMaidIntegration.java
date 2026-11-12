@@ -30,7 +30,9 @@ public class PointerMaidIntegration {
         BlockPos input = PointerDataHelper.getInput(player, entity.level());
         BlockPos output = PointerDataHelper.getOutput(player, entity.level());
 
-        if (work == null || input == null || output == null) {
+        // ★ 只有工作方块是必需的：只标工作方块 = 只加工模式
+        //   （女仆只处理玩家自己放在工作方块上的物品，不取料、不搬产物）。
+        if (work == null) {
             player.displayClientMessage(
                     Component.translatable("message.create_hand_made.pointer.incomplete")
                             .withStyle(ChatFormatting.RED),
@@ -41,11 +43,13 @@ public class PointerMaidIntegration {
 
         PointerDataHelper.copyFrom(player, maid);
 
-        player.displayClientMessage(
-                Component.translatable("message.create_hand_made.pointer.applied",
-                                formatPos(work), formatPos(input), formatPos(output))
-                        .withStyle(ChatFormatting.GREEN),
-                true);
+        Component feedback = (input != null && output != null)
+                ? Component.translatable("message.create_hand_made.pointer.applied",
+                        formatPos(work), formatPos(input), formatPos(output))
+                : Component.translatable("message.create_hand_made.pointer.applied.workonly",
+                        formatPos(work));
+
+        player.displayClientMessage(feedback.copy().withStyle(ChatFormatting.GREEN), true);
 
         entity.level().playSound(null, entity.blockPosition(),
                 SoundEvents.EXPERIENCE_ORB_PICKUP,

@@ -212,7 +212,9 @@ public class MaidNetwork {
                     MaidDebug.log("ApplyToMaid MARK: work={}, input={}, output={}",
                             work, input, output);
 
-                    if (work == null || input == null || output == null) {
+                    // ★ 只有工作方块是必需的：只标工作方块 = 只加工模式
+                    //   （女仆只处理玩家自己放在工作方块上的物品，不取料、不搬产物）。
+                    if (work == null) {
                         player.displayClientMessage(
                                 Component.translatable("message.create_hand_made.pointer.incomplete"),
                                 true);
@@ -224,10 +226,17 @@ public class MaidNetwork {
                     MaidDebug.log("ApplyToMaid MARK: applied to maid {}",
                             maidEntity.getId());
 
-                    player.displayClientMessage(
-                            Component.translatable("message.create_hand_made.pointer.applied",
-                                    formatPos(work), formatPos(input), formatPos(output)),
-                            true);
+                    if (input != null && output != null) {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.applied",
+                                        formatPos(work), formatPos(input), formatPos(output)),
+                                true);
+                    } else {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.applied.workonly",
+                                        formatPos(work)),
+                                true);
+                    }
                 }
 
                 serverLevel.playSound(null, maidEntity.blockPosition(),
