@@ -26,6 +26,12 @@ public class PointerMaidIntegration {
         Entity entity = (Entity) maid;
         if (entity.level().isClientSide) return;
 
+        // ★ 两类标记互斥：液体模式走 MaidNetwork 的 ApplyToMaidPacket 那条路径，
+        //   这里只管默认/MARK 模式。否则液体模式下会拿 MARK 的坐标去校验，
+        //   弹出「标记不完整」的误报（而且还会把液体坐标裁掉）。
+        int mode = PointerDataHelper.Mode.getMode(player.getMainHandItem());
+        if (mode == PointerDataHelper.Mode.MODE_LIQUID) return;
+
         BlockPos work = PointerDataHelper.getWork(player, entity.level());
         BlockPos input = PointerDataHelper.getInput(player, entity.level());
         BlockPos output = PointerDataHelper.getOutput(player, entity.level());

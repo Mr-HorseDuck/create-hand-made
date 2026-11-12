@@ -134,10 +134,39 @@ public final class PointerDataHelper {
         entity.getPersistentData().remove(NBT_ROOT);
     }
 
+    /**
+     * 把玩家身上的整块标记复制给女仆。
+     *
+     * <p>★ 两类标记是**互斥**的（用户拍板）：同一只女仆要么听「加工/部署」的目标，
+     * 要么听「液体搬运」的目标，不会同时持有。所以这里是整块覆盖而不是合并——
+     * 应用液体标记会清掉她原来的工作方块/输入/输出，反之亦然。
+     * 覆盖是刻意的，不是 bug；提示语里已经说明了当前应用的是哪一类。</p>
+     *
+     * <p>如果将来要改成共存，必须在这里按模式只覆盖各自那几个 key，
+     * 并且要一并检查所有读侧（9 个行为类的 tryStart）是否会因为拿到半套数据而误动作。</p>
+     */
     public static void copyFrom(Entity source, Entity target) {
         CompoundTag root = source.getPersistentData().getCompound(NBT_ROOT);
         if (root.isEmpty()) return;
-        target.getPersistentData().put(NBT_ROOT, root.copy());
+
+        // 按来源类型裁掉另一类的残留 key：玩家手上可能两套都留着（先标 MARK 再切液体模式），
+        // 整块复制会把"上一种模式的旧坐标"也带过去，女仆就会按过期目标干活。
+        int mode = source instanceof net.minecraft.world.entity.player.Player p
+                ? Mode.getMode(p.getMainHandItem())
+                : Mode.MODE_DEFAULT;
+
+        CompoundTag trimmed = root.copy();
+        if (mode == Mode.MODE_LIQUID) {
+            trimmed.remove(KEY_WORK);
+            trimmed.remove(KEY_INPUT);
+            trimmed.remove(KEY_OUTPUT);
+        } else {
+            trimmed.remove(KEY_LIQUID_INPUT);
+            trimmed.remove(KEY_LIQUID_OUTPUT);
+            trimmed.remove(KEY_LIQUID_OVERFLOW);
+        }
+
+        target.getPersistentData().put(NBT_ROOT, trimmed);
     }
 
     // ==================== 颜色键 ====================

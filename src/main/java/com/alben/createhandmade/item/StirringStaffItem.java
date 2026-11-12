@@ -58,9 +58,9 @@ import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -73,8 +73,20 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     // 客户端拿到的是服务端下发的值），这样 StirringStaffRenderer 的动画周期
     // 和实际搅拌节奏永远是同一个数。
 
-    /** 玩家 → 搅拌目标 Basin 位置。use 时缓存，onUseTick / finishUsingItem 复用。 */
-    private static final Map<UUID, BlockPos> STIRRING_TARGET = new HashMap<>();
+    /**
+     * 玩家 → 搅拌目标 Basin 位置。use 时缓存，onUseTick / finishUsingItem 复用。
+     *
+     * <p>★ 客户端与服务端**各存一份**：{@code use()} 与 {@code onUseTick()} 两侧都会跑，
+     * 早期共用一个静态 HashMap 时，集成服务器的两个线程会同时 put/remove 同一个表
+     * （HashMap 扩容期可能死循环，或者一侧 remove 掉另一侧正在用的条目，
+     * 表现为客户端音效/粒子提前断掉）。分表后每侧只碰自己那份。</p>
+     */
+    private static final Map<UUID, BlockPos> STIRRING_TARGET_CLIENT = new ConcurrentHashMap<>();
+    private static final Map<UUID, BlockPos> STIRRING_TARGET_SERVER = new ConcurrentHashMap<>();
+
+    private static Map<UUID, BlockPos> stirringTargets(Level level) {
+        return level.isClientSide ? STIRRING_TARGET_CLIENT : STIRRING_TARGET_SERVER;
+    }
 
     public StirringStaffItem(Properties properties) {
         super(properties);
@@ -149,7 +161,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
             return InteractionResultHolder.fail(stack);
         }
 
-        STIRRING_TARGET.put(player.getUUID(), pos.immutable());
+        stirringTargets(level).put(player.getUUID(), pos.immutable());
 
         player.startUsingItem(hand);
         return InteractionResultHolder.consume(stack);
@@ -172,7 +184,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
         int stirDurationTicks = Math.max(1, SyncedServerConfig.stirringStaffProcessing());
         if (usedTicks < windupTicks) return;
 
-        BlockPos pos = STIRRING_TARGET.get(player.getUUID());
+        BlockPos pos = stirringTargets(level).get(player.getUUID());
         if (pos == null) {
             if (!level.isClientSide) player.stopUsingItem();
             return;
@@ -253,21 +265,21 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
-        STIRRING_TARGET.remove(player.getUUID());
+        stirringTargets(level).remove(player.getUUID());
         return stack;
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
-        STIRRING_TARGET.remove(player.getUUID());
+        stirringTargets(level).remove(player.getUUID());
     }
 
     // ================= 玩家下线清理 =================
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        STIRRING_TARGET.remove(event.getEntity().getUUID());
+        STIRRING_TARGET_SERVER.remove(event.getEntity().getUUID());
     }
 
     // ================= 三层配方查询 =================

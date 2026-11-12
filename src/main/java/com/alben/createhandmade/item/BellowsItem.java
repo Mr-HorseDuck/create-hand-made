@@ -1,6 +1,5 @@
 package com.alben.createhandmade.item;
 
-import com.alben.createhandmade.Config;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.item.renderer.BellowsItemRenderer;
@@ -165,9 +164,14 @@ public class BellowsItem extends Item {
         if (!(entity instanceof Player player)) return;
         if (player.getUsedItemHand() != InteractionHand.MAIN_HAND) return;
 
-        int usedTicks = getUseDuration(stack) - timeLeft;
-        if (usedTicks < Config.INSTANCE.bellowsChargeTicks.get()) return;
+        // ★ isClientSide 判断必须在读配置**之前**：下面是服务端逻辑，
+        //   而 Config 是 SERVER 类型，客户端读到的是默认值、
+        //   开发环境配置未加载时 get() 还会抛 IllegalStateException。
         if (level.isClientSide) return;
+
+        int usedTicks = getUseDuration(stack) - timeLeft;
+        // ★ 走同步镜像，和 onUseTick 的提示音判定用同一个数
+        if (usedTicks < SyncedServerConfig.bellowsCharge()) return;
 
         // ★ 1. 拿副手介质的候选类型
         ItemStack media = player.getOffhandItem();

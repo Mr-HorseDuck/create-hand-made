@@ -98,9 +98,13 @@ public final class HandMadeConfig {
     /**
      * 是否输出 [HandMade-Debug] 日志。
      *
-     * <p>调试开关是"本侧是否打日志"，不从服务端同步：客户端看的是自己那份配置。</p>
+     * <p>调试开关是"本侧是否打日志"，**不参与**服务端同步（{@code SyncedServerConfig}
+     * 里没有它）。但底层 {@code Config} 是 {@code ModConfig.Type.SERVER} 类型，
+     * 所以在客户端 / 主菜单 / 开发环境里可能尚未加载，直接 {@code get()} 会抛
+     * {@link IllegalStateException}。这里统一挡掉：未加载时按"不打日志"处理。</p>
      */
     public static boolean isDebugLoggingEnabled() {
+        if (!com.alben.createhandmade.Config.SPEC.isLoaded()) return false;
         return com.alben.createhandmade.Config.INSTANCE.debugEnabled.get();
     }
 }

@@ -72,12 +72,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -90,7 +90,22 @@ public class HandSawItem extends Item {
     /** ★ 当前选中配方的 ID。HUD 和切削都按 ID 查找，不依赖列表顺序。 */
     public static final String NBT_RECIPE_ID = "HandSawRecipeId";
 
-    private static final Set<UUID> CUTTING_PLAYERS = new HashSet<>();
+    /**
+     * 正在连续切削的玩家。
+     *
+     * <p>★ 客户端与服务端**各存一份**：{@code use()} / {@code useOn()} 与
+     * {@code onUseTick()} 两侧都会跑，早期共用一个静态 HashSet 时两个线程会同时
+     * add/remove 同一个表（HashSet 底层是 HashMap，扩容期可能死循环；或者一侧
+     * remove 掉另一侧正在用的条目，表现为切削音效/粒子提前断掉）。</p>
+     */
+    private static final Set<UUID> CUTTING_PLAYERS_CLIENT = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> CUTTING_PLAYERS_SERVER = ConcurrentHashMap.newKeySet();
+
+    private static Set<UUID> cuttingPlayers(Level level) {
+        return level.isClientSide ? CUTTING_PLAYERS_CLIENT : CUTTING_PLAYERS_SERVER;
+    }
+
+    /** 整树砍伐的待处理目标。只在服务端写（{@code onLeftClickBlock} 里有 isClientSide 守卫）。 */
     private static final Map<UUID, BlockPos> FELL_PENDING = new HashMap<>();
 
     // ================= 配方 ID 反查 =================
@@ -198,7 +213,7 @@ public class HandSawItem extends Item {
     // ================= 玩家离开：清掉按 UUID 记的运行期状态 =================
 
     /**
-     * 断线/退服时清掉 {@link #CUTTING_PLAYERS} 与 {@link #FELL_PENDING} 里属于该玩家的条目。
+     * 断线/退服时清掉 {@link #CUTTING_PLAYERS_SERVER} 与 {@link #FELL_PENDING} 里属于该玩家的条目。
      *
      * <p>两个表都按 UUID 记录，正常情况下退出使用 / 松开按键会自己移除，
      * 但玩家在「正在连续切削」或「正在潜行砍树」的状态下直接断线时不会走到那些清理路径，
@@ -209,7 +224,7 @@ public class HandSawItem extends Item {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         Player player = event.getEntity();
         UUID id = player.getUUID();
-        CUTTING_PLAYERS.remove(id);
+        CUTTING_PLAYERS_SERVER.remove(id);
         FELL_PENDING.remove(id);
     }
 
@@ -318,7 +333,7 @@ public class HandSawItem extends Item {
         }
 
         if (!off.isEmpty() && !getCuttingRecipes(level, off).isEmpty()) {
-            CUTTING_PLAYERS.add(player.getUUID());
+            cuttingPlayers(level).add(player.getUUID());
             player.startUsingItem(hand);
             return InteractionResultHolder.consume(saw);
         }
@@ -341,7 +356,7 @@ public class HandSawItem extends Item {
         }
 
         if (!off.isEmpty() && !getCuttingRecipes(level, off).isEmpty()) {
-            CUTTING_PLAYERS.add(player.getUUID());
+            cuttingPlayers(level).add(player.getUUID());
             player.startUsingItem(context.getHand());
             return InteractionResult.CONSUME;
         }
@@ -361,11 +376,11 @@ public class HandSawItem extends Item {
     @Override
     public void onUseTick(Level level, LivingEntity entity, ItemStack stack, int remainingTicks) {
         if (!(entity instanceof Player player)) return;
-        if (!CUTTING_PLAYERS.contains(player.getUUID())) return;
+        if (!cuttingPlayers(level).contains(player.getUUID())) return;
 
         if (stack.isEmpty()) {
             player.stopUsingItem();
-            CUTTING_PLAYERS.remove(player.getUUID());
+            cuttingPlayers(level).remove(player.getUUID());
             return;
         }
 
@@ -385,7 +400,7 @@ public class HandSawItem extends Item {
             ItemStack offAfterCut = player.getOffhandItem();
             if (offAfterCut.isEmpty() || getCuttingRecipes(level, offAfterCut).isEmpty()) {
                 player.stopUsingItem();
-                CUTTING_PLAYERS.remove(player.getUUID());
+                cuttingPlayers(level).remove(player.getUUID());
                 return;
             }
         }
@@ -429,14 +444,14 @@ public class HandSawItem extends Item {
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!(entity instanceof Player player)) return stack;
-        CUTTING_PLAYERS.remove(player.getUUID());
+        cuttingPlayers(level).remove(player.getUUID());
         return stack;
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player)) return;
-        CUTTING_PLAYERS.remove(player.getUUID());
+        cuttingPlayers(level).remove(player.getUUID());
     }
 
     // ================= 切削执行 =================
