@@ -72,13 +72,15 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
 
         BlockPos inputPos = PointerDataHelper.getLiquidInput(maid, level);
         BlockPos outputPos = PointerDataHelper.getLiquidOutput(maid, level);
+        // ★ 过剩输出是可选的：不标就表示"输出塞不下就停手"，不往别处倒。
         BlockPos overflowPos = PointerDataHelper.getLiquidOverflow(maid, level);
 
-        if (inputPos == null || outputPos == null || overflowPos == null) {
+        if (inputPos == null || outputPos == null) {
             status = Behavior.Status.STOPPED;
             return false;
         }
 
+        // isWithinRange 对 null 返回 true，所以未标过剩时这条校验自动跳过
         if (!MaidHelpers.Range.allWithinRange(maid, inputPos, outputPos, overflowPos)) {
             status = Behavior.Status.STOPPED;
             return false;
@@ -89,7 +91,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
             return false;
         }
 
-        if (!(level.getBlockEntity(overflowPos) instanceof BasinBlockEntity)) {
+        if (overflowPos != null && !(level.getBlockEntity(overflowPos) instanceof BasinBlockEntity)) {
             status = Behavior.Status.STOPPED;
             return false;
         }
@@ -134,7 +136,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 return true;
             }
             // 没物品可注 → 走过剩
-            if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 
@@ -161,7 +163,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 status = Behavior.Status.RUNNING;
                 return true;
             }
-            if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 
@@ -187,7 +189,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 status = Behavior.Status.RUNNING;
                 return true;
             }
-            if (CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 

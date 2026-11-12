@@ -102,6 +102,7 @@
   "message.create_hand_made.pointer.applied": "Marker applied: work block %s, input %s, output %s",
   "message.create_hand_made.pointer.applied.workonly": "Marker applied: work block %s only (process-only: no fetching, no output transfer)",
   "message.create_hand_made.pointer.applied.liquid": "Fluid marker applied: input %s, output %s, filter %s",
+  "message.create_hand_made.pointer.applied.liquid.nooverflow": "Fluid marker applied: input %s, output %s (no overflow marked: stops when the output is full)",
   "message.create_hand_made.pointer.mode.0": "Pointer mode: default (highlight / process)",
   "message.create_hand_made.pointer.mode.1": "Pointer mode: assign (mark work block)",
   "message.create_hand_made.pointer.mode.2": "Pointer mode: fluid",

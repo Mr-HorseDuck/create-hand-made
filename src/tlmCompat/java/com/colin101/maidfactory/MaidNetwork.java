@@ -188,7 +188,8 @@ public class MaidNetwork {
                     MaidDebug.log("ApplyToMaid LIQUID: input={}, output={}, overflow={}",
                             li, lo, lov);
 
-                    if (li == null || lo == null || lov == null) {
+                    // ★ 过剩输出可选：不标就表示"输出塞不下就停手"，不往别处倒。
+                    if (li == null || lo == null) {
                         player.displayClientMessage(
                                 Component.translatable("message.create_hand_made.pointer.incomplete"),
                                 true);
@@ -200,10 +201,17 @@ public class MaidNetwork {
                     MaidDebug.log("ApplyToMaid LIQUID: applied to maid {}",
                             maidEntity.getId());
 
-                    player.displayClientMessage(
-                            Component.translatable("message.create_hand_made.pointer.applied.liquid",
-                                    formatPos(li), formatPos(lo), formatPos(lov)),
-                            true);
+                    if (lov != null) {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.applied.liquid",
+                                        formatPos(li), formatPos(lo), formatPos(lov)),
+                                true);
+                    } else {
+                        player.displayClientMessage(
+                                Component.translatable("message.create_hand_made.pointer.applied.liquid.nooverflow",
+                                        formatPos(li), formatPos(lo)),
+                                true);
+                    }
                 } else {
                     BlockPos work = PointerDataHelper.getWork(player, serverLevel);
                     BlockPos input = PointerDataHelper.getInput(player, serverLevel);

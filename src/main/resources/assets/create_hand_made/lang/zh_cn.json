@@ -102,6 +102,7 @@
   "message.create_hand_made.pointer.applied": "已应用标记 工作方块%s 输入%s 输出%s",
   "message.create_hand_made.pointer.applied.workonly": "已应用标记 工作方块%s（只加工模式：不取料、不搬产物）",
   "message.create_hand_made.pointer.applied.liquid": "已应用液体标记：输入 %s，输出 %s，过剩 %s",
+  "message.create_hand_made.pointer.applied.liquid.nooverflow": "已应用液体标记：输入 %s，输出 %s（未标过剩输出：塞不下就停手）",
   "message.create_hand_made.pointer.mode.0": "指杆模式：默认（高亮/加工）",
   "message.create_hand_made.pointer.mode.1": "指杆模式：指定（标记工作方块）",
   "message.create_hand_made.pointer.mode.2": "指杆模式：液体",
