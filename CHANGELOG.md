@@ -24,7 +24,7 @@
 
 ### 内部
 
-- `create_hand_made.mixins.json` 去掉尾随逗号，现在是严格合法的 JSON（此前靠 Mixin 的宽松解析才能过）。
+- **彻底移除 Mixin**：最后一个 `BasinBlockEntityMixin` 已改写为「客户端 tick + 公开 API」，模组现在**不再包含任何字节码注入**。同时移除了 MixinGradle 插件、注解处理器、`create_hand_made.mixins.json` 与 `mods.toml` 里的 mixin 段。
 - `tryExtractFromBasin` 缩进修正。
 - 文档：`docs/TOOL_REFERENCE.md` 补充「只加工模式」「过剩输出可选」「两类标记互斥」三节，并说明只加工模式会**沿加工链一路做下去**（产物留在工作方块上，若还能被同一工具继续加工就继续做，每一步正常消耗耐久）及两种控制办法；README 功能列表同步。
 

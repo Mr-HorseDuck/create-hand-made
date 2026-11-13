@@ -12,8 +12,7 @@ A Create addon for hand crafting.
 '''
 logoFile="mod_logo.png"
 
-[[mixins]]
-config="${mod_id}.mixins.json"
+# 本模组已不再使用 Mixin（0.6.3 起移除最后一个注入类），因此没有 mixin 配置段。
 
 # ==================== Forge 依赖 ====================
 # ★ NeoForge → Forge

@@ -3,7 +3,6 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
-    id 'org.spongepowered.mixin' version '0.7.+'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
 }
 
@@ -20,17 +19,11 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-// ------------------ Mixin 配置 ------------------
-// ★ refmap 说明：
-//   mixin 配置里**不要**写 "refmap" 字段，除非真有需要对 SRG 名做重映射的 mixin。
-//   当前唯一一个 mixin 全部成员都是 remap = false（目标都是 Create 自己的类/方法），
-//   注解处理器不会产出 refmap 文件；配置里却声明了 refmap，启动时就会报
-//   "refmap could not be found"。下面这行 add 保留着，以后加 remapped mixin 时
-//   再把 "refmap": "${mod_id}.refmap.json" 写回 mixins.json 即可。
-mixin {
-    add sourceSets.main, "${mod_id}.refmap.json"
-    config "${mod_id}.mixins.json"
-}
+// ------------------ Mixin ------------------
+// ★ 0.6.3 起本模组**不再使用 Mixin**：最后一个 BasinBlockEntityMixin 已改为
+//   纯事件 + 公开 API 实现（见 client/ClientStates.StirAnimation）。
+//   这里一并移除 MixinGradle 插件与注解处理器；如果以后要重新引入 mixin，
+//   需要把插件、mixin { config ... } 段、mods.toml 的 [[mixins]] 一起加回来。
 
 // ------------------ 仓库配置 ------------------
 repositories {
@@ -208,9 +201,6 @@ dependencies {
     //   - 运行期：加到全局 runtimeClasspath，让客户端能加载 TLM
     tlmCompatCompileOnly fg.deobf("maven.modrinth:touhou-little-maid:${tlm_version}")
     runtimeOnly fg.deobf("maven.modrinth:touhou-little-maid:${tlm_version}")
-
-    // Mixin 注解处理器
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 // ------------------ 编译顺序 ------------------

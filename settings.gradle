@@ -14,7 +14,9 @@ pluginManagement {
             name = 'MinecraftForge'
             url = 'https://maven.minecraftforge.net/'
         }
-        // Mixin Gradle 插件源
+        // 公共 Maven（ForgeGradle 的传递依赖会从这里兜底解析）。
+        // 注意：本模组已不使用 Mixin，但**不要删这个仓库**——删掉会让插件依赖
+        // 在离线模式下失配（Gradle 按仓库集合缓存解析结果），构建直接起不来。
         maven {
             name = 'SpongePowered'
             url = 'https://repo.spongepowered.org/repository/maven-public/'
