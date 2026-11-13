@@ -191,7 +191,8 @@ public class MaidNetwork {
                     // ★ 过剩输出可选：不标就表示"输出塞不下就停手"，不往别处倒。
                     if (li == null || lo == null) {
                         player.displayClientMessage(
-                                Component.translatable("message.create_hand_made.pointer.incomplete"),
+                                Component.translatable(
+                                        "message.create_hand_made.pointer.incomplete.liquid"),
                                 true);
                         return;
                     }

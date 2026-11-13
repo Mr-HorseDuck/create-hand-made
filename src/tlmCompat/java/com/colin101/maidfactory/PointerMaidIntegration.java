@@ -12,6 +12,21 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
+/**
+ * 潜行右键女仆应用标记 —— TLM 交互事件路径。
+ *
+ * <p>★ 与 {@code MaidNetwork.handleApplyToMaid}（客户端发的 ApplyToMaidPacket）分工：</p>
+ * <ul>
+ *   <li>本类：默认 / MARK 模式。借 TLM 的 {@link InteractMaidEvent}，优点是不依赖客户端
+ *       发包、也不会被 TLM 自己的交互逻辑吃掉。</li>
+ *   <li>Packet 路径：液体模式，以及客户端主动发包的场景。服务端侧会做
+ *       手持指杆 + 是自己女仆 + 距离校验。</li>
+ * </ul>
+ *
+ * <p>两条路径都会写同一份女仆标记，所以**校验条件必须保持一致**：液体模式在下面直接
+ * return（交给 Packet 路径），避免这里拿 MARK 的坐标去校验、弹出「标记不完整」误报。
+ * 将来若合并成一条路径，记得把这里的 TLM 事件豁免一起处理掉。</p>
+ */
 public class PointerMaidIntegration {
 
     @SubscribeEvent

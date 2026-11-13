@@ -99,6 +99,7 @@
   "task.create_hand_made.hand_made.desc": "使用手搓工具加工附近的方块与物品",
 
   "message.create_hand_made.pointer.incomplete": "指杆标记不完整：至少要先标记工作方块",
+  "message.create_hand_made.pointer.incomplete.liquid": "液体标记不完整：请先标记输入盆和输出",
   "message.create_hand_made.pointer.applied": "已应用标记 工作方块%s 输入%s 输出%s",
   "message.create_hand_made.pointer.applied.workonly": "已应用标记 工作方块%s（只加工模式：不取料、不搬产物）",
   "message.create_hand_made.pointer.applied.liquid": "已应用液体标记：输入 %s，输出 %s，过剩 %s",

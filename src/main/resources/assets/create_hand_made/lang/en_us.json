@@ -99,6 +99,7 @@
   "task.create_hand_made.hand_made.desc": "Use hand-made tools to process nearby blocks and items",
 
   "message.create_hand_made.pointer.incomplete": "Pointer marker is incomplete: mark the work block first",
+  "message.create_hand_made.pointer.incomplete.liquid": "Fluid marker is incomplete: mark the input basin and output first",
   "message.create_hand_made.pointer.applied": "Marker applied: work block %s, input %s, output %s",
   "message.create_hand_made.pointer.applied.workonly": "Marker applied: work block %s only (process-only: no fetching, no output transfer)",
   "message.create_hand_made.pointer.applied.liquid": "Fluid marker applied: input %s, output %s, filter %s",

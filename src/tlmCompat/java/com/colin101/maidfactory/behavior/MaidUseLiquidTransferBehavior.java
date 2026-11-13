@@ -208,37 +208,37 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
     }
 
     private static boolean tryExtractFromBasin(ServerLevel level, BlockPos pos,
-                                            EntityMaid maid, ItemStack gun) {
-    IFluidHandler handler = CreateHandMadeApi.fluidHandlerAt(level, pos);
-    if (handler == null) return false;
+                                               EntityMaid maid, ItemStack gun) {
+        IFluidHandler handler = CreateHandMadeApi.fluidHandlerAt(level, pos);
+        if (handler == null) return false;
 
-    InfusionGunContents contents = CreateHandMadeApi.infusionGunContents(gun);
-    if (contents.remaining() <= 0) return false;
+        InfusionGunContents contents = CreateHandMadeApi.infusionGunContents(gun);
+        if (contents.remaining() <= 0) return false;
 
-    FluidStack source = FluidStack.EMPTY;
-    for (int i = 0; i < handler.getTanks(); i++) {
-        FluidStack inTank = handler.getFluidInTank(i);
-        if (inTank.isEmpty()) continue;
-        if (!contents.isEmpty()
-                && !FluidStack.areFluidStackTagsEqual(contents.fluid(), inTank)) {
-            continue;
+        FluidStack source = FluidStack.EMPTY;
+        for (int i = 0; i < handler.getTanks(); i++) {
+            FluidStack inTank = handler.getFluidInTank(i);
+            if (inTank.isEmpty()) continue;
+            if (!contents.isEmpty()
+                    && !FluidStack.areFluidStackTagsEqual(contents.fluid(), inTank)) {
+                continue;
+            }
+            source = inTank;
+            break;
         }
-        source = inTank;
-        break;
-    }
-    if (source.isEmpty()) return false;
+        if (source.isEmpty()) return false;
 
-    int want = Math.min(contents.remaining(), source.getAmount());
-    if (want <= 0) return false;
+        int want = Math.min(contents.remaining(), source.getAmount());
+        if (want <= 0) return false;
 
-    FluidStack toDrain = new FluidStack(source.getFluid(), want, source.getTag());
-    FluidStack actual = handler.drain(toDrain, IFluidHandler.FluidAction.EXECUTE);
-    if (actual.isEmpty()) return false;
+        FluidStack toDrain = new FluidStack(source.getFluid(), want, source.getTag());
+        FluidStack actual = handler.drain(toDrain, IFluidHandler.FluidAction.EXECUTE);
+        if (actual.isEmpty()) return false;
 
-    CreateHandMadeApi.setInfusionGunContents(gun, contents.withFill(actual));
-    CreateHandMadeApi.damageTool(gun, maid);
+        CreateHandMadeApi.setInfusionGunContents(gun, contents.withFill(actual));
+        CreateHandMadeApi.damageTool(gun, maid);
 
-    return true;
+        return true;
     }
 
     @Override
