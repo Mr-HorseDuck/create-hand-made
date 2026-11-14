@@ -92,7 +92,7 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
         if (depotPos != null) {
             // ★ 注视即将注入的置物台
             MaidHelpers.Look.lookAtBlock(maid, depotPos);
-            if (CreateHandMadeApi.injectItems(level, depotPos, maid, tool, filter)) {
+            if (CreateHandMadeApi.injectItems(level, depotPos, maid, tool, filter).isSuccess()) {
                 MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, tool);
                 MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, tool);
                 status = Behavior.Status.RUNNING;
@@ -105,7 +105,7 @@ public class MaidUseInfusionGunBehavior implements BehaviorControl<EntityMaid> {
             // ★ 注视即将注入的工作盆
             MaidHelpers.Look.lookAtBlock(maid, basinPos);
             IFluidHandler handler = CreateHandMadeApi.fluidHandlerAt(level, basinPos);
-            if (handler != null && CreateHandMadeApi.storeFluid(level, basinPos, maid, tool)) {
+            if (handler != null && CreateHandMadeApi.storeFluid(level, basinPos, maid, tool).isSuccess()) {
                 MaidBubbleHelper.tryShowFirstUse(maid, ToolType.INFUSION_GUN, tool);
                 MaidBubbleHelper.tryShow(maid, ToolType.INFUSION_GUN, tool);
                 status = Behavior.Status.RUNNING;

@@ -49,11 +49,16 @@ public final class CreateHandMadeApi {
     /**
      * API 契约版本。
      *
+     * <p>3：写操作返回类型从 {@code boolean} 改为 {@link HandMadeResult}，并新增
+     * {@code simulate} 预演重载；{@code findStirringRecipe} 新增按坐标取的重载；
+     * 成功后会发 {@link HandMadeToolUsedEvent}。</p>
+     *
      * <p>2：{@link #recipesFor} 等查询的返回列表改为**不可变**（此前是可变的 ArrayList，
      * 调用方就地排序不会报错，现在会抛 {@code UnsupportedOperationException}）；
-     * 所有写操作在客户端调用时改为静默拒绝（返回 false / 无操作），不再有副作用。</p>
+     * 所有写操作在客户端调用时改为静默拒绝（返回 {@code CLIENT_SIDE}），不再有副作用；
+     * {@code mortarContents} 与 {@code infusionGunContents} 统一为永不返回 null。</p>
      */
-    public static final int API_VERSION = 2;
+    public static final int API_VERSION = 3;
 
     private CreateHandMadeApi() {
     }
@@ -275,27 +280,59 @@ public final class CreateHandMadeApi {
     /**
      * 冲压锤工作盆冲压。
      *
-     * <p><b>只在服务端调用。</b>消耗输入、产出、播放粒子/音效。</p>
+     * <p>消耗输入、产出、播放粒子/音效。<b>只在服务端生效</b>，客户端调用返回
+     * {@link HandMadeResult#CLIENT_SIDE}。</p>
      *
      * @param filter 过滤产物，null 表示不过滤
+     * @return 具体结果；{@code false} 时代的"没反应"被拆成 NO_INPUT / NO_RECIPE / FILTERED_OUT 等
      */
-    public static boolean pressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide || pos == null) return false;
-        return PressHammerItem.tryPressBasin(level, pos, filter);
+    public static HandMadeResult pressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
+        return pressBasin(level, pos, filter, false);
     }
 
     /**
-     * 冲压锤传送带冲压。
+     * 同 {@link #pressBasin(Level, BlockPos, FilterItemStack)}，但可以**预演**。
      *
-     * <p><b>只在服务端调用。</b>消耗输入、产出、播放粒子/音效。</p>
-     *
-     * @param filter 过滤产物，null 表示不过滤
+     * @param simulate true = 只判定不执行，不改工作盆内容、不播特效。
+     *                 返回 {@link HandMadeResult#SUCCESS} 表示"真跑会成功"
      */
-    public static boolean pressTransported(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide || pos == null) return false;
-        return PressHammerItem.tryPressTransported(level, pos, filter);
+    public static HandMadeResult pressBasin(Level level, BlockPos pos,
+                                            @Nullable FilterItemStack filter, boolean simulate) {
+        if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        HandMadeResult result = PressHammerItem.tryPressBasin(level, pos, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(ToolType.PRESS_HAMMER_BASIN, level, pos, null, null);
+        }
+        return result;
+    }
+
+    /**
+     * 冲压锤传送带 / 置物台冲压（batchSize = 1）。
+     *
+     * <p><b>只在服务端生效</b>，客户端调用返回 {@link HandMadeResult#CLIENT_SIDE}。</p>
+     */
+    public static HandMadeResult pressTransported(Level level, BlockPos pos,
+                                                  @Nullable FilterItemStack filter) {
+        return pressTransported(level, pos, filter, 1, false);
+    }
+
+    /**
+     * 冲压锤传送带 / 置物台冲压，可指定批量与预演。
+     *
+     * @param batchSize 本次最多处理多少份（由调用方根据批量加工附魔决定）
+     * @param simulate  true = 只判定"有没有可加工的配方"，不摇结果、不改物品
+     */
+    public static HandMadeResult pressTransported(Level level, BlockPos pos,
+                                                  @Nullable FilterItemStack filter,
+                                                  int batchSize, boolean simulate) {
+        if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        HandMadeResult result = PressHammerItem.tryPressTransported(level, pos, filter, batchSize, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(ToolType.PRESS_HAMMER_DEPOT, level, pos, null, null);
+        }
+        return result;
     }
 
     // ==================== 研钵 / 碾钵（写操作） ====================
@@ -303,23 +340,40 @@ public final class CreateHandMadeApi {
     /**
      * 研钵 / 碾钵一次性研磨。
      *
-     * <p><b>只在服务端调用。</b>消耗输入、产出结果、扣耐久、播放粒子/音效。</p>
+     * <p>消耗输入、产出结果、扣耐久、播放粒子/音效。<b>只在服务端生效</b>。</p>
      *
      * @param crusherMortar true 走碾钵，false 走研钵
      * @param filter        过滤产物，null 表示不过滤
-     * @return 是否成功加工
      */
-    public static boolean grindMortarOnce(Level level, LivingEntity entity, ItemStack mortar,
-                                          @Nullable IItemHandler inputInv,
-                                          @Nullable IItemHandler outputInv,
-                                          @Nullable FilterItemStack filter,
-                                          boolean crusherMortar) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide) return false;
-        if (entity == null || mortar == null || mortar.isEmpty()) return false;
-        return crusherMortar
-                ? CrusherMortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter)
-                : MortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter);
+    public static HandMadeResult grindMortarOnce(Level level, LivingEntity entity, ItemStack mortar,
+                                                 @Nullable IItemHandler inputInv,
+                                                 @Nullable IItemHandler outputInv,
+                                                 @Nullable FilterItemStack filter,
+                                                 boolean crusherMortar) {
+        return grindMortarOnce(level, entity, mortar, inputInv, outputInv, filter, crusherMortar, false);
+    }
+
+    /**
+     * 同 {@link #grindMortarOnce}，但可以**预演**。
+     *
+     * @param simulate true = 只判定「有候选材料 + 有配方 + 过滤器放行」，不取料、不摇结果、不扣耐久
+     */
+    public static HandMadeResult grindMortarOnce(Level level, LivingEntity entity, ItemStack mortar,
+                                                 @Nullable IItemHandler inputInv,
+                                                 @Nullable IItemHandler outputInv,
+                                                 @Nullable FilterItemStack filter,
+                                                 boolean crusherMortar, boolean simulate) {
+        if (level == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        if (entity == null || mortar == null || mortar.isEmpty()) return HandMadeResult.INVALID_TARGET;
+        HandMadeResult result = crusherMortar
+                ? CrusherMortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter, simulate)
+                : MortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(crusherMortar ? ToolType.CRUSHER_MORTAR : ToolType.MORTAR,
+                    level, entity.blockPosition(), mortar, entity.getOffhandItem());
+        }
+        return result;
     }
 
     // ==================== 灌注枪（写操作） ====================
@@ -339,30 +393,63 @@ public final class CreateHandMadeApi {
      * @param filter 过滤产物，null 表示不过滤
      * @return 是否成功注入
      */
-    public static boolean injectItems(Level level, BlockPos pos, LivingEntity entity,
-                                      ItemStack gun, @Nullable FilterItemStack filter) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide || pos == null) return false;
-        if (entity == null || gun == null || gun.isEmpty()) return false;
-        return InfusionGunItem.tryInjectItems(level, pos, entity, gun, filter);
+    public static HandMadeResult injectItems(Level level, BlockPos pos, LivingEntity entity,
+                                             ItemStack gun, @Nullable FilterItemStack filter) {
+        return injectItems(level, pos, entity, gun, filter, false);
+    }
+
+    /**
+     * 同 {@link #injectItems}，但可以**预演**。
+     *
+     * @param simulate true = 只扫描"有没有能注入的物品"，不耗流体、不改物品、不扣耐久
+     */
+    public static HandMadeResult injectItems(Level level, BlockPos pos, LivingEntity entity,
+                                             ItemStack gun, @Nullable FilterItemStack filter,
+                                             boolean simulate) {
+        if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        if (entity == null || gun == null || gun.isEmpty()) return HandMadeResult.INVALID_TARGET;
+        HandMadeResult result = InfusionGunItem.tryInjectItems(level, pos, entity, gun, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(ToolType.INFUSION_GUN, level, pos, gun, null);
+        }
+        return result;
     }
 
     /**
      * 灌注枪把流体存入方块。
      *
-     * <p><b>只在服务端调用。</b>扣耐久、播放音效。</p>
+     * <p>扣耐久、播放音效。<b>只在服务端生效</b>。</p>
      */
-    public static boolean storeFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide || pos == null) return false;
-        if (entity == null || gun == null || gun.isEmpty()) return false;
-        return InfusionGunItem.tryStoreFluid(level, pos, entity, gun);
+    public static HandMadeResult storeFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
+        return storeFluid(level, pos, entity, gun, false);
+    }
+
+    /**
+     * 同 {@link #storeFluid}，但可以**预演**。
+     *
+     * @param simulate true = 只用 SIMULATE 动作问一次"这里能不能装"，不倒流体、不扣耐久
+     */
+    public static HandMadeResult storeFluid(Level level, BlockPos pos, LivingEntity entity,
+                                            ItemStack gun, boolean simulate) {
+        if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        if (entity == null || gun == null || gun.isEmpty()) return HandMadeResult.INVALID_TARGET;
+        HandMadeResult result = InfusionGunItem.tryStoreFluid(level, pos, entity, gun, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(ToolType.INFUSION_GUN, level, pos, gun, null);
+        }
+        return result;
     }
 
     /**
      * 灌注枪从方块抽取一 tick 流体。
      *
-     * <p><b>只在服务端调用。</b>首次成功抽取时扣耐久。</p>
+     * <p><b>只在服务端生效。</b>首次成功抽取时扣耐久。</p>
+     *
+     * <p>⚠ 这个操作是<b>逐 tick 的增量</b>动作（灌注枪物品每 tick 调一次），返回"失败原因"对调用方
+     * 没什么意义，所以保持 {@code void}、也没有 simulate 版本。要预判能不能抽，用
+     * {@link #fluidSourceAt} 看目标有没有流体、用 {@link #infusionGunContents} 看枪还剩多少空间。</p>
      */
     public static void extractFluidTick(Level level, BlockPos pos, LivingEntity entity,
                                         ItemStack gun, int rate) {
@@ -396,6 +483,19 @@ public final class CreateHandMadeApi {
         return StirringStaffItem.findMatchingRecipe(level, basin);
     }
 
+    /**
+     * 同 {@link #findStirringRecipe(Level, BasinBlockEntity)}，但按坐标取，调用方不必先拿到
+     * {@code BasinBlockEntity}（那样就得 import Create 的类）。
+     *
+     * @return 该位置不是工作盆 / 没有匹配配方时返回 null
+     */
+    @Nullable
+    public static Recipe<?> findStirringRecipe(Level level, BlockPos pos) {
+        if (level == null || pos == null) return null;
+        if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return null;
+        return StirringStaffItem.findMatchingRecipe(level, basin);
+    }
+
     // ==================== 风箱 ====================
 
     /** 风箱介质能否处理某物品。只读查询。 */
@@ -407,12 +507,41 @@ public final class CreateHandMadeApi {
     /**
      * 风箱对目标应用鼓风效果。
      *
-     * <p><b>只在服务端调用。</b>跨模组触发上游效果，可能转化物品。</p>
+     * <p>跨模组触发上游效果，可能转化物品。<b>只在服务端生效</b>。</p>
      */
-    public static boolean applyBellows(Level level, BlockPos pos, FanProcessingType type) {
-        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
-        if (level == null || level.isClientSide || pos == null || type == null) return false;
-        return BellowsItem.applyToTarget(level, pos, type);
+    public static HandMadeResult applyBellows(Level level, BlockPos pos, FanProcessingType type) {
+        return applyBellows(level, pos, type, false);
+    }
+
+    /**
+     * 同 {@link #applyBellows}，但可以**预演**。
+     *
+     * @param simulate true = 只扫描"有没有能处理的物品"，不改物品、不播粒子
+     */
+    public static HandMadeResult applyBellows(Level level, BlockPos pos, FanProcessingType type,
+                                              boolean simulate) {
+        if (level == null || pos == null || type == null) return HandMadeResult.INVALID_TARGET;
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        HandMadeResult result = BellowsItem.applyToTarget(level, pos, type, simulate);
+        if (!simulate && result.isSuccess()) {
+            fireToolUsed(ToolType.BELLOWS, level, pos, null, null);
+        }
+        return result;
+    }
+
+    // ==================== 事件 ====================
+
+    /**
+     * 加工成功后发 {@link HandMadeToolUsedEvent}。
+     *
+     * <p>只在真正执行（非预演）且成功时调用；事件是通知性质，不可取消。</p>
+     */
+    private static void fireToolUsed(ToolType tool, Level level, BlockPos pos,
+                                     @Nullable ItemStack toolStack, @Nullable ItemStack target) {
+        if (level == null || level.isClientSide) return;
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new HandMadeToolUsedEvent(tool, level, pos,
+                        toolStack != null ? toolStack : ItemStack.EMPTY, target));
     }
 
     // ==================== 通用 ====================

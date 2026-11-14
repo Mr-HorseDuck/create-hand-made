@@ -2,7 +2,7 @@
 
 适用版本：**1.20.1 Forge / 0.6.3-beta+**
 入口类：`com.alben.createhandmade.api.CreateHandMadeApi`
-`API_VERSION = 2`
+`API_VERSION = 3`
 
 跨模组请优先绑定 `CreateHandMadeApi`；各工具类的 public 方法不保证跨版本稳定。
 
@@ -12,11 +12,63 @@
 
 - `API_VERSION` 只在**破坏性变更**时递增；新增方法不算破坏性变更。
 - 本 API 提供两类能力：
-  - **查询 / 读写组件**（23 个方法）—— 只读，不改世界、不消耗材料；
-  - **写操作**（8 个方法）—— 会消耗输入、产出、扣耐久、播放特效，**只在服务端生效**。
-- 写操作在**客户端调用会被静默拒绝**（返回 `false` / 无操作），不会再改动本地状态。所以调用方不必自己判侧，但仍建议只在服务端发起——客户端调用拿到的 `false` 不代表"没配方"。
+  - **查询 / 读写组件**（26 个方法）—— 只读，不改世界、不消耗材料；
+  - **写操作**（12 个方法，6 类操作 × 普通/预演重载）—— 会消耗输入、产出、扣耐久、播放特效，**只在服务端生效**。
+- 写操作在**客户端调用会被静默拒绝**（返回 `HandMadeResult.CLIENT_SIDE`），不会再改动本地状态。
 - 查询类方法**返回不可变列表**（`recipesFor` / `recipesForFiltered` / `handSawRecipes` / `bellowsMedia*`）。想就地排序请先自己拷贝一份，直接改会抛 `UnsupportedOperationException`。
 - 入参为 `null` 或空物品时，查询返回 `null` / 空列表 / `false`，不会抛 NPE。
+
+### 写操作：`HandMadeResult` + 预演
+
+写操作不再返回 `boolean`，而是返回 `HandMadeResult`——把以前笼统的"没反应"拆成具体原因：
+
+| 取值 | 含义 |
+|---|---|
+| `SUCCESS` | 成功（预演模式下表示"真跑会成功"） |
+| `CLIENT_SIDE` | 在客户端调用，已拒绝 |
+| `INVALID_TARGET` | 目标不是该工具能处理的方块/容器 |
+| `NO_INPUT` | 目标有效，但上面没有可加工的物品 |
+| `NO_RECIPE` | 没有匹配的配方 |
+| `FILTERED_OUT` | 有配方，但产物被过滤器挡掉 |
+| `NO_SPACE` | 产物无空间可放 / 枪内已满 |
+| `NO_FLUID` | 流体不足或不匹配 |
+| `NO_HANDLER` | 缺少物品/流体容器 |
+| `FAILED` | 其它原因（内部异常等，详见日志） |
+
+每个写操作都有一个 `simulate = true` 的**预演重载**：只判定不执行，不消耗材料、不扣耐久、不播特效。
+
+```java
+// 先问"能不能"，再决定要不要真的做
+if (CreateHandMadeApi.pressBasin(level, pos, null, true).isSuccess()) {
+    CreateHandMadeApi.pressBasin(level, pos, null);   // 真跑
+}
+```
+
+### 事件
+
+写操作**成功执行**后（预演不发）会发出 `HandMadeToolUsedEvent`（Forge 事件总线，服务端）：
+
+```java
+@SubscribeEvent
+public static void onToolUsed(HandMadeToolUsedEvent event) {
+    ToolType tool = event.tool();      // 哪个工具
+    BlockPos pos = event.pos();        // 在哪加工
+    ItemStack target = event.target(); // 被加工物（可能为 null）
+}
+```
+
+它是**通知性质、不可取消**——想拦截请在调用前用查询或预演判断。
+
+> ⚠ 本模组自己的工具逻辑（玩家手搓、女仆行为）**不经过** API，所以不会发这个事件；它只覆盖第三方通过 API 触发的加工。
+
+### 3.0 的破坏性变更
+
+| 变更 | 影响 |
+|---|---|
+| 写操作返回 `boolean` → `HandMadeResult` | 旧的 `if (api.pressBasin(...))` 要改成 `.isSuccess()` |
+| 新增 `simulate` 重载 | 纯新增；注意带 `boolean` 的重载参数顺序（simulate 在最后） |
+| `findStirringRecipe` 新增 `(Level, BlockPos)` 重载 | 纯新增，旧签名保留 |
+| 成功后发 `HandMadeToolUsedEvent` | 纯新增 |
 
 ### 2.0 的破坏性变更
 
@@ -25,10 +77,11 @@
 | `recipesFor` 的返回值从可变 `ArrayList` 改为不可变列表 | 以前若就地 `sort()` / `remove()`，现在会抛异常 |
 | 写操作加服务端守卫 | 以前在客户端调用会真的改本地状态（幻影物品、耐久不同步），现在一律拒绝 |
 | 查询方法补 `null` 守卫 | 以前传 `null` 会 NPE，现在返回安全默认值 |
+| `mortarContents` 改为永不返回 `null` | 判空从 `contents == null` 改为 `contents.isEmpty()` |
 
 ---
 
-## 方法总览（31 个）
+## 方法总览（38 个：查询 26 + 写操作 12）
 
 ### 配方查询
 
@@ -75,6 +128,7 @@
 | `findPointerRecipe(Level, ItemStack target, ItemStack tool)` | `@Nullable Recipe<?>` | 指杆应用配方。 |
 | `isPointerApplicationRecipe(@Nullable Recipe<?>)` | `boolean` | 是否指杆可执行的应用配方。 |
 | `findStirringRecipe(Level, BasinBlockEntity)` | `@Nullable Recipe<?>` | 搅拌杖混合配方。 |
+| `findStirringRecipe(Level, BlockPos)` | `@Nullable Recipe<?>` | 同上，按坐标取，不必 import `BasinBlockEntity`。 |
 | `bellowsCanProcess(Level, ItemStack, FanProcessingType)` | `boolean` | 风箱能否以该类型加工该物品（L3 优先、L1 兜底，与游戏内一致）。 |
 | `fluidHandlerAt(Level, BlockPos)` | `@Nullable IFluidHandler` | 方块流体处理器；只读查询。 |
 
@@ -82,18 +136,24 @@
 
 | 方法 | 返回 | 副作用 |
 |---|---|---|
-| `pressBasin(Level, BlockPos, @Nullable FilterItemStack)` | `boolean` | 工作盆冲压：消耗输入、产出、粒子/音效 |
-| `pressTransported(Level, BlockPos, @Nullable FilterItemStack)` | `boolean` | 传送带/置物台冲压（batchSize = 1 的重载） |
-| `grindMortarOnce(Level, LivingEntity, ItemStack, @Nullable IItemHandler in, @Nullable IItemHandler out, @Nullable FilterItemStack, boolean crusherMortar)` | `boolean` | 研钵/碾钵一次性研磨：消耗输入、产出、扣耐久 |
-| `injectItems(Level, BlockPos, LivingEntity, ItemStack, @Nullable FilterItemStack)` | `boolean` | 灌注枪注入：消耗枪内流体、转化传送带物品、扣耐久 |
-| `storeFluid(Level, BlockPos, LivingEntity, ItemStack)` | `boolean` | 灌注枪存液进方块、扣耐久 |
-| `extractFluidTick(Level, BlockPos, LivingEntity, ItemStack, int rate)` | `void` | 灌注枪抽液；首次成功抽取扣耐久 |
-| `applyBellows(Level, BlockPos, FanProcessingType)` | `boolean` | 对目标应用鼓风，跨模组触发上游效果，可能转化物品 |
+| `pressBasin(Level, BlockPos, @Nullable FilterItemStack)` | `HandMadeResult` | 工作盆冲压：消耗输入、产出、粒子/音效 |
+| `pressBasin(Level, BlockPos, @Nullable FilterItemStack, boolean simulate)` | `HandMadeResult` | 同上，**预演**：只判定不执行 |
+| `pressTransported(Level, BlockPos, @Nullable FilterItemStack)` | `HandMadeResult` | 传送带/置物台冲压（batchSize = 1） |
+| `pressTransported(Level, BlockPos, @Nullable FilterItemStack, int batchSize, boolean simulate)` | `HandMadeResult` | 同上，可指定批量与预演 |
+| `grindMortarOnce(Level, LivingEntity, ItemStack, @Nullable IItemHandler in, @Nullable IItemHandler out, @Nullable FilterItemStack, boolean crusherMortar)` | `HandMadeResult` | 研钵/碾钵一次性研磨：消耗输入、产出、扣耐久 |
+| `grindMortarOnce(..., boolean crusherMortar, boolean simulate)` | `HandMadeResult` | 同上，**预演** |
+| `injectItems(Level, BlockPos, LivingEntity, ItemStack, @Nullable FilterItemStack)` | `HandMadeResult` | 灌注枪注入：消耗枪内流体、转化传送带物品、扣耐久 |
+| `injectItems(..., @Nullable FilterItemStack, boolean simulate)` | `HandMadeResult` | 同上，**预演**（只扫描，不耗流体） |
+| `storeFluid(Level, BlockPos, LivingEntity, ItemStack)` | `HandMadeResult` | 灌注枪存液进方块、扣耐久 |
+| `storeFluid(Level, BlockPos, LivingEntity, ItemStack, boolean simulate)` | `HandMadeResult` | 同上，**预演**（用 SIMULATE 动作问容量） |
+| `extractFluidTick(Level, BlockPos, LivingEntity, ItemStack, int rate)` | `void` | 灌注枪抽液；首次成功抽取扣耐久。逐 tick 增量动作，无预演（用 `fluidSourceAt` 预判） |
+| `applyBellows(Level, BlockPos, FanProcessingType)` | `HandMadeResult` | 对目标应用鼓风，跨模组触发上游效果，可能转化物品 |
+| `applyBellows(Level, BlockPos, FanProcessingType, boolean simulate)` | `HandMadeResult` | 同上，**预演** |
 | `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致） |
 
 > 需要 batchSize 版本的冲压或 `HandSawItem#executeCut` / `stripBlock` 这类更细的入口时，只能直接调工具类 public 方法，并自行承担"只在服务端调用""自行扣耐久""自行保证玩家行为约束"。
 >
-> 上表 8 个写操作在客户端调用**一律返回 `false` / 无操作**（`damageTool` 直接 return），不会改动本地状态。
+> 写操作在客户端调用**一律返回 `HandMadeResult.CLIENT_SIDE`**（`extractFluidTick` / `damageTool` 直接 return），不会改动本地状态。
 
 ---
 
@@ -193,4 +253,4 @@ if (!contents.isEmpty()) {                     // 永不返回 null，和灌注�
 
 1. **`findRecipeFor` 只覆盖 5 个工具**：手锯、手锯切石、冲压锤（置物台）、研钵、碾钵——它们「光看一件物品」就能判断配方。工作盆、搅拌杖、灌注枪、指杆、风箱要看更多上下文（整盆材料 / 枪内流体 / 两件输入 / 介质类型），对这些工具它返回 `null`，请用对应入口：`pressBasin`、`findStirringRecipe`、`injectItems`、`findPointerRecipe`、`bellowsCanProcess`。
 2. **风箱没有 L2 过滤**：风箱没有 L1 候选（靠 `fan_type` 匹配），所以过滤表对它无效。要禁某条风箱配方请改数据包或删掉那条配方。
-3. **写操作没有 dry-run**：调用即生效，失败只返回 `false`，不告诉你失败原因（没配方 / 材料不匹配 / 空间不足都混在一起）。需要预判请先用查询方法自己判断。
+3. **`extractFluidTick` 没有预演版本**：它是逐 tick 的增量动作（灌注枪每 tick 调一次），返回失败原因意义不大。要预判请用 `fluidSourceAt` 看目标有没有流体、`infusionGunContents` 看枪还剩多少空间。

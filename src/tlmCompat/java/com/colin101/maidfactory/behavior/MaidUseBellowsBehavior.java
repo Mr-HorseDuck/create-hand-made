@@ -101,7 +101,7 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
                 TransportedItemStackHandlerBehaviour.TYPE) != null
                 && !(be instanceof DepotBlockEntity)) {
             MaidHelpers.Look.lookAtBlock(maid, workPos);
-            if (CreateHandMadeApi.applyBellows(level, workPos, type)) {
+            if (CreateHandMadeApi.applyBellows(level, workPos, type).isSuccess()) {
                 MaidBubbleHelper.tryShowFirstUse(maid, ToolType.BELLOWS, tool);
                 MaidBubbleHelper.tryShow(maid, ToolType.BELLOWS, tool);
                 MaidFeedback.bellowsSound(level, workPos);
@@ -143,7 +143,7 @@ public class MaidUseBellowsBehavior implements BehaviorControl<EntityMaid> {
         }
 
         if (CreateHandMadeApi.bellowsCanProcess(level, held, type)) {
-            if (CreateHandMadeApi.applyBellows(level, workPos, type)) {
+            if (CreateHandMadeApi.applyBellows(level, workPos, type).isSuccess()) {
                 MaidBubbleHelper.tryShowFirstUse(maid, ToolType.BELLOWS, held);
                 MaidBubbleHelper.tryShow(maid, ToolType.BELLOWS, held);
                 MaidFeedback.bellowsSound(level, workPos);

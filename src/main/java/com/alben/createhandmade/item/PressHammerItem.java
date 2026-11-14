@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.api.HandMadeResult;
 import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.PressParticlesPacket;
@@ -393,9 +394,20 @@ public class PressHammerItem extends Item {
 
     // ================= 工作盆（basin 家族） =================
 
-    public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
-        if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) return false;
-        if (basin.isEmpty()) return false;
+    /**
+     * 工作盆冲压（真正的实现）。
+     *
+     * @param simulate true = 只判定不执行：走到"该 apply 了"就返回 {@link HandMadeResult#SUCCESS}，
+     *                 不改工作盆内容、不播特效
+     */
+    public static HandMadeResult tryPressBasin(Level level, BlockPos pos,
+                                              @Nullable FilterItemStack filter, boolean simulate) {
+        if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) {
+            return HandMadeResult.INVALID_TARGET;
+        }
+        if (basin.isEmpty()) return HandMadeResult.NO_INPUT;
+
+        boolean sawFilteredOut = false;
 
         // L3：独立 type + tool=press_hammer_basin
         for (Recipe<?> r : level.getRecipeManager()
@@ -404,10 +416,16 @@ public class PressHammerItem extends Item {
             if (htr.getTool() != ToolType.PRESS_HAMMER_BASIN) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_BASIN, level, htr)) continue;
             if (!BasinRecipe.match(basin, htr)) continue;
-            if (!resultsPassFilter(level, htr, filter)) continue;
+
+            if (!resultsPassFilter(level, htr, filter)) {
+                sawFilteredOut = true;
+                continue;
+            }
+            if (simulate) return HandMadeResult.SUCCESS;
+
             if (BasinRecipe.apply(basin, htr)) {
                 basin.notifyChangeOfContents();
-                return true;
+                return HandMadeResult.SUCCESS;
             }
         }
 
@@ -417,23 +435,36 @@ public class PressHammerItem extends Item {
                     PressHammerItem::matchStaticFilters)) {
                 if (!BasinRecipe.match(basin, recipe)) continue;
 
-                List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                        ToolType.PRESS_HAMMER_BASIN, level, List.of(recipe));
-                if (filtered.isEmpty()) continue;
+                if (HandMadeRecipePool.isRecipeDisabled(ToolType.PRESS_HAMMER_BASIN,
+                        HandMadeRecipePool.recipeIdOf(level, recipe))) {
+                    sawFilteredOut = true;
+                    continue;
+                }
 
-                if (!resultsPassFilter(level, recipe, filter)) continue;
+                if (!resultsPassFilter(level, recipe, filter)) {
+                    sawFilteredOut = true;
+                    continue;
+                }
+                if (simulate) return HandMadeResult.SUCCESS;
 
                 if (BasinRecipe.apply(basin, recipe)) {
                     basin.notifyChangeOfContents();
-                    return true;
+                    return HandMadeResult.SUCCESS;
                 }
             }
         } catch (Exception ex) {
             // 配方数据有问题（缺流体、原料表畸形等）时 Create 会抛，按压应当只是失败而不是崩游戏；
             // 但不能像以前那样直接吞掉——排查"按压没反应"时这是唯一的线索。
             CreateHandMade.LOGGER.debug("[HandMade] Press-hammer basin apply failed, recipe skipped", ex);
+            return HandMadeResult.FAILED;
         }
-        return false;
+
+        return sawFilteredOut ? HandMadeResult.FILTERED_OUT : HandMadeResult.NO_RECIPE;
+    }
+
+    /** 旧签名（boolean）。内部调用方继续用它。 */
+    public static boolean tryPressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
+        return tryPressBasin(level, pos, filter, false).isSuccess();
     }
 
     private static boolean matchStaticFilters(Recipe<?> recipe) {
@@ -517,15 +548,18 @@ public class PressHammerItem extends Item {
      * @param batchSize 本次最多处理多少份。由调用方从工具栈上的 Batch Crafting 附魔读出。
      *                  处理 N 份 = 从物品堆叠里拆 N 个，逐个应用配方，产物累加。
      */
-    public static boolean tryPressTransported(Level level, BlockPos pos,
-                                              @Nullable FilterItemStack filter, int batchSize) {
+    public static HandMadeResult tryPressTransported(Level level, BlockPos pos,
+                                                     @Nullable FilterItemStack filter,
+                                                     int batchSize, boolean simulate) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
-        if (handler == null) return false;
+        if (handler == null) return HandMadeResult.INVALID_TARGET;
 
         if (batchSize < 1) batchSize = 1;
 
-        int[] processed = {0};   // 已处理的份数（跨所有 item 累计）
+        int[] processed = {0};        // 已处理的份数（跨所有 item 累计）
+        boolean[] sawItem = {false};  // 目标上是否有非空物品（用于区分 NO_INPUT / NO_RECIPE）
+        boolean[] simulatedOk = {false};
         final int maxBatch = batchSize;
 
         handler.handleProcessingOnAllItems(item -> {
@@ -533,6 +567,7 @@ public class PressHammerItem extends Item {
 
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
+            sawItem[0] = true;
 
             Recipe<?> recipe = findPressingRecipe(level, stack);
             if (recipe == null) return TransportedResult.doNothing();
@@ -540,6 +575,13 @@ public class PressHammerItem extends Item {
             // ★ 本次从这个堆叠里拆出多少份（受剩余批量和堆叠数量双重限制）
             int toProcess = Math.min(maxBatch - processed[0], stack.getCount());
             if (toProcess <= 0) return TransportedResult.doNothing();
+
+            // ★ 预演：判定"配方存在 + 过滤器放行"即可，不摇结果、不改物品
+            if (simulate) {
+                simulatedOk[0] = true;
+                processed[0] += toProcess;
+                return TransportedResult.doNothing();
+            }
 
             // ★ 循环 toProcess 次，每次处理 1 个，累加产物。
             //   概率配方可能这一次什么都没摇出来 —— 那时这一份算"白磨"（料照扣，和研钵一致），
@@ -598,7 +640,17 @@ public class PressHammerItem extends Item {
             }
         });
 
-        return processed[0] > 0;
+        if (simulate) {
+            if (simulatedOk[0]) return HandMadeResult.SUCCESS;
+            return sawItem[0] ? HandMadeResult.NO_RECIPE : HandMadeResult.NO_INPUT;
+        }
+        return processed[0] > 0 ? HandMadeResult.SUCCESS : HandMadeResult.NO_RECIPE;
+    }
+
+    /** 旧签名（boolean）。内部调用方继续用它。 */
+    public static boolean tryPressTransported(Level level, BlockPos pos,
+                                              @Nullable FilterItemStack filter, int batchSize) {
+        return tryPressTransported(level, pos, filter, batchSize, false).isSuccess();
     }
 
     // ================= 过滤器辅助 =================

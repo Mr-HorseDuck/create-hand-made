@@ -92,7 +92,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
             }
             MaidHelpers.Look.lookAtBlock(maid, workPos);
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
-            if (CreateHandMadeApi.pressBasin(level, workPos, filter)) {
+            if (CreateHandMadeApi.pressBasin(level, workPos, filter).isSuccess()) {
                 // 反馈
                 ItemStack particleItem = ItemStack.EMPTY;
                 for (int i = 0; i < basin.inputInventory.getSlots(); i++) {
@@ -138,7 +138,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
 
             // 有原料 → 冲压
             if (CreateHandMadeApi.findPressingRecipe(level, held) != null) {
-                if (CreateHandMadeApi.pressTransported(level, workPos, filter)) {
+                if (CreateHandMadeApi.pressTransported(level, workPos, filter).isSuccess()) {
                     // 反馈
                     MaidFeedback.pressSound(level, workPos);
                     MaidFeedback.itemParticles(level, workPos, held, 6);
@@ -170,7 +170,7 @@ public class MaidUsePressHammerBehavior implements BehaviorControl<EntityMaid> {
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
             MaidHelpers.Look.lookAtBlock(maid, workPos);
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
-            if (CreateHandMadeApi.pressTransported(level, workPos, filter)) {
+            if (CreateHandMadeApi.pressTransported(level, workPos, filter).isSuccess()) {
                 // 反馈：Belt 上没有现成 item 引用，从 handler 里取第一个非空物品做粒子
                 ItemStack particleItem = findFirstBeltItem(level, workPos);
                 MaidFeedback.pressSound(level, workPos);

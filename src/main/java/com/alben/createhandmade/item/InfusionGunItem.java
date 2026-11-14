@@ -5,6 +5,7 @@ import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.renderer.InfusionGunRenderer;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.ModNetwork;
+import com.alben.createhandmade.api.HandMadeResult;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
@@ -420,14 +421,29 @@ public class InfusionGunItem extends Item {
      *   - public static，供 TLM 行为类调用
      *   - @Nullable FilterItemStack filter：过滤**产物**，null 表示不过滤
      */
+    /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean tryInjectItems(Level level, BlockPos pos, LivingEntity entity,
                                          ItemStack gun, @Nullable FilterItemStack filter) {
+        return tryInjectItems(level, pos, entity, gun, filter, false).isSuccess();
+    }
+
+    /**
+     * 灌注枪对传送带物品注入。
+     *
+     * <p>★ 支持预演：{@code simulate} 为 true 时只扫描"有没有一件物品能被当前枪内流体加工、
+     * 且产物不被过滤器挡住"，不耗流体、不改物品、不扣耐久、不播粒子。</p>
+     */
+    public static HandMadeResult tryInjectItems(Level level, BlockPos pos, LivingEntity entity,
+                                                ItemStack gun, @Nullable FilterItemStack filter,
+                                                boolean simulate) {
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
-        if (handler == null) return false;
+        if (handler == null) return HandMadeResult.INVALID_TARGET;
 
         InfusionGunContents contents = getContents(gun);
-        if (contents.isEmpty()) return false;
+        if (contents.isEmpty()) return HandMadeResult.NO_FLUID;
 
         boolean[] success = {false};
 
@@ -436,7 +452,7 @@ public class InfusionGunItem extends Item {
             ItemStack stack = item.stack;
             if (stack.isEmpty()) return TransportedResult.doNothing();
 
-                        Recipe<?> recipe = findFillingRecipe(level, stack, contents.fluid());
+            Recipe<?> recipe = findFillingRecipe(level, stack, contents.fluid());
             if (recipe != null) {
                 FluidIngredient required = getRequiredFluidOf(recipe);
                 if (required == null) return TransportedResult.doNothing();
@@ -457,6 +473,8 @@ public class InfusionGunItem extends Item {
                 if (!resultsPassFilter(level, results, filter)) return TransportedResult.doNothing();
 
                 success[0] = true;
+                if (simulate) return TransportedResult.doNothing();   // 预演：到此为止
+
                 setContents(gun, contents.withDrain(requiredAmount));
                 broadcastFluidParticles(level, pos, contents.fluid());
 
@@ -479,6 +497,8 @@ public class InfusionGunItem extends Item {
                 if (!resultsPassFilter(level, results, filter)) return TransportedResult.doNothing();
 
                 success[0] = true;
+                if (simulate) return TransportedResult.doNothing();   // 预演：到此为止
+
                 setContents(gun, contents.withDrain(required));
                 broadcastFluidParticles(level, pos, contents.fluid());
 
@@ -488,12 +508,17 @@ public class InfusionGunItem extends Item {
             return TransportedResult.doNothing();
         });
 
+        if (simulate) {
+            return success[0] ? HandMadeResult.SUCCESS : HandMadeResult.NO_RECIPE;
+        }
+
         if (success[0]) {
             damageGun(gun, entity);
             level.playSound(null, pos, FluidHelper.getEmptySound(contents.fluid()),
                     SoundSource.PLAYERS, 0.8f, 1.0f + level.random.nextFloat() * 0.2f);
+            return HandMadeResult.SUCCESS;
         }
-        return success[0];
+        return HandMadeResult.NO_RECIPE;
     }
 
     private static TransportedResult finishInject(TransportedItemStack item, ItemStack stack,
@@ -527,16 +552,34 @@ public class InfusionGunItem extends Item {
 
     // ================= 存入流体 =================
 
+    /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean tryStoreFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
+        return tryStoreFluid(level, pos, entity, gun, false).isSuccess();
+    }
+
+    /**
+     * 把枪里的流体注入方块。
+     *
+     * <p>★ 支持预演：{@code simulate} 为 true 时用 {@code FluidAction.SIMULATE} 问一次
+     * "这里能接受多少"，能接受就返回 {@link HandMadeResult#SUCCESS}——不倒流体、不扣耐久、不播音效。</p>
+     */
+    public static HandMadeResult tryStoreFluid(Level level, BlockPos pos, LivingEntity entity,
+                                               ItemStack gun, boolean simulate) {
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+
         IFluidHandler handler = getFluidHandler(level, pos);
-        if (handler == null) return false;
+        if (handler == null) return HandMadeResult.NO_HANDLER;
 
         InfusionGunContents contents = getContents(gun);
-        if (contents.isEmpty()) return false;
+        if (contents.isEmpty()) return HandMadeResult.NO_FLUID;
 
         FluidStack fluid = contents.fluid();
-        int actual = handler.fill(fluid.copy(), IFluidHandler.FluidAction.EXECUTE);
-        if (actual <= 0) return false;
+        int actual = handler.fill(fluid.copy(), simulate
+                ? IFluidHandler.FluidAction.SIMULATE
+                : IFluidHandler.FluidAction.EXECUTE);
+        if (actual <= 0) return HandMadeResult.NO_SPACE;
+
+        if (simulate) return HandMadeResult.SUCCESS;
 
         setContents(gun, contents.withDrain(actual));
         damageGun(gun, entity);
@@ -544,7 +587,7 @@ public class InfusionGunItem extends Item {
         level.playSound(null, pos, FluidHelper.getEmptySound(fluid),
                 SoundSource.PLAYERS, 1f, 1.0f + level.random.nextFloat() * 0.2f);
 
-        return true;
+        return HandMadeResult.SUCCESS;
     }
 
     // ================= 耐久 =================

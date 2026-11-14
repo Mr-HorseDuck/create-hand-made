@@ -3,6 +3,7 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.item.contents.MortarContents;
 import com.alben.createhandmade.item.renderer.MortarItemRenderer;
+import com.alben.createhandmade.api.HandMadeResult;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
@@ -234,59 +235,79 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 女仆一次性研磨辅助 =================
 
+    /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
                                         @Nullable IItemHandler inputInv,
                                         @Nullable IItemHandler outputInv,
                                         @Nullable FilterItemStack filter) {
-        if (level.isClientSide) return false;
-        if (!(level instanceof ServerLevel serverLevel)) return false;
+        return tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter, false).isSuccess();
+    }
 
-        ItemStack material = ItemStack.EMPTY;
+    /**
+     * 一次性研磨（真正实现）。
+     *
+     * <p>★ 判定与执行分离：先找「候选材料 + 配方 + 过滤器放行」，全通过才真的从副手 / 输入容器
+     * 取料。{@code simulate} 为 true 时就在判定通过后返回，不取料、不摇结果、不扣耐久、不播音效。</p>
+     *
+     * <p>旧实现是「先 extractItem 再判定」，失败再 rollback——那样根本没法做预演，
+     * 而且 rollback 自身的分支（副手已空 / 容器已满）容易出漏洞。改成先判定后取料后，
+     * rollbackMaterial 不再需要，已连带删除。</p>
+     */
+    public static HandMadeResult tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
+                                              @Nullable IItemHandler inputInv,
+                                              @Nullable IItemHandler outputInv,
+                                              @Nullable FilterItemStack filter, boolean simulate) {
+        if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
+        if (!(level instanceof ServerLevel serverLevel)) return HandMadeResult.INVALID_TARGET;
+
+        // ---- 1. 找候选材料（此时不取料）----
+        ItemStack candidate = ItemStack.EMPTY;
         boolean fromOffhand = false;
         int fromInputSlot = -1;
 
         ItemStack off = entity.getOffhandItem();
         if (!off.isEmpty() && findRecipe(level, off) != null) {
-            material = off.copyWithCount(1);
+            candidate = off.copyWithCount(1);
             fromOffhand = true;
         } else if (inputInv != null) {
             for (int i = 0; i < inputInv.getSlots(); i++) {
                 ItemStack slot = inputInv.getStackInSlot(i);
                 if (slot.isEmpty()) continue;
                 if (findRecipe(level, slot) == null) continue;
-                material = inputInv.extractItem(i, 1, false);
-                if (!material.isEmpty()) {
-                    fromInputSlot = i;
-                    break;
-                }
+                candidate = slot.copyWithCount(1);
+                fromInputSlot = i;
+                break;
             }
         }
 
-        if (material.isEmpty()) return false;
+        if (candidate.isEmpty()) return HandMadeResult.NO_INPUT;
 
-        Recipe<?> recipe = findRecipe(level, material);
-        if (!(recipe instanceof ProcessingRecipe<?> pr)) {
-            rollbackMaterial(entity, inputInv, material, fromOffhand, fromInputSlot);
-            return false;
-        }
+        // ---- 2. 配方 ----
+        Recipe<?> recipe = findRecipe(level, candidate);
+        if (!(recipe instanceof ProcessingRecipe<?> pr)) return HandMadeResult.NO_RECIPE;
 
-        if (fromOffhand) {
-            off.shrink(1);
-        }
-
-        List<ItemStack> results = pr.rollResults();
+        // ---- 3. 过滤器：摇结果只为看有没有放行的；rollResults 是纯计算，无副作用 ----
         List<ItemStack> accepted = new ArrayList<>();
-        for (ItemStack result : results) {
+        for (ItemStack result : pr.rollResults()) {
             if (result.isEmpty()) continue;
             if (filter != null && !filter.test(level, result)) continue;
             accepted.add(result);
         }
+        if (accepted.isEmpty()) return HandMadeResult.FILTERED_OUT;
 
-        if (accepted.isEmpty()) {
-            rollbackMaterial(entity, inputInv, material, fromOffhand, fromInputSlot);
-            return false;
+        if (simulate) return HandMadeResult.SUCCESS;
+
+        // ---- 4. 真正取料 ----
+        ItemStack material;
+        if (fromOffhand) {
+            off.shrink(1);
+            material = candidate;
+        } else {
+            material = inputInv.extractItem(fromInputSlot, 1, false);
+            if (material.isEmpty()) return HandMadeResult.NO_INPUT;
         }
 
+        // ---- 5. 产出 ----
         for (ItemStack result : accepted) {
             ItemStack remaining = result.copy();
 
@@ -335,39 +356,9 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
             }
         });
 
-        return true;
+        return HandMadeResult.SUCCESS;
     }
 
-    private static void rollbackMaterial(LivingEntity entity, @Nullable IItemHandler inputInv,
-                                          ItemStack material, boolean fromOffhand, int fromInputSlot) {
-        if (material.isEmpty()) return;
-
-        if (fromOffhand) {
-            ItemStack off = entity.getOffhandItem();
-            if (off.isEmpty()) {
-                entity.setItemInHand(InteractionHand.OFF_HAND, material);
-            } else if (ItemStack.isSameItemSameTags(off, material) && off.getCount() < off.getMaxStackSize()) {
-                off.grow(1);
-            } else {
-                entity.spawnAtLocation(material);
-            }
-            return;
-        }
-
-        if (inputInv != null) {
-            if (fromInputSlot >= 0 && fromInputSlot < inputInv.getSlots()) {
-                ItemStack leftover = inputInv.insertItem(fromInputSlot, material, false);
-                if (leftover.isEmpty()) return;
-                material = leftover;
-            }
-            for (int i = 0; i < inputInv.getSlots(); i++) {
-                material = inputInv.insertItem(i, material, false);
-                if (material.isEmpty()) return;
-            }
-        }
-
-        entity.spawnAtLocation(material);
-    }
 
     // ================= 动画 / 音效屏蔽 =================
 

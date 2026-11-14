@@ -65,7 +65,7 @@ public class MaidUseMortarBehavior implements BehaviorControl<EntityMaid> {
 
         FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
-        if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, false)) {
+        if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, false).isSuccess()) {
             // ★ 这里是研钵，不是碾钵：以前误传 CRUSHER_MORTAR，导致
             //   "maidfactory_used_crusher_mortar" 被提前烧掉、而研钵自己的首次标记
             //   永远没人写 —— 表现为研钵第一次用不弹气泡，碾钵的首次气泡也跟着丢。

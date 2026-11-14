@@ -1,5 +1,6 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.api.HandMadeResult;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.item.renderer.BellowsItemRenderer;
@@ -713,10 +714,24 @@ private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemS
     
     // ================= 加工 =================
 
+    /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
+        return applyToTarget(level, pos, type, false).isSuccess();
+    }
+
+    /**
+     * 风箱对目标应用鼓风效果。
+     *
+     * <p>★ 支持预演：{@code simulate} 为 true 时只扫描"有没有一件物品能被该类型处理且产物非空"，
+     * 不改物品、不播粒子。</p>
+     */
+    public static HandMadeResult applyToTarget(Level level, BlockPos pos, FanProcessingType type,
+                                               boolean simulate) {
+        if (level == null || pos == null || type == null) return HandMadeResult.INVALID_TARGET;
+
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
-        if (handler == null) return false;
+        if (handler == null) return HandMadeResult.INVALID_TARGET;
 
         boolean[] success = {false};
 
@@ -728,24 +743,26 @@ private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemS
             ItemStack single = stack.copyWithCount(1);
 
             // L3 优先
-    List<ItemStack> results = findL3Results(level, single, type);
+            List<ItemStack> results = findL3Results(level, single, type);
 
-    // L1 兜底
-    if (results == null) {
-    if (!type.canProcess(single, level)) return TransportedResult.doNothing();
-    results = type.process(single, level);
-    if (results == null) return TransportedResult.doNothing();
-    }
+            // L1 兜底
+            if (results == null) {
+                if (!type.canProcess(single, level)) return TransportedResult.doNothing();
+                results = type.process(single, level);
+                if (results == null) return TransportedResult.doNothing();
+            }
 
-    // ★ 过滤容器空壳
-    results = filterContainerShells(single, results);
+            // ★ 过滤容器空壳
+            results = filterContainerShells(single, results);
 
-    // 过滤后可能全空（比如只有空桶产出）→ 视为"没加工"，不消耗输入
-    if (results.isEmpty()) return TransportedResult.doNothing();
+            // 过滤后可能全空（比如只有空桶产出）→ 视为"没加工"，不消耗输入
+            if (results.isEmpty()) return TransportedResult.doNothing();
 
-    success[0] = true;
-    ItemStack left = stack.copy();
-    left.shrink(1);
+            success[0] = true;
+            if (simulate) return TransportedResult.doNothing();   // 预演：到此为止
+
+            ItemStack left = stack.copy();
+            left.shrink(1);
 
             List<TransportedItemStack> outputs = new ArrayList<>();
             for (ItemStack r : results) {
@@ -772,7 +789,10 @@ private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemS
             }
         });
 
-        return success[0];
+        if (simulate) {
+            return success[0] ? HandMadeResult.SUCCESS : HandMadeResult.NO_RECIPE;
+        }
+        return success[0] ? HandMadeResult.SUCCESS : HandMadeResult.NO_RECIPE;
     }
 
     // ================= 广播 =================

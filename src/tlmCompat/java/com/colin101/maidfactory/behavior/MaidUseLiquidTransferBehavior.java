@@ -125,7 +125,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 && BlockEntityBehaviour.get(level, outputPos,
                 TransportedItemStackHandlerBehaviour.TYPE) != null) {
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
-            if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter)) {
+            if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
 
@@ -136,7 +136,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 return true;
             }
             // 没物品可注 → 走过剩
-            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 
@@ -153,7 +153,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
         // Depot 分支：对 Depot 上的物品注液
         if (outBe instanceof DepotBlockEntity) {
             FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
-            if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter)) {
+            if (CreateHandMadeApi.injectItems(level, outputPos, maid, gun, filter).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
 
@@ -163,7 +163,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 status = Behavior.Status.RUNNING;
                 return true;
             }
-            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 
@@ -179,7 +179,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
 
         // Basin 分支：纯液体转移
         if (outBe instanceof BasinBlockEntity) {
-            if (CreateHandMadeApi.storeFluid(level, outputPos, maid, gun)) {
+            if (CreateHandMadeApi.storeFluid(level, outputPos, maid, gun).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, outputPos);
                 MaidFeedback.fluidParticles(level, outputPos, contents.fluid(), 4);
 
@@ -189,7 +189,7 @@ public class MaidUseLiquidTransferBehavior implements BehaviorControl<EntityMaid
                 status = Behavior.Status.RUNNING;
                 return true;
             }
-            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun)) {
+            if (overflowPos != null && CreateHandMadeApi.storeFluid(level, overflowPos, maid, gun).isSuccess()) {
                 MaidFeedback.fluidFillSound(level, overflowPos);
                 MaidFeedback.fluidParticles(level, overflowPos, contents.fluid(), 4);
 

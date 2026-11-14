@@ -65,7 +65,7 @@ public class MaidUseCrusherMortarBehavior implements BehaviorControl<EntityMaid>
 
         FilterItemStack filter = MaidHelpers.Filter.findFilterStack(maid);
 
-        if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, true)) {
+        if (CreateHandMadeApi.grindMortarOnce(level, maid, tool, inputInv, outputInv, filter, true).isSuccess()) {
             MaidBubbleHelper.tryShowFirstUse(maid, ToolType.CRUSHER_MORTAR, tool); 
             MaidBubbleHelper.tryShow(maid, ToolType.CRUSHER_MORTAR, tool);            
             cooldown = MaidFavorabilityHelper.cooldownFor(MaidConfig.INSTANCE.maidMortarCooldown, maid);

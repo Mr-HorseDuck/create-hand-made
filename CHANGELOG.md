@@ -24,6 +24,12 @@
 
 ### 变更
 
+- **对外 API：写操作返回具体结果 + 支持预演，`API_VERSION` 升到 3**：
+  - 写操作不再返回 `boolean`，改为返回 `HandMadeResult`：`SUCCESS`、`NO_RECIPE`、`FILTERED_OUT`、`NO_INPUT`、`NO_SPACE`、`NO_FLUID`、`NO_HANDLER`、`INVALID_TARGET`、`CLIENT_SIDE`、`FAILED`。以前笼统的"没反应"现在能说清是哪种。
+  - 每个写操作新增 `simulate = true` 的**预演重载**：只判定不执行，不消耗材料、不扣耐久、不播特效。可以"先问能不能、再决定做不做"。
+  - 写操作成功执行后（预演不发）会发 `HandMadeToolUsedEvent`，附属模组做统计 / 进度 / 连锁时不必再包一层。注意本模组自己的工具逻辑不经过 API，所以不发这个事件。
+  - `findStirringRecipe` 新增按 `BlockPos` 取的重载，调用方不必 import Create 的 `BasinBlockEntity`。
+  - **破坏性**：依赖方若写过 `if (api.pressBasin(...))`，需要改成 `.isSuccess()`。
 - **对外 API 加固，`API_VERSION` 升到 2**：
   - 8 个写操作（冲压、研磨、注入、存液、抽液、鼓风、扣耐久）在**客户端调用会被静默拒绝**，不再改动本地状态。此前只在文档里写「只在服务端调用」，误调会产生幻影物品或耐久不同步。
   - 查询类方法统一返回**不可变列表**（`recipesFor` 此前返回可变列表，与其它查询不一致）；传入 `null` / 空物品时返回安全默认值而不是抛 NPE。
