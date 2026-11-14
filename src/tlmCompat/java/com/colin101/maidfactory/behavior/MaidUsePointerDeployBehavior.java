@@ -31,7 +31,9 @@ import net.minecraftforge.items.IItemHandler;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 女仆指杆部署行为（默认模式）。
@@ -314,11 +316,26 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
 
     // ================= 辅助 =================
 
+    /**
+     * 在输入容器里找一个能和 {@code target} 组成部署配方的槽位。
+     *
+     * <p>★ 按物品去重：{@code findPointerRecipe} 内部要扫一遍 TOOL_RECIPE、再做序列组装 /
+     * DEPLOYING / ITEM_APPLICATION 三次查询，每次还分配两套 ItemStackHandler + RecipeWrapper。
+     * 物流箱里同一个物品常常占满几十个槽位，逐槽查会把同样的工作重复几十遍。
+     * 这里用 count 归一后的 ItemStack 做键（equals/hashCode 比 item + NBT），
+     * 同一个物品只查一次：查出来能配就返回最先遇到的槽位，查不出来则后面同样的物品必然也不行。</p>
+     */
     private static int findDeployableInputSlot(ServerLevel level, IItemHandler inputInv, ItemStack target) {
+        Set<ItemStack> tried = new HashSet<>();
+
         for (int i = 0; i < inputInv.getSlots(); i++) {
             ItemStack slot = inputInv.getStackInSlot(i);
             if (slot.isEmpty()) continue;
-            Recipe<?> recipe = CreateHandMadeApi.findPointerRecipe(level, target, slot.copyWithCount(1));
+
+            ItemStack key = slot.copyWithCount(1);
+            if (!tried.add(key)) continue;   // 同款物品已经查过，结果一样
+
+            Recipe<?> recipe = CreateHandMadeApi.findPointerRecipe(level, target, key);
             if (CreateHandMadeApi.isPointerApplicationRecipe(recipe)) {
                 return i;
             }

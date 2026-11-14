@@ -495,9 +495,8 @@ public class PressHammerItem extends Item {
 
         if (result == null) return null;
 
-        List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.PRESS_HAMMER_DEPOT, level, List.of(result));
-        return filtered.isEmpty() ? null : filtered.get(0);
+        if (!HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_DEPOT, level, result)) return null;
+        return result;
     }
 
     /** 旧签名（女仆行为等调用方用），batchSize = 1。 */

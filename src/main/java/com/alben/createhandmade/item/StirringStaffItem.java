@@ -303,9 +303,7 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
                     StirringStaffItem::matchStaticFilters)) {
                 if (!BasinRecipe.match(basin, recipe)) continue;
 
-                List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                        ToolType.STIRRING_STAFF, level, List.of(recipe));
-                if (filtered.isEmpty()) continue;
+                if (!HandMadeRecipePool.isAvailable(ToolType.STIRRING_STAFF, level, recipe)) continue;
 
                 return recipe;
             }

@@ -632,9 +632,8 @@ public class InfusionGunItem extends Item {
 
         if (result == null) return null;
 
-        List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.INFUSION_GUN, level, List.of(result));
-        return filtered.isEmpty() ? null : filtered.get(0);
+        if (!HandMadeRecipePool.isAvailable(ToolType.INFUSION_GUN, level, result)) return null;
+        return result;
     }
         /** 统一取 FillingRecipe / HandMadeRecipes.Filling 的流体要求。 */
     @Nullable

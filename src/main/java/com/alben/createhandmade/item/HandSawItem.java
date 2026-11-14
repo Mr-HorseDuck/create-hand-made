@@ -43,6 +43,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.StonecutterRecipe;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -71,6 +72,7 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -586,7 +588,66 @@ public class HandSawItem extends Item {
 
     // ================= 三层配方查询 =================
 
+    // ================= 切削配方缓存 =================
+    // ★ getCuttingRecipes 一次调用要遍历全部 CUTTING 配方逐个 matches（整合包里常有几百条），
+    //   还要扫一遍 TOOL_RECIPE，并分配 2~3 套 ItemStackHandler/RecipeWrapper + 列表。
+    //   而它的调用点很密：
+    //     - use() / useOn()            每次右键
+    //     - onUseTick()                每个切削周期
+    //     - 女仆手锯行为                每冷却窗口一次
+    //     - 传送带 handleProcessingOnAllItems   **每个物品各一次**
+    //   所以这里按「输入物品」做一层结果缓存。
+    //
+    //   ★ 键里带上 RecipeManager 身份，而不是"manager 变了就清表"：单人游戏里客户端线程
+    //     和服务端线程各自持有**不同的** RecipeManager 实例，两个线程交替调用时会互相
+    //     把对方刚算好的缓存清掉，等于缓存完全失效。做成键的一部分后两边各存各的。
+    //
+    //   失效：HandMadeRecipePool.cacheEpoch()（过滤器增删、资源/脚本重载都会 +1）变化时整表清空。
+    //   键的 ItemStack 用 copyWithCount(1)，其 equals/hashCode 比的是 item + NBT；
+    //   键一旦入表不再改动。表本身是 ConcurrentHashMap，双线程访问安全。
+
+    private static final int CUTTING_CACHE_MAX = 512;
+    private static final Map<CuttingKey, List<Recipe<?>>> CUTTING_CACHE = new ConcurrentHashMap<>();
+    private static final Object CUTTING_CACHE_EPOCH_LOCK = new Object();
+    private static volatile int cuttingCacheEpoch = Integer.MIN_VALUE;
+
+    /** 缓存键：同一份配方表（manager）+ 同一版本号 + 同一件输入物品。 */
+    private record CuttingKey(RecipeManager manager, int epoch, ItemStack input) {}
+
     public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
+        if (level == null || input == null || input.isEmpty()) return List.of();
+
+        RecipeManager manager = level.getRecipeManager();
+        int epoch = HandMadeRecipePool.cacheEpoch();
+
+        if (epoch != cuttingCacheEpoch) {
+            synchronized (CUTTING_CACHE_EPOCH_LOCK) {
+                if (epoch != cuttingCacheEpoch) {
+                    CUTTING_CACHE.clear();
+                    cuttingCacheEpoch = epoch;
+                }
+            }
+        }
+
+        CuttingKey key = new CuttingKey(manager, epoch, input.copyWithCount(1));
+        List<Recipe<?>> cached = CUTTING_CACHE.get(key);
+        if (cached != null) return cached;
+
+        // ★ 不用 List.copyOf：它对 null 元素会抛 NPE。这里要的是"不可变 + 允许 null"。
+        List<Recipe<?>> computed =
+                Collections.unmodifiableList(new ArrayList<>(computeCuttingRecipes(level, key.input())));
+
+        // 简单限长：条目到顶就整体清空，不做 LRU（物品种类本来就不该无上限增长）
+        if (CUTTING_CACHE.size() >= CUTTING_CACHE_MAX) {
+            CUTTING_CACHE.clear();
+        }
+
+        List<Recipe<?>> race = CUTTING_CACHE.putIfAbsent(key, computed);
+        return race != null ? race : computed;
+    }
+
+    /** 真正干活的部分：不缓存，只由 {@link #getCuttingRecipes} 在未命中时调用。 */
+    private static List<Recipe<?>> computeCuttingRecipes(Level level, ItemStack input) {
     if (input.isEmpty()) return List.of();
 
         // ---- 段 1：L3 独占切削（独立 type） ----

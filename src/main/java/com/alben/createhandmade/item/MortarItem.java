@@ -219,9 +219,8 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
         if (recipeOpt.isEmpty()) return null;
 
         // ---- L2 过滤 ----
-        List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.MORTAR, level, List.of(recipeOpt.get()));
-        return filtered.isEmpty() ? null : filtered.get(0);
+        if (!HandMadeRecipePool.isAvailable(ToolType.MORTAR, level, recipeOpt.get())) return null;
+        return recipeOpt.get();
     }
 
     // ================= 女仆一次性研磨辅助 =================

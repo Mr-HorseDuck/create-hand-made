@@ -219,9 +219,8 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         if (result == null) return null;
 
         // ---- 段 4：L2 过滤 ----
-        List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.CRUSHER_MORTAR, level, List.of(result));
-        return filtered.isEmpty() ? null : filtered.get(0);
+        if (!HandMadeRecipePool.isAvailable(ToolType.CRUSHER_MORTAR, level, result)) return null;
+        return result;
     }
 
     // ================= 女仆一次性加工辅助 =================

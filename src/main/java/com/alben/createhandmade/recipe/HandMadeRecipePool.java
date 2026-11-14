@@ -70,6 +70,22 @@ public class HandMadeRecipePool {
         resetKubeJS();
     }
 
+    // ================= 版本号：供上层缓存判失效 =================
+    // ★ 任何会让「查询结果」变化的事件都应 +1：过滤器增删（会改变 L2 结果）、
+    //   资源/脚本重载（会改变配方集）、RecipeManager 换实例（已由各自缓存单独判）。
+    //   上层缓存（例如 HandSawItem 的切削配方缓存）只比对版本号，不关心具体是什么变了。
+
+    private static volatile int cacheEpoch;
+
+    /** 当前版本号。上层缓存把它和 RecipeManager 身份一起作为失效条件。 */
+    public static int cacheEpoch() {
+        return cacheEpoch;
+    }
+
+    private static void bumpEpoch() {
+        cacheEpoch++;
+    }
+
     // ================= 配方 → ID 反查缓存 =================
     // ★ applyFilter 每过滤一条配方都要知道它的 ID。原实现每次调用都用
     //   manager.getRecipeIds() + byKey() 把整张配方表遍历一遍（几千条哈希查找），
@@ -90,6 +106,7 @@ public class HandMadeRecipePool {
     public static void invalidateIdCache() {
         cachedIdMap = null;
         cachedIdManager = null;
+        bumpEpoch();
     }
 
     /** 反查某条配方的 ID（走缓存）。找不到返回 null——例如动态生成的配方。 */
@@ -118,7 +135,8 @@ public class HandMadeRecipePool {
     // ================= L2: 数据包添加过滤 =================
 
     public static void addFilter(ToolType tool, Collection<ResourceLocation> ids) {
-        FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).addAll(ids);
+        boolean changed = FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).addAll(ids);
+        if (changed) bumpEpoch();
     }
 
     // ================= L2: KubeJS 添加过滤 =================
@@ -130,12 +148,16 @@ public class HandMadeRecipePool {
 
     /** 添加一条 KubeJS 过滤（精确配方 ID） */
     public static void addKubeJSFilter(ToolType tool, ResourceLocation recipeId) {
-        KUBEJS_FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).add(recipeId);
+        if (KUBEJS_FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).add(recipeId)) {
+            bumpEpoch();
+        }
     }
 
     /** 添加一条 KubeJS 过滤（整个 namespace） */
     public static void addKubeJSFilterByMod(ToolType tool, String modId) {
-        KUBEJS_MOD_FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).add(modId);
+        if (KUBEJS_MOD_FILTER_MAP.computeIfAbsent(tool, t -> ConcurrentHashMap.newKeySet()).add(modId)) {
+            bumpEpoch();
+        }
     }
 
         // ================= 1.21 对齐：getBaseRecipes =================
@@ -292,10 +314,23 @@ public class HandMadeRecipePool {
      * <p>给「L3 段命中即返回」这类查询用。以前 L2 只作用于 L1，工具照旧执行被数据包 /
      * KubeJS 禁用的独占配方 —— 与 {@code recipesForFiltered} 的口径对不上。现在两层一致，
      * 独占配方也能用同一套过滤器禁掉。</p>
+     *
+     * <p>★ 零分配实现：以前是 {@code applyFilter(tool, level, List.of(recipe)).isEmpty()}，
+     * 每次调用都要创建一个单元素 List 和一个 ArrayList，只为回答一个布尔。而它挂在
+     * 每个工具的 L3 循环里（每个候选配方一次），女仆行为每冷却窗口都会走到。
+     * 现在直接查「这条配方的 ID 是否被禁用」，语义完全等价：</p>
+     * <ul>
+     *   <li>动态配方（{@code SequencedAssemblyRecipe} 等）没有稳定 ID，{@link #recipeIdOf}
+     *       返回 null，过滤器本来就管不到它 → 视为可用；</li>
+     *   <li>有 ID 的走 {@link #isRecipeDisabled}，判定条件与 {@code applyFilter} 逐条一致。</li>
+     * </ul>
      */
     public static boolean isAvailable(ToolType tool, Level level, Recipe<?> recipe) {
         if (recipe == null || level == null) return false;
-        return !applyFilter(tool, level, List.of(recipe)).isEmpty();
+
+        ResourceLocation id = recipeIdOf(level, recipe);
+        if (id == null) return true;   // 动态配方没有 ID，禁不掉
+        return !isRecipeDisabled(tool, id);
     }
 
     /**

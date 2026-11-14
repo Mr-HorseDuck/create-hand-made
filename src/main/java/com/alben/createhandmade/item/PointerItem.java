@@ -342,9 +342,8 @@ public class PointerItem extends Item {
 
         if (result == null) return null;
 
-        List<Recipe<?>> filtered = HandMadeRecipePool.applyFilter(
-                ToolType.POINTER, level, List.of(result));
-        return filtered.isEmpty() ? null : filtered.get(0);
+        if (!HandMadeRecipePool.isAvailable(ToolType.POINTER, level, result)) return null;
+        return result;
     }
 
     // ================= 辅助 =================
