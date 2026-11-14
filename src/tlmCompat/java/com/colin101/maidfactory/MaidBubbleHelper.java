@@ -56,6 +56,9 @@ public final class MaidBubbleHelper {
 
         LAST_BUBBLE_TIME.put(id, now);
         maid.getChatBubbleManager().addTextChatBubble(langKey);
+
+        // 冷却早就过了的条目对判定已无影响，可以清
+        sweepIfNeeded(LAST_BUBBLE_TIME, now, BUBBLE_COOLDOWN_TICKS * 2);
     }
 
     public static void tryShowFirstUse(EntityMaid maid, ToolType tool, ItemStack stack) {
@@ -69,6 +72,7 @@ public final class MaidBubbleHelper {
         UUID id = ((Entity) maid).getUUID();
         long now = ((Entity) maid).level().getGameTime();
         LAST_BUBBLE_TIME.put(id, now);   // 占住 30 秒冷却，防止紧接着的 tryShow 覆盖 first
+        sweepIfNeeded(LAST_BUBBLE_TIME, now, BUBBLE_COOLDOWN_TICKS * 2);
 
         maid.getChatBubbleManager().addTextChatBubble(
                 "message.maidfactory.bubble." + toolKey + ".first");
@@ -90,11 +94,33 @@ public final class MaidBubbleHelper {
         LAST_SUCCESS_TIME.remove(id);
     }
 
+    // ==================== 过期清理 ====================
+    // ★ 这三张表都以女仆 UUID 为键，原来只在「女仆死亡」时清理。而女仆被删除、区块永久卸载、
+    //   换存档等情况下死亡事件未必触发，长期运行的服务器上条目只增不减（每个约几十字节）。
+    //   量级很小，但没理由让它无限长——表长到阈值时顺手扫一遍，把早已过期的条目去掉。
+
+    /** 表超过这个条数就做一次过期清理。 */
+    private static final int SWEEP_THRESHOLD = 256;
+
+    /**
+     * 清掉「早就不可能再影响判定」的条目。
+     *
+     * @param keepTicks 超过这个 tick 数的条目视为过期（各表的有效期语义不同，由调用方给）
+     */
+    private static void sweepIfNeeded(Map<UUID, Long> map, long now, int keepTicks) {
+        if (map.size() < SWEEP_THRESHOLD) return;
+        map.entrySet().removeIf(entry -> now - entry.getValue() > keepTicks);
+    }
+
     // ==================== 连续判断 ====================
 
     private static boolean updateContinuousState(UUID id, long now) {
         Long last = LAST_SUCCESS_TIME.get(id);
         LAST_SUCCESS_TIME.put(id, now);
+
+        // 连续判定的两张表：超过「连续间隔」的旧值已经没有意义
+        sweepIfNeeded(LAST_SUCCESS_TIME, now, CONTINUOUS_GAP_TICKS * 4);
+        sweepIfNeeded(CONTINUOUS_START, now, CONTINUOUS_DURATION_TICKS * 2);
 
         if (last == null || now - last >= CONTINUOUS_GAP_TICKS) {
             CONTINUOUS_START.remove(id);

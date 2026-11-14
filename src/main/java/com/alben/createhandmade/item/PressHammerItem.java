@@ -456,20 +456,27 @@ public class PressHammerItem extends Item {
 
     // ================= 置物台 / 传送带（depot 家族） =================
 
+    /** 单格输入的配方 wrapper；L3 查询按需创建用（绝大多数整合包没有 L3 配方，先建就是白分配）。 */
+    private static RecipeWrapper wrapSingle(ItemStack input) {
+        ItemStackHandler handler = new ItemStackHandler(1);
+        handler.setStackInSlot(0, input.copyWithCount(1));
+        return new RecipeWrapper(handler);
+    }
+
     @Nullable
     public static Recipe<?> findPressingRecipe(Level level, ItemStack stack) {
         if (stack.isEmpty()) return null;
 
         // ---- 段 1：L3 独立 type ----
-        ItemStackHandler l3Handler = new ItemStackHandler(1);
-        l3Handler.setStackInSlot(0, stack.copyWithCount(1));
-        RecipeWrapper l3Wrapper = new RecipeWrapper(l3Handler);
+        // ★ 懒创建：只有真的遇到 tool=press_hammer_depot 的 L3 配方才需要 wrapper
+        RecipeWrapper l3Wrapper = null;
 
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(r instanceof HandMadeToolRecipeLike like)) continue;
             if (like.getTool() != ToolType.PRESS_HAMMER_DEPOT) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.PRESS_HAMMER_DEPOT, level, r)) continue;
+            if (l3Wrapper == null) l3Wrapper = wrapSingle(stack);
             if (!r.matches(l3Wrapper, level)) continue;
             return r;
         }

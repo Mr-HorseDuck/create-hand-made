@@ -299,16 +299,16 @@ public class PointerItem extends Item {
         if (target.isEmpty()) return null;
 
         // ---- 段 1：L3 独立 type ----
-        ItemStackHandler l3Handler = new ItemStackHandler(2);
-        l3Handler.setStackInSlot(0, target.copyWithCount(1));
-        l3Handler.setStackInSlot(1, tool.copyWithCount(1));
-        RecipeWrapper l3Wrapper = new RecipeWrapper(l3Handler);
+        // ★ 懒创建：只有真的遇到 tool=pointer 的 L3 配方才需要 ItemStackHandler/RecipeWrapper。
+        //   多数整合包没有 L3 配方，先建就是白分配（女仆部署行为每个冷却窗口都会走到这里）。
+        RecipeWrapper l3Wrapper = null;
 
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(r instanceof HandMadeRecipes.Application har)) continue;
             if (har.getTool() != ToolType.POINTER) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.POINTER, level, r)) continue;
+            if (l3Wrapper == null) l3Wrapper = wrapApplication(target, tool);
             if (!har.matches(l3Wrapper, level)) continue;
             return har;
         }
@@ -347,6 +347,14 @@ public class PointerItem extends Item {
     }
 
     // ================= 辅助 =================
+
+    /** 两格输入（被加工物 + 手持工具）的配方 wrapper；L3 查询按需创建用。 */
+    private static RecipeWrapper wrapApplication(ItemStack target, ItemStack tool) {
+        ItemStackHandler handler = new ItemStackHandler(2);
+        handler.setStackInSlot(0, target.copyWithCount(1));
+        handler.setStackInSlot(1, tool.copyWithCount(1));
+        return new RecipeWrapper(handler);
+    }
 
     /** 判断是否是应用家族的配方——同时接受 Create 的 ItemApplicationRecipe 和本模组的 L3 类。 */
     public static boolean isApplicationRecipe(@Nullable Recipe<?> recipe) {

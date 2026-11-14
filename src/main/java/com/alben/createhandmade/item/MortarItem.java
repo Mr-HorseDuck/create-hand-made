@@ -196,13 +196,19 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 三层配方查询 =================
 
+    /** 单格输入的配方 wrapper；L3 查询按需创建用（绝大多数整合包没有 L3 配方，先建就是白分配）。 */
+    private static RecipeWrapper wrapSingle(ItemStack input) {
+        ItemStackHandler handler = new ItemStackHandler(1);
+        handler.setStackInSlot(0, input.copyWithCount(1));
+        return new RecipeWrapper(handler);
+    }
+
     @Nullable
     public static Recipe<?> findRecipe(Level level, ItemStack input) {
         if (input.isEmpty()) return null;
 
-        ItemStackHandler handler = new ItemStackHandler(1);
-        handler.setStackInSlot(0, input.copyWithCount(1));
-        RecipeWrapper wrapper = new RecipeWrapper(handler);
+        // ★ 懒创建：没有 L3 配方时不必提前分配（女仆研钵行为每个冷却窗口会走到这里）
+        RecipeWrapper wrapper = null;
 
         // ---- 段 1：L3 独立 type ----
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
@@ -210,11 +216,14 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
             if (!(r instanceof HandMadeToolRecipeLike like)) continue;
             if (like.getTool() != ToolType.MORTAR) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.MORTAR, level, r)) continue;
+            if (wrapper == null) wrapper = wrapSingle(input);
             if (!r.matches(wrapper, level)) continue;
             return r;
         }
 
         // ---- 段 2：L1 Create 的 MILLING ----
+        // 段 1 没建过 wrapper（没有 L3 配方）时在这里补上
+        if (wrapper == null) wrapper = wrapSingle(input);
         Optional<MillingRecipe> recipeOpt = AllRecipeTypes.MILLING.find(wrapper, level);
         if (recipeOpt.isEmpty()) return null;
 

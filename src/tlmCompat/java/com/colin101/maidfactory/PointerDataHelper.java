@@ -6,6 +6,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class PointerDataHelper {
 
@@ -101,13 +104,34 @@ public final class PointerDataHelper {
 
     // ================= 通用 =================
 
+    /**
+     * 维度 ID 的字符串缓存（Level → "minecraft:overworld"）。
+     *
+     * <p>{@code level.dimension().location()} 本身不分配，但 {@code toString()} 每次都新建
+     * 一个字符串。读写标记的路径挂在女仆行为的每次 tryStart 上（每个冷却窗口 1~6 次），
+     * 而维度在一个 Level 生命周期内不会变，没必要反复拼。</p>
+     *
+     * <p>用 WeakHashMap：维度卸载后条目自动消失；外面包一层同步，因为不假设只有服务端线程会读。</p>
+     */
+    private static final Map<Level, String> DIM_ID_CACHE =
+            Collections.synchronizedMap(new WeakHashMap<>());
+
+    private static String dimIdOf(Level level) {
+        String cached = DIM_ID_CACHE.get(level);
+        if (cached != null) return cached;
+
+        String id = level.dimension().location().toString();
+        DIM_ID_CACHE.put(level, id);
+        return id;
+    }
+
     private static void writeBlock(Entity entity, String key, Level level, BlockPos pos) {
         CompoundTag root = entity.getPersistentData().getCompound(NBT_ROOT);
         CompoundTag tag = new CompoundTag();
         tag.putInt("X", pos.getX());
         tag.putInt("Y", pos.getY());
         tag.putInt("Z", pos.getZ());
-        tag.putString("Dim", level.dimension().location().toString());
+        tag.putString("Dim", dimIdOf(level));
         root.put(key, tag);
         entity.getPersistentData().put(NBT_ROOT, root);
     }
@@ -124,8 +148,11 @@ public final class PointerDataHelper {
         if (!root.contains(key)) return null;
 
         CompoundTag tag = root.getCompound(key);
-        String dim = tag.getString("Dim");
-        if (!dim.equals(level.dimension().location().toString())) return null;
+
+        // ★ 不比较 toString()：那会在每次读取时新分配一个字符串，而这段代码挂在女仆行为
+        //   的每次 tryStart 上（每个冷却窗口读 1~6 次）。维度字符串按 Level 缓存，
+        //   这里只做一次 map 查找 + 字符串比较，零分配。
+        if (!tag.getString("Dim").equals(dimIdOf(level))) return null;
 
         return new BlockPos(tag.getInt("X"), tag.getInt("Y"), tag.getInt("Z"));
     }

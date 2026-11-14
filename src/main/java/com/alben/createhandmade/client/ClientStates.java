@@ -60,6 +60,10 @@ public final class ClientStates {
             Level level = Minecraft.getInstance().level;
             if (level == null) return List.of();
 
+            // ★ 没有任何人搅拌时（绝大多数 tick 都是这种）直接返回共享的空列表，
+            //   不分配 ArrayList——本方法在客户端每 tick 的 Phase.END 里都会被调用。
+            if (ACTIVE.isEmpty()) return List.of();
+
             long now = level.getGameTime();
             List<BlockPos> out = new ArrayList<>(ACTIVE.size());
             Iterator<Map.Entry<BlockPos, Long>> it = ACTIVE.entrySet().iterator();

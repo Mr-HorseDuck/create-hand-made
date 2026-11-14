@@ -646,21 +646,28 @@ public class HandSawItem extends Item {
         return race != null ? race : computed;
     }
 
+    /** 单格输入的配方 wrapper；L3 查询按需创建用（绝大多数整合包没有 L3 配方，先建就是白分配）。 */
+    private static RecipeWrapper wrapSingle(ItemStack input) {
+        ItemStackHandler handler = new ItemStackHandler(1);
+        handler.setStackInSlot(0, input.copyWithCount(1));
+        return new RecipeWrapper(handler);
+    }
+
     /** 真正干活的部分：不缓存，只由 {@link #getCuttingRecipes} 在未命中时调用。 */
     private static List<Recipe<?>> computeCuttingRecipes(Level level, ItemStack input) {
     if (input.isEmpty()) return List.of();
 
         // ---- 段 1：L3 独占切削（独立 type） ----
         List<Recipe<?>> custom = new ArrayList<>();
-        ItemStackHandler customHandler = new ItemStackHandler(1);
-        customHandler.setStackInSlot(0, input.copyWithCount(1));
-        RecipeWrapper customWrapper = new RecipeWrapper(customHandler);
+        // ★ 懒创建：只有真的遇到 tool=hand_saw 的 L3 配方才需要 wrapper
+        RecipeWrapper customWrapper = null;
 
         for (ProcessingRecipe<RecipeWrapper> recipe : level.getRecipeManager()
                 .getAllRecipesFor(HandMadeRecipeTypes.TOOL_RECIPE.get())) {
             if (!(recipe instanceof HandMadeToolRecipeLike like)) continue;
             if (like.getTool() != ToolType.HAND_SAW) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.HAND_SAW, level, recipe)) continue;
+            if (customWrapper == null) customWrapper = wrapSingle(input);
             if (!recipe.matches(customWrapper, level)) continue;
             custom.add(recipe);
         }
@@ -705,15 +712,27 @@ public class HandSawItem extends Item {
     private static List<Recipe<?>> sortById(Level level, List<Recipe<?>> recipes) {
         if (recipes.size() <= 1) return recipes;
 
-        List<Recipe<?>> sorted = new ArrayList<>(recipes);
-        sorted.sort((a, b) -> {
-            ResourceLocation idA = getRecipeId(level, a);
-            ResourceLocation idB = getRecipeId(level, b);
-            if (idA == null && idB == null) return 0;
-            if (idA == null) return 1;
-            if (idB == null) return -1;
-            return idA.compareTo(idB);
+        // ★ 装饰-排序：ID 先一次性取好再排序。原实现把 getRecipeId 放进比较器，
+        //   排序过程要回调 O(n log n) 次，每次都是一次 map 查找；现在只取 n 次。
+        record Keyed(Recipe<?> recipe, @Nullable ResourceLocation id) {}
+
+        List<Keyed> keyed = new ArrayList<>(recipes.size());
+        for (Recipe<?> recipe : recipes) {
+            keyed.add(new Keyed(recipe, getRecipeId(level, recipe)));
+        }
+
+        // null（动态配方）排最后
+        keyed.sort((a, b) -> {
+            if (a.id() == null && b.id() == null) return 0;
+            if (a.id() == null) return 1;
+            if (b.id() == null) return -1;
+            return a.id().compareTo(b.id());
         });
+
+        List<Recipe<?>> sorted = new ArrayList<>(keyed.size());
+        for (Keyed k : keyed) {
+            sorted.add(k.recipe());
+        }
         return sorted;
     }
 

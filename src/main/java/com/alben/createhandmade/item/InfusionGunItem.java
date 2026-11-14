@@ -593,13 +593,19 @@ public class InfusionGunItem extends Item {
      * ★ 返回类型从 FillingRecipe 放宽到 Recipe<?>，
      *   因为 HandMadeRecipes.Filling 不是 FillingRecipe 的子类。
      */
+    /** 单格输入的配方 wrapper；L3 查询按需创建用（绝大多数整合包没有 L3 配方，先建就是白分配）。 */
+    private static RecipeWrapper wrapSingle(ItemStack input) {
+        ItemStackHandler handler = new ItemStackHandler(1);
+        handler.setStackInSlot(0, input.copyWithCount(1));
+        return new RecipeWrapper(handler);
+    }
+
     @Nullable
     private static Recipe<?> findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
         if (target.isEmpty()) return null;
 
-        ItemStackHandler handler = new ItemStackHandler(1);
-        handler.setStackInSlot(0, target.copyWithCount(1));
-        RecipeWrapper wrapper = new RecipeWrapper(handler);
+        // ★ 懒创建：没有 L3 配方时不必提前分配
+        RecipeWrapper wrapper = null;
 
         // ---- 段 1：L3 独立 type ----
         for (ProcessingRecipe<RecipeWrapper> r : level.getRecipeManager()
@@ -607,17 +613,22 @@ public class InfusionGunItem extends Item {
             if (!(r instanceof HandMadeRecipes.Filling hfr)) continue;
             if (hfr.getTool() != ToolType.INFUSION_GUN) continue;
             if (!HandMadeRecipePool.isAvailable(ToolType.INFUSION_GUN, level, r)) continue;
+            if (wrapper == null) wrapper = wrapSingle(target);
             if (!hfr.matches(wrapper, level)) continue;
             if (!hfr.getRequiredFluid().test(fluid)) continue;
             return hfr;
         }
 
         // ---- 段 2：L1 序列组装 ----
+        if (wrapper == null) wrapper = wrapSingle(target);   // 段 1 没建过时补上
+        // ★ 下面的谓词是 lambda，捕获的局部变量必须是 effectively final；
+        //   而 wrapper 上面被赋值过两次（懒创建 + 兜底），所以这里导出一个 final 别名。
+        RecipeWrapper finalWrapper = wrapper;
         FillingRecipe result = null;
 
         Optional<FillingRecipe> sequenced = SequencedAssemblyRecipe.getRecipe(
-                level, wrapper, AllRecipeTypes.FILLING.getType(), FillingRecipe.class,
-                r -> r.matches(wrapper, level) && r.getRequiredFluid().test(fluid));
+                level, finalWrapper, AllRecipeTypes.FILLING.getType(), FillingRecipe.class,
+                r -> r.matches(finalWrapper, level) && r.getRequiredFluid().test(fluid));
         if (sequenced.isPresent()) {
             result = sequenced.get();
         } else {
