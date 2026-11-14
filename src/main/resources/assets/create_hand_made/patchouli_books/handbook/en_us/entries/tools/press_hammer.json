@@ -1,0 +1,23 @@
+{
+  "name": "Press Hammer",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:press_hammer",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:press_hammer",
+      "text": "Hold right-click to charge, release to strike. Works on items on a $(l)Basin$(), $(l)Depot$() or $(l)belt$().\\n\\nCharging past the threshold lands a $(l)critical hit$() on mobs too."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Recipes it can do",
+      "text": "$(li)$(l)Basin$(): pressing (compacting) recipes$(br)$(li)$(l)Depot / belt$(): pressing recipes$(br)$(li)Plus any exclusive recipe you add via datapack"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Tips",
+      "text": "$(li)It reads Create's pressing recipes, so disabling a Create recipe also disables it here.$(br)$(li)Use a $(l)filter$() in the offhand to control outputs.$(br)$(li)Critical strikes only apply to the target you charged at, once."
+    }
+  ]
+}

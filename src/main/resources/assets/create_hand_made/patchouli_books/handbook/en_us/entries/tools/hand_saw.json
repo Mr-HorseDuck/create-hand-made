@@ -1,0 +1,28 @@
+{
+  "name": "Hand Saw",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:hand_saw",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:hand_saw",
+      "text": "Cuts, fells trees, strips logs and scrapes copper.\\n\\nPut the material in your $(l)offhand$() and hold right-click to saw. Shift + right-click cycles the recipe when several match."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Felling trees",
+      "text": "Shift + left-click a log to fell the whole tree.\\n\\nThis can be turned off in config ($(c)enable_tree_felling$()). Breaking is done with player context, so protection plugins, statistics and enchantment drops all behave normally."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Recipes it can do",
+      "text": "$(li)$(l)Cutting$() recipes$(br)$(li)$(l)Stonecutting$() as fallback$(br)$(li)Exclusive saw recipes from datapacks\\n\\n$(italic)Only 1 durability per cut, no matter how many items the recipe yields.$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Tips",
+      "text": "$(li)The tooltip shows the currently selected recipe index.$(br)$(li)Batch crafting enchantment processes multiple items at once.$(br)$(li)Saplings and leaves aren't touched when felling."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "配方",
+  "description": "三层配方系统：工具能做什么，完全由数据决定。",
+  "icon": "minecraft:crafting_table",
+  "sortnum": 2
+}

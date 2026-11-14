@@ -1,0 +1,23 @@
+{
+  "name": "Bellows",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:bellows",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:bellows",
+      "text": "Applies fan processing without a fan. Put the $(l)catalyst$() in your offhand, hold right-click to charge, release to blow.\\n\\nWorks on items on belts, depots and basins — and on mobs."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Catalysts it recognises",
+      "text": "Not limited to vanilla: any fan processing type registered by another mod can be triggered. Catalysts are discovered from$(br)$(li)item / block / fluid tags named $(c)<ns>:fan_processing_catalysts/<type>$() or $(c)<ns>:fan_catalysts/<type>$()$(br)$(li)colored dye buckets (Dragons Plus)$(br)$(li)dye catalysts (Create Connected)"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Tips",
+      "text": "$(li)Conflicts (one item claimed by several types) are logged as a WARN — resolve with $(c)bellows_type_overrides$() in the config.$(br)$(li)It produces $(o)no$() Create air current, so block-dyeing logic that needs airflow won't trigger.$(br)$(li)Entity conversion happens instantly on release, not after sustained blowing."
+    }
+  ]
+}

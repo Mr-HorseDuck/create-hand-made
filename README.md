@@ -45,6 +45,7 @@
 | KubeJS | 2001.6.5+ | 可选 |
 | TLM | 1.5.3+ | 可选 |
 | Cloth Config API | 11.1.136+ | 可选 |
+| Patchouli（帕秋莉手册） | 1.20.1-84+ | 可选（提供游戏内手册） |
 
 ## 补充
 - 和女仆流水线有联动
@@ -73,8 +74,18 @@
 支持**数据包**
 **KubeJS**
 
+## 游戏内手册
+
+安装 [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) 后，首次进入世界会自动获得《手搓学：从入门到入土》（中英双语）。内容涵盖 8 件工具、女仆兼容（9 种行为与指杆指定目标）、三层配方系统与配置说明。
+
+不想要自动送书，可以在存档的 `serverconfig/create_hand_made-server.toml` 里把 `[guidebook]` 的 `give_on_first_join` 设为 `false`。手动补一本：
+
+```
+/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}
+```
+
 ## 未来展望
-- 支持帕秋莉手册
+- 女仆 API（`MaidFactoryApi`），供附属模组直接调用女仆能力
 
 ## 构建（开发者）
 

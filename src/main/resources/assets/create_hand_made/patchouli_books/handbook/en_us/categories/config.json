@@ -1,0 +1,6 @@
+{
+  "name": "Config",
+  "description": "Server-authoritative config and its file locations.",
+  "icon": "minecraft:comparator",
+  "sortnum": 3
+}

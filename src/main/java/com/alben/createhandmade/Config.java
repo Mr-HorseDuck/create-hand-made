@@ -36,6 +36,9 @@ public class Config {
     public final ForgeConfigSpec.IntValue stirringStaffWindupTicks;
     public final ForgeConfigSpec.IntValue stirringStaffProcessingTicks;
 
+    // ==================== 手册 ====================
+    public final ForgeConfigSpec.BooleanValue giveGuideBookOnFirstJoin;
+
     // ==================== 调试 ====================
     public final ForgeConfigSpec.BooleanValue debugEnabled;
 
@@ -171,6 +174,18 @@ public class Config {
         builder.pop(); // stirring_staff
 
         builder.pop(); // tools
+
+        // ==================== 手册 ====================
+        builder.comment("帕秋莉手册（需要安装 Patchouli 模组）").push("guidebook");
+
+        giveGuideBookOnFirstJoin = builder
+                .comment("玩家第一次进入世界时，是否自动赠送一本《手搓学：从入门到入土》",
+                         "需要安装 Patchouli；未安装时该项无效果",
+                         "每个玩家只送一次（记录在玩家数据里，换存档不会重复送）",
+                         "默认: true")
+                .define("give_on_first_join", true);
+
+        builder.pop(); // guidebook
 
         // ==================== 调试 ====================
         builder.comment("调试选项").push("debug");

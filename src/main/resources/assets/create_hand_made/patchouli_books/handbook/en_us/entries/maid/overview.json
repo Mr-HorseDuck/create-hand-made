@@ -1,0 +1,23 @@
+{
+  "name": "Maid Compatibility",
+  "category": "create_hand_made:maid",
+  "icon": "minecraft:cake",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Prerequisites",
+      "text": "Requires $(l)Touhou Little Maid$(). Set the maid's task to $(l)Hand Made$(), then put the tool in her main hand.\\n\\nShe won't swap tools by herself — you have to hand her a different one."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Nine behaviours (by priority)",
+      "text": "$(li)$(l)5$() Press Hammer$(br)$(li)$(l)6$() Fluid transfer (uses pointer-marked targets)$(br)$(li)$(l)7$() Infusion Gun (finds a nearby depot/basin when no target marked)$(br)$(li)$(l)8$() Stirring Staff$(br)$(li)$(l)9$() Hand Saw$(br)$(li)$(l)10$() Mortar$(br)$(li)$(l)11$() Crusher Mortar$(br)$(li)$(l)12$() Bellows$(br)$(li)$(l)13$() Pointer deploy"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Favorability bonuses",
+      "text": "Higher favour means faster, cheaper work:$(br)$(li)cooldown $(c)−7.5%$() / $(c)−15%$() / $(c)−22.5%$()$(br)$(li)$(c)5%$() / $(c)10%$() / $(c)15%$() chance to skip durability$(br)\\n$(italic)#6 and #7 are exclusive: once you mark draw/fill targets with the pointer, #7 steps aside."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Recipes",
+  "description": "Three-layer recipe system: what a tool can do is fully data-driven.",
+  "icon": "minecraft:crafting_table",
+  "sortnum": 2
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Assigning targets with the Pointer",
+  "category": "create_hand_made:maid",
+  "icon": "create_hand_made:pointer",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Marking",
+      "text": "Switch the pointer to $(l)Mark$() mode (Ctrl + scroll), then sneak + right-click to mark in order:$(br)\\n$(li)Work block: depot / basin / belt$(br)$(li)Input: a container$(br)$(li)Output: a container$(br)\\n$(italic)Only blocks with an item handler count as containers. $()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Applying to a maid",
+      "text": "When you're done, $(l)sneak + right-click the maid$(). The chat bar tells you which mode you got:$(br)\\n$(li)$(l)Full logistics$(): work block + input + output$(br)$(li)$(l)Process-only$(): only the work block$(br)\\n$(c)Only the work block is mandatory$()."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Process-only mode",
+      "text": "If you only mark a work block, she processes whatever $(l)you$() put on it — no fetching, no output transfer.\\n\\nHandy when robots or belts handle the logistics and you just want her to do the hammering.\\n\\n$(italic)Note: if the output can be processed again by the same tool (log → stripped → planks), she'll keep going and spend durability each step. $()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Marks are exclusive",
+      "text": "A maid listens to $(l)either$() work targets $(l)or$() fluid targets, never both.\\n\\nApplying fluid marks clears her work block / input / output, and vice versa. Switch back to the other mode and re-apply to change your mind."
+    }
+  ]
+}

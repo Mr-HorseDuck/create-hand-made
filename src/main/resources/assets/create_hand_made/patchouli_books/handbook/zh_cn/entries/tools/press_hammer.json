@@ -1,0 +1,23 @@
+{
+  "name": "冲压锤",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:press_hammer",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:press_hammer",
+      "text": "长按右键蓄力，松手砸下。对$(l)工作盆$()、$(l)置物台$()或$(l)传送带$()上的物品生效。\\n\\n蓄力超过阈值时，对生物还会打出$(l)暴击$()。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "能做什么配方",
+      "text": "$(li)$(l)工作盆$()：冲压（压缩）配方$(br)$(li)$(l)置物台 / 传送带$()：冲压配方$(br)$(li)外加你用数据包添加的独占配方"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "要点",
+      "text": "$(li)它读的是 Create 的冲压配方，所以禁用某条 Create 配方，这里也跟着没了。$(br)$(li)副手放$(l)过滤器$()可以筛选产物。$(br)$(li)暴击只作用于你蓄力瞄准的那个目标，且只有一次。"
+    }
+  ]
+}

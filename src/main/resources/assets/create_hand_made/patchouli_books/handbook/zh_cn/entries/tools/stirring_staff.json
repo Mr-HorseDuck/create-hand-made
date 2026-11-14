@@ -1,0 +1,23 @@
+{
+  "name": "搅拌杖",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:stirring_staff",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:stirring_staff",
+      "text": "手动搅拌工作盆：混合配方、无序合成、自动酿造都能做。\\n\\n对着工作盆长按右键。搅拌时液面会动起来。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "能做什么配方",
+      "text": "$(li)Create 的$(l)混合$()配方$(br)$(li)Create 允许在搅拌机里做的无序合成$(br)$(li)自动酿造$(br)$(li)搅拌杖独占配方\\n\\n$(italic)无序合成是否可用取决于 Create 的 $(c)allowShapelessInMixer$() 设置。$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "要点",
+      "text": "$(li)空盆、无匹配配方时都不扣耐久。$(br)$(li)按固定周期结算一次，具体配方请看 JEI。"
+    }
+  ]
+}

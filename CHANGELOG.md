@@ -5,6 +5,31 @@
 
 ---
 
+## 0.6.4-beta — 2026-11-14
+
+基准：`0.6.3-beta`。这一版加了**帕秋莉手册**（游戏内指南书），中英双语。玩法无改动。
+
+### 新增
+
+- **游戏内手册《手搓学：从入门到入土》**（英文副标题 *Hand Made: from beginner to expert*）。需要安装 **Patchouli**；没装则完全无感（手册数据被忽略、不报错）。
+  - 四个分类：**工具**（8 件工具各一条：能做什么配方、操作方式、要点）、**女仆**（9 种行为与优先级、指杆指定目标、只加工模式、好感度加成）、**配方**（三层系统与 L2/L3 写法）、**配置**（三个文件位置、服务端权威、热重载、图形界面）。
+  - 中英双语：`zh_cn` 与 `en_us` 各一套完整内容。
+- **首次进游戏自动送一本**：新玩家第一次进入世界时自动获得手册，每名玩家只送一次（记在玩家数据里，换存档不会重复）。
+  - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
+  - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
+
+### 内部
+
+- 手册完全**数据驱动**，没有引入 Patchouli 编译依赖：内容在 `assets/create_hand_made/patchouli_books/handbook/`，`book.json` 在 `data/create_hand_made/patchouli_books/handbook/`（1.20+ 要求 `use_resource_pack: true`，`book.json` 仍留在 `data/`）。
+- 送书逻辑对 Patchouli 的物品注册方式做了双路兼容：优先查 `create_hand_made:handbook`，找不到则用 `patchouli:guide_book` + NBT `patchouli:book`。
+
+### 升级注意
+
+- 已存档的玩家**不会**补发手册（只对首次登录生效）；需要的话用上面的 `/give` 命令。
+- 没有方块 / 物品 ID 变化，协议版本未变。
+
+---
+
 ## 0.6.3-beta — 2026-11-13
 
 基准：`0.6.2-beta`。这一版把指杆给女仆指定目标的方式放开（能只标工作方块、只做加工），并修掉一轮代码审查发现的并发与配置读取问题。玩法没有破坏性改动，老存档的标记继续有效。

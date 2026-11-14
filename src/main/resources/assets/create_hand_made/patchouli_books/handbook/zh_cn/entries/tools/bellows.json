@@ -1,0 +1,23 @@
+{
+  "name": "风箱",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:bellows",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:bellows",
+      "text": "不用鼓风机也能鼓风。副手放$(l)触媒$()，长按右键蓄力，松手吹出。\\n\\n作用于传送带、置物台、工作盆上的物品——也对生物生效。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "能识别哪些触媒",
+      "text": "不限于原版：任何模组注册的鼓风类型都能触发。触媒从这些地方自动发现：$(br)$(li)名为 $(c)<命名空间>:fan_processing_catalysts/<类型>$() 或 $(c)<命名空间>:fan_catalysts/<类型>$() 的物品/方块/流体标签$(br)$(li)龙+ 的染料桶$(br)$(li)创意传动的染料触媒"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "要点",
+      "text": "$(li)同一物品被多个类型认领时会在日志里打 WARN，用配置里的 $(c)bellows_type_overrides$() 解决。$(br)$(li)它$(o)不$()产生 Create 的气流，所以依赖气流判定的方块染色不会触发。$(br)$(li)生物转化在松手瞬间完成，不需要持续吹。"
+    }
+  ]
+}

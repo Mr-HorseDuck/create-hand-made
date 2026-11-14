@@ -1,0 +1,28 @@
+{
+  "name": "Three-layer recipe system",
+  "category": "create_hand_made:recipe",
+  "icon": "minecraft:crafting_table",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Why layers",
+      "text": "Changing what hand tools can do must $(l)not$() affect Create's machines. Hence three layers:$(br)\\n$(li)$(l)L1 inherit$(): read Create's recipe types directly$(br)$(li)$(l)L2 filter$(): disable one recipe for one tool$(br)$(li)$(l)L3 exclusive$(): recipes only hand tools can read"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Writing an L2 filter",
+      "text": "Datapack:$(br)$(c)data/<namespace>/handmade/filter/<tool>.json$(br)\\nKubeJS:$(br)$(c)HandMadeEvents.toolFilter(e => e.disable('mortar', 'create:milling/charcoal'))$(br)\\n$(italic)Disabled recipes vanish from JEI too, so both stay consistent. $()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Writing an L3 recipe",
+      "text": "Datapack $(c)data/<namespace>/recipes/*.json$(), with $(c)type$() set to one of:$(br)\\n$(li)$(c)create_hand_made:tool_recipe$() (dispatched by the tool field)$(br)$(li)$(c)create_hand_made:stonecutting_recipe$()$(br)$(li)$(c)create_hand_made:bellows_recipe$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Full documentation",
+      "text": "The per-tool recipe source matrix lives in $(c)docs/TOOL_REFERENCE.md$(); the full field reference and KubeJS examples are in $(c)docs/RECIPE_API.md$().$(br)\\n$(italic)Bellows has no L2 — it has no L1 candidates and matches by fan_type. $()"
+    }
+  ]
+}

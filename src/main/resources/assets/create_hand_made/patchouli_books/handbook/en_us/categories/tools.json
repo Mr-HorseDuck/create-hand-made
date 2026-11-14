@@ -1,0 +1,6 @@
+{
+  "name": "Tools",
+  "description": "Eight hand tools. Each one replaces a machine, one swing at a time.",
+  "icon": "create_hand_made:hand_saw",
+  "sortnum": 0
+}

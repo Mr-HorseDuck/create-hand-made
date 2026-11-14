@@ -1,0 +1,28 @@
+{
+  "name": "手锯",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:hand_saw",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:hand_saw",
+      "text": "能切削、砍树、剥皮、刮铜。\\n\\n把材料放$(l)副手$()，长按右键切削。多个配方匹配时，潜行 + 右键切换。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "砍树",
+      "text": "潜行 + 左键点原木，整棵树一起倒。\\n\\n可在配置里关掉（$(c)enable_tree_felling$()）。破坏是带玩家上下文执行的，所以保护插件、统计、附魔掉落都正常生效。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "能做什么配方",
+      "text": "$(li)$(l)切削$()配方$(br)$(li)$(l)切石$()配方（兜底）$(br)$(li)数据包里的手锯独占配方\\n\\n$(italic)一次只扣 1 点耐久，不管配方产出多少。$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "要点",
+      "text": "$(li)tooltip 会显示当前选中的配方序号。$(br)$(li)批量加工附魔能一次处理多个。$(br)$(li)砍树不碰树苗和树叶。"
+    }
+  ]
+}

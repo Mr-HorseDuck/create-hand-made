@@ -1,0 +1,23 @@
+{
+  "name": "Stirring Staff",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:stirring_staff",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:stirring_staff",
+      "text": "Stirs a Basin by hand: mixing recipes, shapeless crafting and automatic brewing.\\n\\nHold right-click on the basin. The fluid surface animates while you stir."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Recipes it can do",
+      "text": "$(li)Create's $(l)mixing$() recipes$(br)$(li)Shapeless crafting that Create allows in a mixer$(br)$(li)Automatic brewing$(br)$(li)Exclusive stirring recipes\\n\\n$(italic)Shapeless support depends on Create's $(c)allowShapelessInMixer$() setting.$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Tips",
+      "text": "$(li)Empty basins and unmatched recipes don't waste durability.$(br)$(li)Mixing cycles at a fixed interval; check JEI for the exact recipes."
+    }
+  ]
+}

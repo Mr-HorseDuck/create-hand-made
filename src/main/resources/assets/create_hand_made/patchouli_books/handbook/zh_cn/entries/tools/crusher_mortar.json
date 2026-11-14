@@ -1,0 +1,23 @@
+{
+  "name": "碾钵",
+  "category": "create_hand_made:tools",
+  "icon": "create_hand_made:crusher_mortar",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:spotlight",
+      "item": "create_hand_made:crusher_mortar",
+      "text": "研钵的大哥：先粉碎，没配方就退回研磨。\\n\\n起手与周期时长有独立配置项，和研钵分开。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "能做什么配方",
+      "text": "$(li)Create 的$(l)粉碎$()配方（优先）$(br)$(li)Create 的$(l)研磨$()配方（兜底）$(br)$(li)写给$(o)研钵或碾钵$()的独占配方都收$(br)\\n$(italic)「碾钵是研钵升级版」是设计如此。$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "要点",
+      "text": "$(li)它连 $(l)tool$() 字段写 $(c)mortar$() 的独占配方也收，不用重复写一份。$(br)$(li)过滤一律走 $(c)crusher_mortar$() 表，即使是 mortar 名下的配方。"
+    }
+  ]
+}
