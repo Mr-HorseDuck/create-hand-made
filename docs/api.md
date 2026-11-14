@@ -62,7 +62,7 @@
 
 | 方法 | 返回 | 说明 |
 |---|---|---|
-| `mortarContents(ItemStack stack)` | `@Nullable MortarContents` | 读研钵内容物；空碗返回 `null`。 |
+| `mortarContents(ItemStack stack)` | `MortarContents` | 读研钵内容物。**永不返回 `null`**；空碗返回 `new MortarContents(ItemStack.EMPTY)`，判空用 `isEmpty()`。 |
 | `setMortarContents(ItemStack stack, @Nullable MortarContents contents)` | `void` | 写内容物；`null` 表示清空。 |
 | `mortarProcessingTicks(boolean crusherMortar)` | `int` | 按配置算加工 tick（不含起手）。`true` 读碾钵段、`false` 读研钵段。取值走 `SyncedServerConfig`，客户端拿到的是服务端同步值。 |
 
@@ -78,7 +78,7 @@
 | `bellowsCanProcess(Level, ItemStack, FanProcessingType)` | `boolean` | 风箱能否以该类型加工该物品（L3 优先、L1 兜底，与游戏内一致）。 |
 | `fluidHandlerAt(Level, BlockPos)` | `@Nullable IFluidHandler` | 方块流体处理器；只读查询。 |
 
-### 写操作（只在服务端调用）
+### 写操作（只在服务端生效）
 
 | 方法 | 返回 | 副作用 |
 |---|---|---|
@@ -141,7 +141,7 @@ CreateHandMadeApi.setInfusionGunContents(gun,
 
 ```java
 MortarContents contents = CreateHandMadeApi.mortarContents(mortar);
-if (contents != null) {
+if (!contents.isEmpty()) {                     // 永不返回 null，和灌注枪一致
     ItemStack input = contents.stack();
     int batchCount = input.getCount();
     int ticks = CreateHandMadeApi.mortarProcessingTicks(false); // 研钵
@@ -175,13 +175,22 @@ if (contents != null) {
 
 ---
 
+## 语义约定
+
+下面这些**不是**限制，是「本来就这么设计」，写在一起免得踩坑：
+
+| 方法 / 概念 | 约定 |
+|---|---|
+| `infusionGunContents` / `mortarContents` | 两者**都永不返回 `null`**，空容器返回空对象；判空统一用 `isEmpty()` |
+| `fluidSourceAt` / `fluidHandlerAt` | 只读：不消耗流体、不改方块状态。要真正抽取用 `extractFluidTick`（有副作用） |
+| `mortarProcessingTicks(boolean)` | 只有两态：`true` 读碾钵段 `[tools.crusher_mortar]`、`false` 读研钵段 `[tools.mortar]`，没有「自动」档 |
+| 碾钵读 L3 | `CRUSHER_MORTAR` 会同时收 `tool: mortar` 的独占配方（碾钵是研钵的升级版），设计如此 |
+| `recipesFor` / `recipesForFiltered` | 前者不含 L2 过滤，后者含。游戏内工具查询与 JEI 分类页都按 L2 过滤 |
+
+---
+
 ## 已知限制
 
-1. `recipesFor` 的 L3 在 switch 之后统一收：不要在 switch 里给某个工具单独加 `TOOL_RECIPE` 查询，会重复。
-2. 碾钵接受研钵的 L3：`CRUSHER_MORTAR` 会同时收 `ToolType.MORTAR` 的独占配方，这是设计行为。
-3. `mortarProcessingTicks(boolean)` 没有三态：研钵与碾钵各有独立配置段（`[tools.mortar]` / `[tools.crusher_mortar]`）。
-4. `fluidSourceAt` 只读：不消耗流体、不改方块状态。要实际抽取用 `extractFluidTick`（有副作用）。
-5. `infusionGunContents` 永不返回 `null`：空枪返回 `new InfusionGunContents(FluidStack.EMPTY)`，判空用 `contents.isEmpty()`。
-6. `mortarContents` **可能**返回 `null`（空碗），与 5 的语义不同；判空用 `contents == null || contents.stack().isEmpty()`。
-7. `findRecipeFor` 对工作盆 / 搅拌杖 / 灌注枪 / 指杆 / 风箱返回 `null`——它们光看一件物品判不出配方，请用对应的专门入口。
-8. `recipesFor` 不含 L2，`recipesForFiltered` 含；游戏内工具查询与 JEI 分类页都按 L2 过滤，三方口径一致。风箱没有 L2（无 L1 候选，靠 `fan_type` 匹配）。
+1. **`findRecipeFor` 只覆盖 5 个工具**：手锯、手锯切石、冲压锤（置物台）、研钵、碾钵——它们「光看一件物品」就能判断配方。工作盆、搅拌杖、灌注枪、指杆、风箱要看更多上下文（整盆材料 / 枪内流体 / 两件输入 / 介质类型），对这些工具它返回 `null`，请用对应入口：`pressBasin`、`findStirringRecipe`、`injectItems`、`findPointerRecipe`、`bellowsCanProcess`。
+2. **风箱没有 L2 过滤**：风箱没有 L1 候选（靠 `fan_type` 匹配），所以过滤表对它无效。要禁某条风箱配方请改数据包或删掉那条配方。
+3. **写操作没有 dry-run**：调用即生效，失败只返回 `false`，不告诉你失败原因（没配方 / 材料不匹配 / 空间不足都混在一起）。需要预判请先用查询方法自己判断。

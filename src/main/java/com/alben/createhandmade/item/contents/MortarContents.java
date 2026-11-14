@@ -39,6 +39,22 @@ public record MortarContents(ItemStack stack) {
         return new MortarContents(stored);
     }
 
+    /**
+     * 与 {@link InfusionGunContents#fromStackOrEmpty} 对齐的安全读取入口：空碗返回空对象而非 null。
+     *
+     * <p>对外 API 用这个（{@code CreateHandMadeApi.mortarContents}）。内部的
+     * {@link #fromStack} 保留返回 null 的语义——工具类里有大量 {@code != null} 判定依赖它。</p>
+     */
+    public static MortarContents fromStackOrEmpty(ItemStack holder) {
+        MortarContents contents = holder == null || holder.isEmpty() ? null : fromStack(holder);
+        return contents != null ? contents : new MortarContents(ItemStack.EMPTY);
+    }
+
+    /** 是否为空碗。与 {@link InfusionGunContents#isEmpty()} 同名同义，方便调用方统一写判空。 */
+    public boolean isEmpty() {
+        return this.stack.isEmpty();
+    }
+
     /** 将 MortarContents 写入 ItemStack 的 NBT */
     public void writeToStack(ItemStack holder) {
         if (this.stack.isEmpty()) {

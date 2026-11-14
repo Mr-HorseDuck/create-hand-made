@@ -220,11 +220,16 @@ public final class CreateHandMadeApi {
 
     // ==================== 研钵 / 碾钵 ====================
 
-    /** 读研钵内的内容物；空碗返回 null。 */
-    @Nullable
+    /**
+     * 读研钵内的内容物。
+     *
+     * <p>与 {@link #infusionGunContents} 语义一致：<b>永不返回 null</b>，空碗返回
+     * {@code new MortarContents(ItemStack.EMPTY)}，判空用 {@code contents.isEmpty()}。</p>
+     *
+     * <p>（2.0 之前这里会返回 null，和灌注枪那边要写两套判空，已统一。）</p>
+     */
     public static MortarContents mortarContents(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) return null;
-        return MortarContents.fromStack(stack);
+        return MortarContents.fromStackOrEmpty(stack);
     }
 
     /** 写研钵内的内容物；传 null 表示清空。 */
