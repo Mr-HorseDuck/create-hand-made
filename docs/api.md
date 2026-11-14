@@ -1,8 +1,8 @@
 # Create: Hand Made 对外 API
 
-适用版本：**1.20.1 Forge / 0.6.2-beta+**
+适用版本：**1.20.1 Forge / 0.6.3-beta+**
 入口类：`com.alben.createhandmade.api.CreateHandMadeApi`
-`API_VERSION = 1`
+`API_VERSION = 2`
 
 跨模组请优先绑定 `CreateHandMadeApi`；各工具类的 public 方法不保证跨版本稳定。
 
@@ -13,8 +13,18 @@
 - `API_VERSION` 只在**破坏性变更**时递增；新增方法不算破坏性变更。
 - 本 API 提供两类能力：
   - **查询 / 读写组件**（23 个方法）—— 只读，不改世界、不消耗材料；
-  - **写操作**（8 个方法）—— 会消耗输入、产出、扣耐久、播放特效，**只允许在服务端调用**。
-- 写操作由本模组内部同一批实现承担，签名已收敛到 API 层；本模组自己的调用点都在 `if (!level.isClientSide)` 之内，开放后请在调用方保证这一前提。
+  - **写操作**（8 个方法）—— 会消耗输入、产出、扣耐久、播放特效，**只在服务端生效**。
+- 写操作在**客户端调用会被静默拒绝**（返回 `false` / 无操作），不会再改动本地状态。所以调用方不必自己判侧，但仍建议只在服务端发起——客户端调用拿到的 `false` 不代表"没配方"。
+- 查询类方法**返回不可变列表**（`recipesFor` / `recipesForFiltered` / `handSawRecipes` / `bellowsMedia*`）。想就地排序请先自己拷贝一份，直接改会抛 `UnsupportedOperationException`。
+- 入参为 `null` 或空物品时，查询返回 `null` / 空列表 / `false`，不会抛 NPE。
+
+### 2.0 的破坏性变更
+
+| 变更 | 影响 |
+|---|---|
+| `recipesFor` 的返回值从可变 `ArrayList` 改为不可变列表 | 以前若就地 `sort()` / `remove()`，现在会抛异常 |
+| 写操作加服务端守卫 | 以前在客户端调用会真的改本地状态（幻影物品、耐久不同步），现在一律拒绝 |
+| 查询方法补 `null` 守卫 | 以前传 `null` 会 NPE，现在返回安全默认值 |
 
 ---
 
@@ -82,6 +92,8 @@
 | `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致） |
 
 > 需要 batchSize 版本的冲压或 `HandSawItem#executeCut` / `stripBlock` 这类更细的入口时，只能直接调工具类 public 方法，并自行承担"只在服务端调用""自行扣耐久""自行保证玩家行为约束"。
+>
+> 上表 8 个写操作在客户端调用**一律返回 `false` / 无操作**（`damageTool` 直接 return），不会改动本地状态。
 
 ---
 

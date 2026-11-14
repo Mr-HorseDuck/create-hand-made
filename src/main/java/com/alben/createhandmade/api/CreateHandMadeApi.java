@@ -46,7 +46,14 @@ import java.util.List;
  */
 public final class CreateHandMadeApi {
 
-    public static final int API_VERSION = 1;
+    /**
+     * API 契约版本。
+     *
+     * <p>2：{@link #recipesFor} 等查询的返回列表改为**不可变**（此前是可变的 ArrayList，
+     * 调用方就地排序不会报错，现在会抛 {@code UnsupportedOperationException}）；
+     * 所有写操作在客户端调用时改为静默拒绝（返回 false / 无操作），不再有副作用。</p>
+     */
+    public static final int API_VERSION = 2;
 
     private CreateHandMadeApi() {
     }
@@ -64,7 +71,10 @@ public final class CreateHandMadeApi {
      * {@link #recipesForFiltered}；只想知道"这件物品能不能加工"请用 {@link #findRecipeFor}。</p>
      */
     public static List<Recipe<?>> recipesFor(ToolType tool, Level level) {
-        return HandMadeRecipePool.getBaseRecipes(tool, level);
+        if (level == null) return List.of();
+        // ★ 返回不可变列表，和 recipesForFiltered / handSawRecipes 保持一致：
+        //   以前这里返回可变的 ArrayList，调用方既能改也能传出去，容易踩到"改完影响别人"的坑。
+        return List.copyOf(HandMadeRecipePool.getBaseRecipes(tool, level));
     }
 
     /**
@@ -153,6 +163,7 @@ public final class CreateHandMadeApi {
      */
     @Nullable
     public static ResourceLocation recipeIdOf(Level level, Recipe<?> recipe) {
+        if (level == null) return null;
         return HandMadeRecipePool.recipeIdOf(level, recipe);
     }
 
@@ -160,21 +171,25 @@ public final class CreateHandMadeApi {
 
     /** 该物品能充当哪些风箱处理类型。 */
     public static List<ResourceLocation> bellowsMediaTypes(ItemStack stack) {
-        return BellowsMediaRegistry.resolveAll(stack);
+        if (stack == null || stack.isEmpty()) return List.of();
+        return List.copyOf(BellowsMediaRegistry.resolveAll(stack));
     }
 
     /** 该物品是否能作为风箱介质。 */
     public static boolean isBellowsMedia(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
         return BellowsMediaRegistry.isMedia(stack);
     }
 
     /** 某风箱处理类型对应的介质物品列表。 */
     public static List<ItemStack> bellowsMediaItems(ResourceLocation typeId) {
-        return BellowsMediaRegistry.getMediaFor(typeId);
+        if (typeId == null) return List.of();
+        return List.copyOf(BellowsMediaRegistry.getMediaFor(typeId));
     }
 
     /** 某风箱处理类型是否被配置禁用。 */
     public static boolean isBellowsTypeDisabled(ResourceLocation typeId) {
+        if (typeId == null) return false;
         return BellowsMediaRegistry.isTypeDisabled(typeId);
     }
 
@@ -187,16 +202,19 @@ public final class CreateHandMadeApi {
 
     /** 读灌注枪内的流体（永不返回 null；空枪返回 FluidStack.EMPTY）。 */
     public static InfusionGunContents infusionGunContents(ItemStack gun) {
+        if (gun == null || gun.isEmpty()) return new InfusionGunContents(FluidStack.EMPTY);
         return InfusionGunItem.getContents(gun);
     }
 
     /** 写灌注枪内的流体；contents 为空时移除组件。 */
-    public static void setInfusionGunContents(ItemStack gun, InfusionGunContents contents) {
+    public static void setInfusionGunContents(ItemStack gun, @Nullable InfusionGunContents contents) {
+        if (gun == null || gun.isEmpty()) return;
         InfusionGunItem.setContents(gun, contents);
     }
 
     /** 读取世界里某个位置的流体源（只读，不消耗、不改变世界）。 */
     public static FluidStack fluidSourceAt(Level level, BlockPos pos) {
+        if (level == null || pos == null) return FluidStack.EMPTY;
         return InfusionGunItem.getFluidFromSource(level, pos);
     }
 
@@ -205,11 +223,13 @@ public final class CreateHandMadeApi {
     /** 读研钵内的内容物；空碗返回 null。 */
     @Nullable
     public static MortarContents mortarContents(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
         return MortarContents.fromStack(stack);
     }
 
     /** 写研钵内的内容物；传 null 表示清空。 */
     public static void setMortarContents(ItemStack stack, @Nullable MortarContents contents) {
+        if (stack == null || stack.isEmpty()) return;
         if (contents == null) {
             MortarContents.clearFromStack(stack);
         } else {
@@ -228,7 +248,12 @@ public final class CreateHandMadeApi {
 
     // ==================== 手锯 ====================
 
-    /** 手锯在某输入上可用的切削配方（L1 + L3，顺序即游戏内优先顺序）。 */
+    /**
+     * 手锯在某输入上可用的切削配方（L1 + L3，顺序即游戏内优先顺序）。
+     *
+     * <p><b>返回的列表不可变</b>（内部按「配方表 + 输入物品」缓存，直接复用同一实例，
+     * 所以调用方不要就地修改）。想改顺序请自己拷贝一份。</p>
+     */
     public static List<Recipe<?>> handSawRecipes(Level level, ItemStack input) {
         return HandSawItem.getCuttingRecipes(level, input);
     }
@@ -238,6 +263,7 @@ public final class CreateHandMadeApi {
     /** 冲压锤在某输入上可用的压制配方；无匹配返回 null。 */
     @Nullable
     public static Recipe<?> findPressingRecipe(Level level, ItemStack input) {
+        if (level == null || input == null || input.isEmpty()) return null;
         return PressHammerItem.findPressingRecipe(level, input);
     }
 
@@ -249,6 +275,8 @@ public final class CreateHandMadeApi {
      * @param filter 过滤产物，null 表示不过滤
      */
     public static boolean pressBasin(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null) return false;
         return PressHammerItem.tryPressBasin(level, pos, filter);
     }
 
@@ -260,6 +288,8 @@ public final class CreateHandMadeApi {
      * @param filter 过滤产物，null 表示不过滤
      */
     public static boolean pressTransported(Level level, BlockPos pos, @Nullable FilterItemStack filter) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null) return false;
         return PressHammerItem.tryPressTransported(level, pos, filter);
     }
 
@@ -279,6 +309,9 @@ public final class CreateHandMadeApi {
                                           @Nullable IItemHandler outputInv,
                                           @Nullable FilterItemStack filter,
                                           boolean crusherMortar) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide) return false;
+        if (entity == null || mortar == null || mortar.isEmpty()) return false;
         return crusherMortar
                 ? CrusherMortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter)
                 : MortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter);
@@ -289,6 +322,7 @@ public final class CreateHandMadeApi {
     /** 方块在该位置的流体处理器；无返回 null。只读查询，不改变世界。 */
     @Nullable
     public static IFluidHandler fluidHandlerAt(Level level, BlockPos pos) {
+        if (level == null || pos == null) return null;
         return InfusionGunItem.getFluidHandler(level, pos);
     }
 
@@ -302,6 +336,9 @@ public final class CreateHandMadeApi {
      */
     public static boolean injectItems(Level level, BlockPos pos, LivingEntity entity,
                                       ItemStack gun, @Nullable FilterItemStack filter) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null) return false;
+        if (entity == null || gun == null || gun.isEmpty()) return false;
         return InfusionGunItem.tryInjectItems(level, pos, entity, gun, filter);
     }
 
@@ -311,6 +348,9 @@ public final class CreateHandMadeApi {
      * <p><b>只在服务端调用。</b>扣耐久、播放音效。</p>
      */
     public static boolean storeFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null) return false;
+        if (entity == null || gun == null || gun.isEmpty()) return false;
         return InfusionGunItem.tryStoreFluid(level, pos, entity, gun);
     }
 
@@ -321,6 +361,9 @@ public final class CreateHandMadeApi {
      */
     public static void extractFluidTick(Level level, BlockPos pos, LivingEntity entity,
                                         ItemStack gun, int rate) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null) return;
+        if (entity == null || gun == null || gun.isEmpty()) return;
         InfusionGunItem.tryExtractTick(level, pos, entity, gun, rate);
     }
 
@@ -329,6 +372,8 @@ public final class CreateHandMadeApi {
     /** 指杆：在某目标上、用某工具执行的应用配方；无匹配返回 null。 */
     @Nullable
     public static Recipe<?> findPointerRecipe(Level level, ItemStack target, ItemStack tool) {
+        if (level == null || target == null || target.isEmpty()) return null;
+        if (tool == null || tool.isEmpty()) return null;
         return PointerItem.findRecipe(level, target, tool);
     }
 
@@ -342,6 +387,7 @@ public final class CreateHandMadeApi {
     /** 搅拌杖在工作盆上可用的混合配方；无匹配返回 null。 */
     @Nullable
     public static Recipe<?> findStirringRecipe(Level level, BasinBlockEntity basin) {
+        if (level == null || basin == null) return null;
         return StirringStaffItem.findMatchingRecipe(level, basin);
     }
 
@@ -349,6 +395,7 @@ public final class CreateHandMadeApi {
 
     /** 风箱介质能否处理某物品。只读查询。 */
     public static boolean bellowsCanProcess(Level level, ItemStack media, FanProcessingType type) {
+        if (level == null || media == null || media.isEmpty() || type == null) return false;
         return BellowsItem.canProcess(level, media, type);
     }
 
@@ -358,6 +405,8 @@ public final class CreateHandMadeApi {
      * <p><b>只在服务端调用。</b>跨模组触发上游效果，可能转化物品。</p>
      */
     public static boolean applyBellows(Level level, BlockPos pos, FanProcessingType type) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (level == null || level.isClientSide || pos == null || type == null) return false;
         return BellowsItem.applyToTarget(level, pos, type);
     }
 
@@ -371,6 +420,9 @@ public final class CreateHandMadeApi {
      * 没装 TLM 时就是裸扣耐久。</p>
      */
     public static void damageTool(ItemStack stack, LivingEntity entity) {
+        // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
+        if (stack == null || stack.isEmpty() || entity == null) return;
+        if (entity.level().isClientSide) return;
         if (MaidApiHooks.damageToolWithMaidRules(stack, entity, 1)) return;
         InfusionGunItem.damageGun(stack, entity);
     }
