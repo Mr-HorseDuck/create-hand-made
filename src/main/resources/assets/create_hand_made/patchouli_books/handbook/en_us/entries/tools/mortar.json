@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:mortar",
-      "text": "Grind items by hand — the manual version of a Millstone.\\n\\nHold right-click with the ingredient in your offhand (or in a container you're pointing at)."
+      "text": "Grind items by hand — the manual version of a Millstone.\n\nHold right-click with the ingredient in your offhand (or in a container you're pointing at)."
     },
     {
       "type": "patchouli:text",
       "title": "Recipes it can do",
-      "text": "$(li)Create's $(l)milling$() recipes$(br)$(li)Plus exclusive mortar recipes from datapacks\\n\\n$(italic)Every grind consumes 1 durability.$()"
+      "text": "$(li)Create's $(l)milling$() recipes$(br)$(li)Plus exclusive mortar recipes from datapacks\n\n$(italic)Every grind consumes 1 durability.$()"
     },
     {
       "type": "patchouli:text",

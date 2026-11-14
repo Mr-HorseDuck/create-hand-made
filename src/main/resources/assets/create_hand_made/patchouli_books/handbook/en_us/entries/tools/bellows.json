@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:bellows",
-      "text": "Applies fan processing without a fan. Put the $(l)catalyst$() in your offhand, hold right-click to charge, release to blow.\\n\\nWorks on items on belts, depots and basins — and on mobs."
+      "text": "Applies fan processing without a fan. Put the $(l)catalyst$() in your offhand, hold right-click to charge, release to blow.\n\nWorks on items on belts, depots and basins — and on mobs."
     },
     {
       "type": "patchouli:text",

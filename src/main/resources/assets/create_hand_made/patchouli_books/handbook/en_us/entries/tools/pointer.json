@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:pointer",
-      "text": "Performs deploying / item application recipes.\\n\\nRight-click a block with an item to apply it. Sneak + right-click highlights blocks — this is also how you assign targets to a maid."
+      "text": "Performs deploying / item application recipes.\n\nRight-click a block with an item to apply it. Sneak + right-click highlights blocks — this is also how you assign targets to a maid."
     },
     {
       "type": "patchouli:text",
       "title": "Modes",
-      "text": "$(li)$(l)Ctrl + scroll$() cycles modes$(br)$(li)$(l)Default$(): highlight / process on right-click$(br)$(li)$(l)Mark$(): record a work block, input and output$(br)$(li)$(l)Fluid$(): record input basin, output and (optionally) overflow$(br)\\nSneak + right-click a maid to apply the marks to her."
+      "text": "$(li)$(l)Ctrl + scroll$() cycles modes$(br)$(li)$(l)Default$(): highlight / process on right-click$(br)$(li)$(l)Mark$(): record a work block, input and output$(br)$(li)$(l)Fluid$(): record input basin, output and (optionally) overflow$(br)\nSneak + right-click a maid to apply the marks to her."
     },
     {
       "type": "patchouli:text",

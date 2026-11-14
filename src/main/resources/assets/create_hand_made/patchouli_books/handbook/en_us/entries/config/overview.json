@@ -12,17 +12,17 @@
     {
       "type": "patchouli:text",
       "title": "Server-authoritative",
-      "text": "All timing values (durations, cooldowns, windup, particle level) are decided by the $(l)server$() and synced to clients, so on a multiplayer server what you see is what the server actually uses.\\n\\nEditable in singleplayer, read-only elsewhere."
+      "text": "All timing values (durations, cooldowns, windup, particle level) are decided by the $(l)server$() and synced to clients, so on a multiplayer server what you see is what the server actually uses.\n\nEditable in singleplayer, read-only elsewhere."
     },
     {
       "type": "patchouli:text",
       "title": "Reloading",
-      "text": "$(c)/chm reload$() reloads both the main and maid configs (permission level 2).\\n\\n$(italic)$(c)blocked_mods$() is not hot-reloadable — it's read during mod init, so restart after changing it. $()"
+      "text": "$(c)/chm reload$() reloads both the main and maid configs (permission level 2).\n\n$(italic)$(c)blocked_mods$() is not hot-reloadable — it's read during mod init, so restart after changing it. $()"
     },
     {
       "type": "patchouli:text",
       "title": "In-game GUI",
-      "text": "With Cloth Config installed, the config button in the mod list edits the same settings, one category per TOML section.\\n\\n$(italic)The maid page needs both Cloth Config and Touhou Little Maid. $()"
+      "text": "With Cloth Config installed, the config button in the mod list edits the same settings, one category per TOML section.\n\n$(italic)The maid page needs both Cloth Config and Touhou Little Maid. $()"
     }
   ]
 }

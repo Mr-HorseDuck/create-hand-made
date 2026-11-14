@@ -12,17 +12,17 @@
     {
       "type": "patchouli:text",
       "title": "服务端权威",
-      "text": "时间类参数（时长、冷却、起手、粒子等级）都是$(l)服务端说了算$()，会下发给客户端，所以多人服里你看到的就是服务器实际用的值。\\n\\n单人可改、多人只读。"
+      "text": "时间类参数（时长、冷却、起手、粒子等级）都是$(l)服务端说了算$()，会下发给客户端，所以多人服里你看到的就是服务器实际用的值。\n\n单人可改、多人只读。"
     },
     {
       "type": "patchouli:text",
       "title": "热重载",
-      "text": "$(c)/chm reload$() 重载主配置与女仆配置（需要权限等级 2）。\\n\\n$(italic)$(c)blocked_mods$() 不参与热重载——它要在模组初始化阶段读取，改完得重启游戏。$()"
+      "text": "$(c)/chm reload$() 重载主配置与女仆配置（需要权限等级 2）。\n\n$(italic)$(c)blocked_mods$() 不参与热重载——它要在模组初始化阶段读取，改完得重启游戏。$()"
     },
     {
       "type": "patchouli:text",
       "title": "图形界面",
-      "text": "装了 Cloth Config 的话，模组列表里的配置按钮能直接改，分类和 TOML 一一对应。\\n\\n$(italic)女仆页需要同时装 Cloth Config 与车万女仆。$()"
+      "text": "装了 Cloth Config 的话，模组列表里的配置按钮能直接改，分类和 TOML 一一对应。\n\n$(italic)女仆页需要同时装 Cloth Config 与车万女仆。$()"
     }
   ]
 }

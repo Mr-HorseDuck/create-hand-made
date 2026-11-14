@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:press_hammer",
-      "text": "Hold right-click to charge, release to strike. Works on items on a $(l)Basin$(), $(l)Depot$() or $(l)belt$().\\n\\nCharging past the threshold lands a $(l)critical hit$() on mobs too."
+      "text": "Hold right-click to charge, release to strike. Works on items on a $(l)Basin$(), $(l)Depot$() or $(l)belt$().\n\nCharging past the threshold lands a $(l)critical hit$() on mobs too."
     },
     {
       "type": "patchouli:text",

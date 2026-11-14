@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:infusion_gun",
-      "text": "Draws and injects fluids. Holds $(l)1000 mB$().\\n\\nPoint at a fluid source or a fluid handler to draw; point at an item or a tank to inject."
+      "text": "Draws and injects fluids. Holds $(l)1000 mB$().\n\nPoint at a fluid source or a fluid handler to draw; point at an item or a tank to inject."
     },
     {
       "type": "patchouli:text",
       "title": "Recipes it can do",
-      "text": "$(li)$(l)Filling$() recipes (item + fluid -> item)$(br)$(li)Exclusive infusion gun recipes\\n\\n$(italic)Exclusive recipes must declare at least one fluid ingredient, otherwise they fail to load.$()"
+      "text": "$(li)$(l)Filling$() recipes (item + fluid -> item)$(br)$(li)Exclusive infusion gun recipes\n\n$(italic)Exclusive recipes must declare at least one fluid ingredient, otherwise they fail to load.$()"
     },
     {
       "type": "patchouli:text",

@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:press_hammer",
-      "text": "长按右键蓄力，松手砸下。对$(l)工作盆$()、$(l)置物台$()或$(l)传送带$()上的物品生效。\\n\\n蓄力超过阈值时，对生物还会打出$(l)暴击$()。"
+      "text": "长按右键蓄力，松手砸下。对$(l)工作盆$()、$(l)置物台$()或$(l)传送带$()上的物品生效。\n\n蓄力超过阈值时，对生物还会打出$(l)暴击$()。"
     },
     {
       "type": "patchouli:text",

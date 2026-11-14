@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:infusion_gun",
-      "text": "抽液与注液，容量 $(l)1000 mB$()。\\n\\n对着流体源或储罐抽液；对着物品或容器注液。"
+      "text": "抽液与注液，容量 $(l)1000 mB$()。\n\n对着流体源或储罐抽液；对着物品或容器注液。"
     },
     {
       "type": "patchouli:text",
       "title": "能做什么配方",
-      "text": "$(li)$(l)灌注$()配方（物品 + 流体 → 物品）$(br)$(li)灌注枪独占配方\\n\\n$(italic)独占配方必须声明至少一种流体原料，否则加载期报错。$()"
+      "text": "$(li)$(l)灌注$()配方（物品 + 流体 → 物品）$(br)$(li)灌注枪独占配方\n\n$(italic)独占配方必须声明至少一种流体原料，否则加载期报错。$()"
     },
     {
       "type": "patchouli:text",

@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:crusher_mortar",
-      "text": "The Mortar's bigger brother: crushes first, falls back to milling.\\n\\nUses its own windup and cycle timings — independent from the Mortar's config."
+      "text": "The Mortar's bigger brother: crushes first, falls back to milling.\n\nUses its own windup and cycle timings — independent from the Mortar's config."
     },
     {
       "type": "patchouli:text",
       "title": "Recipes it can do",
-      "text": "$(li)Create's $(l)crushing$() recipes (first)$(br)$(li)Create's $(l)milling$() recipes (fallback)$(br)$(li)Exclusive recipes written for $(o)either$() mortar or crusher mortar$(br)\\n$(italic)Being an upgraded Mortar is intentional.$()"
+      "text": "$(li)Create's $(l)crushing$() recipes (first)$(br)$(li)Create's $(l)milling$() recipes (fallback)$(br)$(li)Exclusive recipes written for $(o)either$() mortar or crusher mortar$(br)\n$(italic)Being an upgraded Mortar is intentional.$()"
     },
     {
       "type": "patchouli:text",

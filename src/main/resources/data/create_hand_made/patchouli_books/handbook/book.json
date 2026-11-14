@@ -1,7 +1,7 @@
 {
   "name": "手搓学：从入门到入土",
   "subtitle": "Hand Made: from beginner to expert",
-  "landing_text": "为 $(l)机械动力$() 添加的一批手工工具——不造机器，徒手把活干完。\\n\\n本书按 $(l)工具$()、$(l)女仆$()、$(l)配方$() 三块组织。左边目录直接翻，或者从工具分类开始。\\n\\n$(italic)模组版本 0.6.4-beta$()",
+  "landing_text": "为 $(l)机械动力$() 添加的一批手工工具——不造机器，徒手把活干完。\n\n本书按 $(l)工具$()、$(l)女仆$()、$(l)配方$() 三块组织。左边目录直接翻，或者从工具分类开始。\n\n$(italic)模组版本 0.6.4-beta$()",
   "use_resource_pack": true,
   "use_blocky_font": true,
   "book_texture": "patchouli:textures/gui/book_brown.png",

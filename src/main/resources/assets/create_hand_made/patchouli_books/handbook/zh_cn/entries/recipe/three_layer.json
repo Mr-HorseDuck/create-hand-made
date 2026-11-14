@@ -7,22 +7,22 @@
     {
       "type": "patchouli:text",
       "title": "为什么要分层",
-      "text": "改手搓工具能做什么，$(l)不该影响 Create 的机器$()。所以分成三层：$(br)\\n$(li)$(l)L1 继承$()：直接读 Create 的配方类型$(br)$(li)$(l)L2 过滤$()：只对某个工具禁用某条配方$(br)$(li)$(l)L3 独占$()：只有手搓工具能读的配方"
+      "text": "改手搓工具能做什么，$(l)不该影响 Create 的机器$()。所以分成三层：$(br)\n$(li)$(l)L1 继承$()：直接读 Create 的配方类型$(br)$(li)$(l)L2 过滤$()：只对某个工具禁用某条配方$(br)$(li)$(l)L3 独占$()：只有手搓工具能读的配方"
     },
     {
       "type": "patchouli:text",
       "title": "L2 过滤写法",
-      "text": "数据包：$(br)$(c)data/<命名空间>/handmade/filter/<工具>.json$(br)\\nKubeJS：$(br)$(c)HandMadeEvents.toolFilter(e => e.disable('mortar', 'create:milling/charcoal'))$(br)\\n$(italic)被禁的配方在 JEI 里也会消失，口径一致。$()"
+      "text": "数据包：$(br)$(c)data/<命名空间>/handmade/filter/<工具>.json$(br)\nKubeJS：$(br)$(c)HandMadeEvents.toolFilter(e => e.disable('mortar', 'create:milling/charcoal'))$(br)\n$(italic)被禁的配方在 JEI 里也会消失，口径一致。$()"
     },
     {
       "type": "patchouli:text",
       "title": "L3 独占写法",
-      "text": "数据包 $(c)data/<命名空间>/recipes/*.json$()，$(c)type$() 写这三种之一：$(br)\\n$(li)$(c)create_hand_made:tool_recipe$()（按 tool 字段分派）$(br)$(li)$(c)create_hand_made:stonecutting_recipe$()$(br)$(li)$(c)create_hand_made:bellows_recipe$()"
+      "text": "数据包 $(c)data/<命名空间>/recipes/*.json$()，$(c)type$() 写这三种之一：$(br)\n$(li)$(c)create_hand_made:tool_recipe$()（按 tool 字段分派）$(br)$(li)$(c)create_hand_made:stonecutting_recipe$()$(br)$(li)$(c)create_hand_made:bellows_recipe$()"
     },
     {
       "type": "patchouli:text",
       "title": "去哪查完整文档",
-      "text": "工具与配方来源的完整对照表在仓库的 $(c)docs/TOOL_REFERENCE.md$()，三层写法与字段矩阵在 $(c)docs/RECIPE_API.md$()。$(br)\\n$(italic)风箱没有 L2——它没有 L1 候选，靠 fan_type 匹配。$()"
+      "text": "工具与配方来源的完整对照表在仓库的 $(c)docs/TOOL_REFERENCE.md$()，三层写法与字段矩阵在 $(c)docs/RECIPE_API.md$()。$(br)\n$(italic)风箱没有 L2——它没有 L1 候选，靠 fan_type 匹配。$()"
     }
   ]
 }

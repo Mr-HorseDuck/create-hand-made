@@ -7,12 +7,12 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:mortar",
-      "text": "徒手研磨——等于一台手动磨石。\\n\\n把原料放副手（或指向一个装着原料的容器），长按右键研磨。"
+      "text": "徒手研磨——等于一台手动磨石。\n\n把原料放副手（或指向一个装着原料的容器），长按右键研磨。"
     },
     {
       "type": "patchouli:text",
       "title": "能做什么配方",
-      "text": "$(li)Create 的$(l)研磨$()配方$(br)$(li)外加数据包里的研钵独占配方\\n\\n$(italic)每次研磨消耗 1 点耐久。$()"
+      "text": "$(li)Create 的$(l)研磨$()配方$(br)$(li)外加数据包里的研钵独占配方\n\n$(italic)每次研磨消耗 1 点耐久。$()"
     },
     {
       "type": "patchouli:text",

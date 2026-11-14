@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:bellows",
-      "text": "不用鼓风机也能鼓风。副手放$(l)触媒$()，长按右键蓄力，松手吹出。\\n\\n作用于传送带、置物台、工作盆上的物品——也对生物生效。"
+      "text": "不用鼓风机也能鼓风。副手放$(l)触媒$()，长按右键蓄力，松手吹出。\n\n作用于传送带、置物台、工作盆上的物品——也对生物生效。"
     },
     {
       "type": "patchouli:text",
