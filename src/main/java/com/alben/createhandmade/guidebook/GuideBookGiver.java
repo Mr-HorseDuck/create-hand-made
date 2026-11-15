@@ -69,14 +69,12 @@ public final class GuideBookGiver {
     /**
      * 造一本手册物品。
      *
-     * <p>★ 对 Patchouli 的物品注册方式做两种兼容，按顺序尝试：</p>
-     * <ol>
-     *   <li>{@code create_hand_made:handbook}——如果 Patchouli 按书 ID 注册了独立物品；</li>
-     *   <li>{@code patchouli:guide_book} + NBT {@code patchouli:book="create_hand_made:handbook"}
-     *       ——Patchouli 的通用书物品，靠 NBT 区分是哪本。</li>
-     * </ol>
-     *
-     * <p>两种都在就优先第一种（不需要 NBT，也不会被别的模组覆盖标签）。</p>
+     * <p>★ 实际走的是第 2 条：{@code patchouli:guide_book} + NBT
+     * {@code patchouli:book="create_hand_made:handbook"}。已核对 Patchouli 1.20.1 源码
+     * （{@code ItemModBook} 只有一个无参构造、{@code BookRegistry} 也不按书注册物品）：
+     * 所有书<b>共用同一个</b>通用物品，书 ID 只存在 NBT 里，不存在 {@code create_hand_made:handbook}
+     * 这个物品。所以下面第 1 条只是便宜的前置探测（万一有别的模组真注册了同名物品就优先用它），
+     * 别当成主路径。</p>
      */
     public static ItemStack createBook() {
         Item dedicated = ForgeRegistries.ITEMS.getValue(BOOK_ID);

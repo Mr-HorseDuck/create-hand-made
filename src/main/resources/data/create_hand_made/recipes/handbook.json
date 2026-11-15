@@ -1,0 +1,28 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "patchouli"
+        }
+      ],
+      "recipe": {
+        "type": "minecraft:crafting_shapeless",
+        "ingredients": [
+          {
+            "item": "minecraft:book"
+          },
+          {
+            "item": "create_hand_made:press_hammer"
+          }
+        ],
+        "result": {
+          "item": "patchouli:guide_book",
+          "nbt": "{patchouli:book:\"create_hand_made:handbook\"}"
+        }
+      }
+    }
+  ]
+}
