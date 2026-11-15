@@ -1,0 +1,13 @@
+{
+  "name": "Acknowledgements",
+  "category": "create_hand_made:other",
+  "icon": "minecraft:poppy",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Thanks",
+      "text": "This book, and everything in it, did not appear out of nowhere.$(br2)$(li)$(l)Create$() (simibubi) — the mod this one grows on$(li)$(l)Touhou Little Maid$() (TartaricAcid) — all the maid support$(li)$(l)Patchouli$() (VazKii) — the book you are reading$(li)$(l)JEI$() (mezz) — how you look recipes up$(li)$(l)Cloth Config$() (shedaniel) — the config screen$(li)$(l)KubeJS$() — how scripts change things$(br2)And everyone who filed an issue, tried a build, or said \"this part is wrong\".$(br2)Thank you."
+    }
+  ]
+}

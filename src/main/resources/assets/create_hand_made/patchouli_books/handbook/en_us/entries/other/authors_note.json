@@ -1,0 +1,18 @@
+{
+  "name": "Author's Note",
+  "category": "create_hand_made:other",
+  "icon": "minecraft:writable_book",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "How it started",
+      "text": "This mod is an addon for $(l)Create$().$(br2)The idea was simple: $(l)can you get the work done by hand, without building a machine?$()$(br2)So here are the tools — press hammer, mortar, crusher mortar, hand saw, stirring staff, infusion gun, bellows, pointer. They are not a replacement for machines; they are another way to play. For small builds, scarce space, or the times you just want to do it yourself."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "A few rules we kept",
+      "text": "$(li)$(l)Never touch Create's machines.$()Whatever the hand tools do, machines must not be affected — that is what the three-layer recipe system is for.$(br2)$(li)$(l)Data first.$()What a tool can do is decided by datapacks and KubeJS, i.e. by modpack authors.$(br2)$(li)$(l)Rather nothing than half of it.$()Anything uncertain stays out of this book.$(br2)Bugs and ideas: open an issue on the repository."
+    }
+  ]
+}

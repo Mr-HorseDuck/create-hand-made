@@ -1,0 +1,13 @@
+{
+  "name": "致谢",
+  "category": "create_hand_made:other",
+  "icon": "minecraft:poppy",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "谢谢",
+      "text": "这本书，和它讲的这些东西，都不是凭空来的。$(br2)$(li)$(l)Create$()（simibubi）——整个模组长在它上面$(li)$(l)车万女仆$()（TartaricAcid）——女仆兼容全靠它$(li)$(l)Patchouli$()（VazKii）——你正在翻的这本书$(li)$(l)JEI$()（mezz）——配方怎么查$(li)$(l)Cloth Config$()（shedaniel）——配置界面$(li)$(l)KubeJS$()——脚本怎么改$(br2)还有所有提过 issue、试过版本、说过「这里不对」的人。$(br2)谢谢。"
+    }
+  ]
+}
