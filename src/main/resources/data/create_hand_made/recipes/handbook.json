@@ -9,7 +9,9 @@
         }
       ],
       "recipe": {
-        "type": "minecraft:crafting_shapeless",
+        "type": "create_hand_made:handbook_craft",
+        "group": "",
+        "category": "misc",
         "ingredients": [
           {
             "item": "minecraft:book"

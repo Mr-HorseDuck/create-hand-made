@@ -17,7 +17,7 @@
 - **首次进游戏自动送一本**：新玩家第一次进入世界时自动获得手册，每名玩家只送一次（记在玩家数据里，换存档不会重复）。
   - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
-  - 也可以合成：**`1× 书` + `1× 冲压锤`**（无序合成，冲压锤会被消耗）。配方带 `forge:conditional` + `forge:mod_loaded`，没装 Patchouli 时不加载、也不报错。
+  - 也可以合成：**`1× 书` + `1× 冲压锤`**（无序合成，**冲压锤不消耗**，耐久/附魔原样退回）。配方类型是 `create_hand_made:handbook_craft`（继承原版无序配方，只覆写"剩余物"这一环），外层包 `forge:conditional` + `forge:mod_loaded`，没装 Patchouli 时不加载、也不报错。
 
 ### 内部
 

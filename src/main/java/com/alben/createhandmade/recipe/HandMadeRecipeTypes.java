@@ -4,6 +4,7 @@ import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.recipe.serializer.HandMadeBellowsRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeStonecuttingRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeToolRecipeSerializer;
+import com.alben.createhandmade.recipe.serializer.HandbookCraftRecipeSerializer;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.recipe.IRecipeTypeInfo;
@@ -104,6 +105,16 @@ public class HandMadeRecipeTypes {
         return (T) BELLOWS_RECIPE.get();
     }
     };
+
+    // ==================== handbook_craft（书 + 冲压锤 → 手册；锤不消耗） ====================
+    //
+    // ★ 没有自己的 RecipeType：它实现 CraftingRecipe，type 就是 minecraft:crafting，
+    //   这样合成台（RecipeManager#getRecipeFor(RecipeType.CRAFTING, ...)）才找得到它。
+    //   只注册 serializer。
+
+    public static final RegistryObject<RecipeSerializer<HandbookCraftRecipe>> HANDBOOK_CRAFT_SERIALIZER =
+            RECIPE_SERIALIZERS.register("handbook_craft",
+                    HandbookCraftRecipeSerializer::new);
 
     public static void register(IEventBus modEventBus) {
         RECIPE_TYPES.register(modEventBus);
