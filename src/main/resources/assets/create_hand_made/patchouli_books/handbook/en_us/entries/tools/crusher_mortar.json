@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:crusher_mortar",
-      "text": "The Mortar's bigger brother: crushes first, falls back to milling.$(br2)Uses its own windup and cycle timings — independent from the Mortar's config."
+      "text": "The Mortar's bigger brother: crushes first, falls back to milling.$(br2)Uses its own windup and cycle timings — independent from the Mortar's config.$(br2)By default the Crusher Mortar's processing time is half the Mortar's."
     },
     {
       "type": "patchouli:text",

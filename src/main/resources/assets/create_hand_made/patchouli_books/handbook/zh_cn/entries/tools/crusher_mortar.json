@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:crusher_mortar",
-      "text": "研钵的大哥：先粉碎，没配方就退回研磨。$(br2)起手与周期时长有独立配置项，和研钵分开。"
+      "text": "研钵的大哥：先粉碎，没配方就退回研磨。$(br2)起手与周期时长有独立配置项，和研钵分开。$(br2)碾钵加工时间默认比研钵减半"
     },
     {
       "type": "patchouli:text",

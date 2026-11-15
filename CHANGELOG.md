@@ -5,9 +5,9 @@
 
 ---
 
-## 0.6.4-beta — 2026-11-14
+## 0.6.4-beta — 2026-11-15
 
-基准：`0.6.3-beta`。这一版加了**帕秋莉手册**（游戏内指南书），中英双语。玩法无改动。
+基准：`0.6.3-beta`。这一版加了**帕秋莉手册**（游戏内指南书），中英双语；另修掉一轮排查发现的 5 处静默失效。玩法无破坏性改动。
 
 ### 新增
 
@@ -20,6 +20,16 @@
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
   - 也可以合成：**`1× 书` + `1× 冲压锤`**（无序合成，**冲压锤不消耗**，耐久/附魔原样退回）。配方类型是 `create_hand_made:handbook_craft`（继承原版无序配方，只覆写"剩余物"这一环），外层包 `forge:conditional` + `forge:mod_loaded`，没装 Patchouli 时不加载、也不报错。
 
+### 修复
+
+共同点是「代码以为自己在生效、实际没生效」——不崩溃、不报错，属于最难自己发现的那类。
+
+- **女仆液体标记的清除逻辑从未生效**：换下手持物时清液体三坐标的处理器没注册进事件总线，`clearLiquid()` 全库没有调用点。后果是坐标永久残留，之后给另一只女仆应用标记会把过期坐标一起复制过去，让她按旧目标搬液体。现已注册。
+- **手锯切削配方缓存从未命中**：缓存键直接用了 `ItemStack`，而 1.20.1 的 `ItemStack` 没有重写 `equals`/`hashCode`（只有 `matches` / `isSameItemSameTags` 等静态比较），`copyWithCount(1)` 每次都造新实例，键永远不相等——缓存变成「只写不读」，反而每次多一次分配。改用新增的 `util/ItemStacks.Key`（物品 + NBT 值语义）。
+- **女仆指杆部署的按物品去重同样失效**：同因。`Set<ItemStack>` 的 `add()` 永远成功，物流箱同款物品占满几十格时仍逐格完整查配方。改用 `Set<ItemStacks.Key>`。
+- **指针模式网络包不校验取值**：改过的客户端可往指杆 NBT 写任意整数。服务端写入前补 `Mode.isValidMode`。
+- **只读路径会给物品挂空 NBT**：手锯 HUD 每帧读当前配方序号时用 `getOrCreateTag()`，tag 为 null 时会塞一个空 `CompoundTag`，而**空 `{}` 与 `null` 在 `isSameItemSameTags` 下并不相等**，客户端栈与服务端栈会「标签不同」，影响过滤器比对与堆叠合并。读取路径统一改为不写入。
+
 ### 内部
 
 - 手册完全**数据驱动**，没有引入 Patchouli 编译依赖：内容在 `assets/create_hand_made/patchouli_books/handbook/`，`book.json` 在 `data/create_hand_made/patchouli_books/handbook/`（1.20+ 要求 `use_resource_pack: true`，`book.json` 仍留在 `data/`）。
@@ -27,8 +37,10 @@
 
 ### 升级注意
 
-- 已存档的玩家**不会**补发手册（只对首次登录生效）；需要的话用上面的 `/give` 命令。
-- 没有方块 / 物品 ID 变化，协议版本未变。
+- 手册需要 **Patchouli**，且**客户端与服务端都要装**：送书是服务端行为，服务端没装不会送；服务端装了而客户端没装会因缺少物品而不同步。不装 Patchouli 不影响模组其它任何功能。
+- **已存档的玩家不会补发手册**（只对首次登录生效）；用合成或 `/give` 补一本。
+- 手册**不在创造模式物品栏里**（Patchouli 默认不给书分配创造标签页），请用合成或 JEI 搜书。
+- 没有方块 / 物品 ID 变化，协议版本未变（仍为 2）；对外 `API_VERSION` 仍为 3，没有破坏性变更。
 
 ---
 

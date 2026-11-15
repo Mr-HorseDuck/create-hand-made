@@ -58,3 +58,6 @@ runs/
 ### Tooling / local state ###
 .dsh-meow/
 .sable-dev/
+
+### Release notes (local drafts, not committed) ###
+RELEASE_*.md
