@@ -33,7 +33,7 @@
 # 2) 编译（用项目自带 wrapper，不要用系统 gradle）
 .\gradlew.bat build
 # 3) 产物
-#    build/libs/create_hand_made-0.5.0-beta.jar
+#    build/libs/create_hand_made-0.5.1-beta.jar
 ```
 
 `build.gradle` 通过 `implementation files("libs/create-fly-${create_fly_version}.jar")` 引用前置，
@@ -389,7 +389,7 @@ fabric/
 ## 8. 验证状态
 
 - `.\gradlew.bat build` → **BUILD SUCCESSFUL**（Gradle 9.8.2 + Loom 1.19.4 + JDK 25），产出
-  `create_hand_made-0.5.0-beta.jar`（约 464 KB，含 JEI 支持的 24 个 class）。
+  `create_hand_made-0.5.1-beta.jar`（约 464 KB，含 JEI 支持的 24 个 class）。
 - **JEI 支持的静态验证（已通过，D 阶段）**：
   - `--rerun-tasks` 强制重编译 → BUILD SUCCESSFUL，`compileJava` / `jar` 均真正执行；
   - jar 内含 `compat/jei/` 全部 21 个 class；`mezz/` 与 `com/zurrtum/` 前缀条目 **0 项**
