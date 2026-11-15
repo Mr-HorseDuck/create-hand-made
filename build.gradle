@@ -21,22 +21,29 @@ dependencies {
     // Create Fly: 本地 jar（Modrinth CDN 在当前网络不可达）
     implementation files("libs/create-fly-${create_fly_version}.jar")
 
-    // JEI（可选，仅编译期）
-    compileOnly "mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}"
+    // JEI（可选，仅编译期）。
+    // 必须是完整 mod jar：-fabric-api 薄壳里只有 META-INF + 部分 mezz.jei.api 条目，
+    // 没有 mezz.jei.common.Internal —— 而客户端配方来源（RecipeMap）只能从它拿。
+    compileOnly "mezz.jei:jei-${minecraft_version}-fabric:${jei_version}"
+
+    // dev 运行时（runClient 里真的加载 JEI）：
+    // Loom 1.19.4 没有 modLocalRuntime / modRuntimeOnly 这类配置（配置阶段直接报
+    // "Could not find method modLocalRuntime()"），所以本行保持注释。
+    // 需要 dev 内验证时，把 JEI 发布 jar 丢进 run/mods/ 即可（不改构建脚本）。
+    // modLocalRuntime "mezz.jei:jei-${minecraft_version}-fabric:${jei_version}"
 }
 
+// 目标 Java 版本只走 toolchain（配 settings.gradle 的 foojay resolver）：
+// 环境 JDK 低于 25 时由 foojay 自动 provision，不用 options.release 硬指。
 java {
+    withSourcesJar()
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
     }
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-    withSourcesJar()
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 25
 }
 
 processResources {

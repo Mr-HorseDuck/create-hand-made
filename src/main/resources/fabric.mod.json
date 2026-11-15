@@ -20,6 +20,9 @@
     ],
     "client": [
       "com.alben.createhandmade.CreateHandMadeClient"
+    ],
+    "jei_mod_plugin": [
+      "com.alben.createhandmade.compat.jei.CreateHandMadeJEI"
     ]
   },
   "mixins": [
@@ -28,7 +31,8 @@
     }
   ],
   "depends": {
-    "fabricloader": ">=0.18.0",
+    "fabricloader": ">=0.20.1",
+    "fabric-api": "*",
     "minecraft": "~26.1",
     "java": ">=25",
     "create": ">=6.0.9-4"

@@ -56,3 +56,6 @@ run2/
 runs/
 PROJECT_STATE.md
 DEV_NOTES.md
+### 本地参考 / 工具目录（不进仓库）###
+neo-source/
+.dsh-meow/

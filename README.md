@@ -15,8 +15,10 @@
 | Fabric API | 0.155.3+26.1.2 |
 | Create 前置 | Create Fly 26.1.2-6.0.9-4（mod id `create`，版本 `6.0.9-4`） |
 | Java | 25 |
-| Gradle | 9.8.2（Loom 1.19.3 要求 ≥ 9.8.0） |
-| Fabric Loom | 1.19-SNAPSHOT → 解析为 1.19.3 |
+| JEI（可选） | 29.47.0.111（`jei-26.1.2-fabric`，编译期 `compileOnly`，不打包、不设硬依赖） |
+| Gradle | 9.8.2（wrapper 已钉；Loom 1.19.x 要求 ≥ 9.8.0） |
+| Fabric Loom | 1.19.4（钉死 stable，不再用 `1.19-SNAPSHOT`） |
+| Gradle 守护进程 JVM | 25（`gradle/gradle-daemon-jvm.properties`；Loom 1.19.x 的插件字节码要求 JVM 25，用 JAVA_HOME 的 JDK 21 会在配置阶段失败） |
 
 26.1 起 Minecraft 不再混淆、使用官方 Mojang 映射，因此 Loom 配置里没有 `mappings` 段，
 依赖统一用 `implementation` / `compileOnly`。
@@ -28,14 +30,18 @@
 ```powershell
 # 1) 把 Create Fly 的 jar 放到 fabric/libs/ 下
 #    create-fly-26.1.2-6.0.9-4.jar
-# 2) 编译
-gradle -p fabric build
+# 2) 编译（用项目自带 wrapper，不要用系统 gradle）
+.\gradlew.bat build
 # 3) 产物
-#    fabric/build/libs/create_hand_made-0.5.0-beta.jar
+#    build/libs/create_hand_made-0.5.0-beta.jar
 ```
 
 `build.gradle` 通过 `implementation files("libs/create-fly-${create_fly_version}.jar")` 引用前置，
 所以**必须先手动放好 jar**。JEI 是 `compileOnly`，不参与运行时。
+
+Java 25 由 `java.toolchain` + `settings.gradle` 的 foojay resolver 提供（缺 JDK 会自动下载）；
+Gradle 自身跑在哪个 JVM 上由 `gradle/gradle-daemon-jvm.properties` 的 `toolchainVersion=25` 决定，
+换机不需要改 `JAVA_HOME`。
 
 ---
 
@@ -190,6 +196,49 @@ Fabric 26.1 没有那套 API，改用 26.1 自己的扩展点：
 **灌注枪**：旧渲染器的旋转是注释掉的（只有 `pushPose` → 画原模型 → `popPose`），
 等价于普通 JSON 模型，所以不需要自定义 `ItemModel`，现状与上游一致。
 
+### 3.7 JEI 支持（`compat/jei/`，16 个类型里注册了 14 个）
+
+JEI 插件走 Fabric 的 `jei_mod_plugin` entrypoint（键名与 Create Fly 自己的 `fabric.mod.json` 一致），
+`depends` 里**故意不**声明 `jei`：没装 JEI 时插件类根本不会被加载，装了就自动出现配方页。
+依赖用**完整 mod jar**（`compileOnly`）而**不是** `-fabric-api` 薄壳 —— 薄壳里只有 `mezz.jei.api`，
+没有 `mezz.jei.common.Internal`。
+
+| 类别 | UID 后缀 | 数据源（L1 + L3） | 布局抄自 |
+| --- | --- | --- | --- |
+| 手锯切削 | `hand_saw_cutting` | `CUTTING` + `HandMadeCuttingRecipe` | `SawingCategory` |
+| 手锯切石 | `hand_saw_stonecutting` | 原版 `STONECUTTING` + `HandMadeStonecuttingRecipe` | 继承 `BlockCuttingCategory`（5×3 折叠，>15 并入同槽） |
+| 冲压锤·置物台 | `hand_press_depot` | `PRESSING` + `HandMadePressingRecipe` | `PressingCategory` |
+| 冲压锤·工作盆 | `hand_press_basin` | `COMPACTING` + `HandMadeToolRecipe` | `CompactingCategory` |
+| 研钵研磨 | `mortar_milling` | `MILLING` + `HandMadeCrushingRecipe` | `MillingCategory` |
+| 碾钵粉碎 | `crusher_mortar_crushing` | `CRUSHING`（去重 `MILLING`）+ L3 | `CrushingCategory` |
+| 搅拌杖混合 | `stirring_staff_mixing` | `MIXING` + `HandMadeToolRecipe` | `MixingCategory` |
+| 搅拌杖自动酿造 | `stirring_staff_auto_brewing` | `POTION` | `PotionCategory` |
+| 指杆应用 | `pointer_application` | `DEPLOYING` + `ITEM_APPLICATION` + L3 | `DeployingCategory` |
+| 风箱熔炼 / 烟熏 | `bellows_blasting` / `bellows_smoking` | `SMELTING`→`BLASTING`→`SMOKING` 三级去重 + L3（按 `fan_type`） | `FanBlastingCategory` |
+| 风箱缠魂 / 洗涤 | `bellows_haunting` / `bellows_splashing` | `HAUNTING` / `SPLASHING` + L3 | `FanHauntingCategory` / `FanWashingCategory` |
+| 灌注枪注液 | `hand_infusion_gun` | `FILLING` + `HandMadeFillingRecipe` | `SpoutFillingCategory` |
+
+关键设计：
+
+- **配方来源只有一个**：`JeiRecipeSource` → `mezz.jei.common.Internal.getClientSyncedRecipes()`
+  （返回 MC 的 `RecipeMap`）。**不能**用 `level.getRecipeManager()` —— 26.1 客户端没有它，
+  照抄上游会得到「类别存在但一条配方都没有」这种静默失败。JEI 的内部 API 只在这一处封装。
+- **零显示代理**：L1 与 L3 在 26.1 里本来就实现了同一批接口，所以泛型直接绑接口就够：
+  单输入多产物 6 类共用 `CreateSingleStackRollableRecipe`；工作盆 3 类共用 `BasinRecipe`
+  （`MixingRecipe`/`CompactingRecipe`/`PotionRecipe`/`HandMadeToolRecipe` 都实现它）；
+  指杆用 `ItemApplicationRecipe`；灌注枪用 `CreateRecipe<FillingInput>`。
+  只有切石（`BlockCuttingDisplay`）和风箱熔炼/烟熏（自建 `display/BellowsCookingDisplay`）
+  需要独立显示类型。上游那套 `asDeployerProxy` / `wrapAsBasin` / `asBellowsCookingProxy` 全部不需要。
+- **装饰**：Create 原本在工作盆/磨盘位置画 3D 模型（`*RenderState`），这里换成对应工具的
+  物品图标（`GuiGraphicsExtractor#item`），坐标沿用模型原点。
+- **未注册 2 个类型**：`hand_press_basin_auto_square` / `stirring_staff_auto_shapeless`
+  （工作台配方 → 工作盆语义）。26.1 的 `BasinRecipe` 只有 `matchCraftingRecipe` / `applyCraftingRecipe`
+  （运行期 `BasinInput` 入口），**没有** `convertShaped` / `convertShapeless`，做不出可显示的
+  `BasinRecipe`，因此不注册，也不自造 3×3 布局。
+- 上游对灌注枪的「转换配方」（`SpoutCategory.consumeRecipes`）26.1 已无该入口，本期不做。
+- **dev 内不会加载 JEI**：Loom 1.19.4 没有 `modLocalRuntime`；需要 `runClient` 里目视时，
+  把 JEI 的发布 jar 丢进 `run/mods/`。
+
 ---
 
 ## 4. NeoForge → Fabric 的等价替换
@@ -287,7 +336,7 @@ Fabric 26.1 没有那套 API，改用 26.1 自己的扩展点：
 | 项 | 原因 | 影响 |
 | --- | --- | --- |
 | **KubeJS 支持** | KubeJS 在 Fabric 26.1.2 上不存在 | 已彻底移除：`kubejs` 包、`kubejs.plugins.txt`、`recipe_schema` 全部删除。L3 配方改为纯数据包 JSON。 |
-| **JEI 插件** | Create Fly 没有原 JEI 类别基类，需要基于 `com.zurrtum.create.client.compat.jei.CreateCategory` 重写全部 13 个类别 | `fabric.mod.json` 的 `jei_mod_plugin` 入口已移除，JEI 里不会出现本模组的配方页（工具本身功能不受影响）。 |
+| **JEI 的两个自动类别** | 26.1 的 `BasinRecipe` 没有 `convertShaped` / `convertShapeless`（只有运行期 `BasinInput` 入口），做不出可显示的 `BasinRecipe` | `hand_press_basin_auto_square` / `stirring_staff_auto_shapeless` 不注册；其余 14 个类别正常（见 3.7）。 |
 | **灌注枪物品栏液体底图** | `GuiGraphicsMixin` 依赖已变更的 26.1 渲染 API（`RenderSystem.setShaderColor` 等） | 物品栏里的灌注枪图标不显示液面。 |
 | **`ServerConfigPayload` 客户端同步** | 需要自建 S2C 包 | 目前两端各自读本地 JSON。单人游戏完全一致；多人游戏里客户端与服务器的计时参数若被改过可能不同步（默认值下无影响）。 |
 
@@ -308,6 +357,7 @@ Create 的 `CustomRenderedItemModelRenderer` 那一套在 Create Fly 里已删�
 ```
 fabric/
 ├─ build.gradle / gradle.properties / settings.gradle
+├─ gradle/gradle-daemon-jvm.properties  ← 钉 Gradle 守护进程用 JDK 25
 ├─ libs/create-fly-26.1.2-6.0.9-4.jar     ← 需自行放入
 ├─ src/main/java/com/alben/createhandmade/
 │  ├─ CreateHandMade.java                 主入口 + 事件接线
@@ -316,6 +366,7 @@ fabric/
 │  ├─ ModDataComponents.java
 │  ├─ bellows/                            风箱介质表（数据包 + 自动发现）
 │  ├─ client/                             客户端状态 + 5 个自定义 ItemModel + 手锯 HUD
+│  ├─ compat/jei/                         JEI 插件：14 个类别 + 唯一配方来源 + 2 个 display record
 │  ├─ item/                               8 个工具 + 注册 + 手锯配方缓存
 │  ├─ mixin/BasinBlockEntityMixin.java
 │  ├─ mixin/client/ItemInHandRendererMixin.java
@@ -337,13 +388,32 @@ fabric/
 
 ## 8. 验证状态
 
-- `gradle -p fabric build` → **BUILD SUCCESSFUL**，产出
-  `create_hand_made-0.5.0-beta.jar`（约 407 KB）。
+- `.\gradlew.bat build` → **BUILD SUCCESSFUL**（Gradle 9.8.2 + Loom 1.19.4 + JDK 25），产出
+  `create_hand_made-0.5.0-beta.jar`（约 464 KB，含 JEI 支持的 24 个 class）。
+- **JEI 支持的静态验证（已通过，D 阶段）**：
+  - `--rerun-tasks` 强制重编译 → BUILD SUCCESSFUL，`compileJava` / `jar` 均真正执行；
+  - jar 内含 `compat/jei/` 全部 21 个 class；`mezz/` 与 `com/zurrtum/` 前缀条目 **0 项**
+    （`compileOnly` 的 JEI 未被打进产物，前置 Create Fly 也没有）；
+  - `fabric.mod.json`（构建产物与 jar 内两处）均含 `jei_mod_plugin`，`${version}` 已展开；
+  - 16 个 UID 的 path 与上游 NeoForge 版**逐字一致**（老玩家的 JEI 收藏不会失效）；
+  - 类别实例数 = `addRecipes` 调用数 = `addCraftingStation` 调用数 = **14**，且都有 `getRecipes()` 数据源；
+  - 未装 JEI 的启动安全（静态）：`CreateHandMade` / `CreateHandMadeClient` 里 `compat.jei` 引用 **0 处**，
+    `mezz.jei` 只出现在 `compat/jei/` 内部；
+  - 14 个 `TITLE_KEY` 在 `en_us` / `zh_cn` 两个语言文件里齐备。
+- **JEI 的目视验收（尚未做，需要你在正式客户端确认）**：
+  1. 卸掉 JEI 启动一次，确认模组照常加载（静态已证无引用，运行期未实测）；
+  2. 装上 JEI 后逐个展开 14 个类别：槽位是否重叠、装饰图标位置（用物品图标替代了 Create 的 3D 模型）、
+     是否有空类别、点亮「手锯 / 研钵 / 搅拌杖」等能否反查到对应类别；
+  3. **R11 风险**：L3 独占配方（`tool_recipe` / `stonecutting_recipe` / `bellows_recipe`）是否真的出现在客户端
+     `RecipeMap` 里。若缺席，类别会「存在但为空」且**不报错** —— `JeiRecipeSource.recipeMap()` 在
+     `hasClientSyncedRecipes() == false` 时会打一条 **debug 级**日志（用 log4j2 配置把
+     `com.alben.createhandmade` 调到 debug 即可看到），据此判断是"快照没同步"还是"L3 没进快照"。
+  - dev 内想直接看到 JEI：把 JEI 发布 jar 丢进 `run/mods/`（Loom 1.19.4 没有 `modLocalRuntime`）。
 - 资源完整性静态校验：8 个 `assets/create_hand_made/items/<id>.json` 全部指向存在的
   `models/item/<id>.json`，10 个模型的 `parent`（`minecraft:item/handheld` / `generated`）
   与 `layer0` 纹理在合并后的 Minecraft 资源中均能解析；其中 5 个物品定义使用自定义
   `ItemModel` 类型（`mortar` / `hand_saw` / `bellows` / `stirring_staff`）。
-- `gradle -p fabric runClient` → 客户端能正常启动、进入世界：
+- `.\gradlew.bat runClient` → 客户端能正常启动、进入世界：
   - `Reloading ResourceManager: vanilla, create, create_hand_made, ...` 成功
   - 资源重载与进入世界后**没有任何** `Unable to load model` / 模型解析相关的 WARN/ERROR
   - 研钵/碾钵的「钵 + 杵 + 内容物」三层模型 + 第一人称捶捣动画已由人工进游戏目视确认
@@ -360,7 +430,7 @@ fabric/
   - 灌注枪已由人工进游戏确认（修正液滴单位之后）：对工作盆长按可抽满 1 桶
     （1000 mB = 81000 droplets）且盆内水量同步清空、短按地面放出整格流体、
     长按水源方块整格吸取、短按置物台/传送带上的物品可正常注液。
-- `gradle -p fabric runServer` → 服务端正常启动到 `Done`：
+- `.\gradlew.bat runServer` → 服务端正常启动到 `Done`：
   - `Create: Hand Made (Fabric port) initialised`
   - `Loaded 3435 recipes`（含本模组 8 个合成配方，无解析错误）
   - 风箱介质表 4 个文件全部解析成功
