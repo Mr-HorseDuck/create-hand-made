@@ -7,7 +7,7 @@
     {
       "type": "patchouli:text",
       "title": "How it started",
-      "text": "This mod is an addon for $(l)Create$().$(br2)The idea was simple: $(l)can you get the work done by hand, without building a machine?$()$(br2)So here are the tools — press hammer, mortar, crusher mortar, hand saw, stirring staff, infusion gun, bellows, pointer. They are not a replacement for machines; they are another way to play. For small builds, scarce space, or the times you just want to do it yourself."
+      "text": "This mod is an addon for $(l)Create$().$(br)Adventure packs often ship with $(l)Create$(),$(br)yet needing a whole machine just for a couple of items gets in the way.$(br)So this mod happened."
     },
     {
       "type": "patchouli:text",

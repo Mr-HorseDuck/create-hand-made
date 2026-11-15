@@ -17,7 +17,7 @@
     {
       "type": "patchouli:text",
       "title": "要点",
-      "text": "$(li)它连 $(l)tool$() 字段写 $(c)mortar$() 的独占配方也收，不用重复写一份。$(li)过滤一律走 $(c)crusher_mortar$() 表，即使是 mortar 名下的配方。"
+      "text": "$(li)它连$(l)tool$() 字段写 $(c)mortar$() 的独占配方也收，不用重复写一份。$(li)过滤一律走 $(c)crusher_mortar$() 表，即使是 mortar 名下的配方。"
     }
   ]
 }

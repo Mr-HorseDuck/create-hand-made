@@ -6,8 +6,23 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "title": "谢谢",
-      "text": "这本书，和它讲的这些东西，都不是凭空来的。$(br2)$(li)$(l)Create$()（simibubi）——整个模组长在它上面$(li)$(l)车万女仆$()（TartaricAcid）——女仆兼容全靠它$(li)$(l)Patchouli$()（VazKii）——你正在翻的这本书$(li)$(l)JEI$()（mezz）——配方怎么查$(li)$(l)Cloth Config$()（shedaniel）——配置界面$(li)$(l)KubeJS$()——脚本怎么改$(br2)还有所有提过 issue、试过版本、说过「这里不对」的人。$(br2)谢谢。"
+      "title": "致谢的模组",
+      "text": "这本书，和它讲的这些东西，都不是凭空来的。$(br2)$(li)$(l)Create$()（simibubi）——整个模组长在它上面$(li)$(l)车万女仆$()（TartaricAcid）——女仆兼容全靠它$(li)$(l)Patchouli$()（VazKii）——你正在翻的这本书$(li)$(l)JEI$()（mezz）——配方怎么查$(li)$(l)Cloth Config$()（shedaniel）——配置界面$(li)$(l)KubeJS$()——脚本怎么改$(br2)"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "致谢的社区贡献者",
+      "text": "$(l)yansunsky(Github)$()提出灌注枪网络问题并主动发Pull修复$(br)$(l)SweetDumplingPorridge(Github)$()提出了世界创建问题Issue(1.20.1)"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "致谢的功能提议者",
+      "text": "$(l)LoneToze(Github)$()提出了手锯配置文件的建议$(br)$(l)手搓学宣传片下的各位观众们$()提出了女仆支持和1.20.1版本支持的建议$(br)$(l)@SW_Autumn(B站)$()提出了手锯UI的建议$(br)$(l)@灰渡owo(B站)$()提出了研钵和研杵的动画优化建议"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "致谢的测试者",
+      "text": "给了我许多做模组的动力$(br)$(l)@屑九阴(B站)$()$(br)$(l)@wdlpiaoyi(B站)$()$(br)$(l)@娇娇地吃饼饼(B站)$()"
     }
   ]
 }

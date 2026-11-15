@@ -7,7 +7,7 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:infusion_gun",
-      "text": "抽液与注液，容量 $(l)1000 mB$()。$(br2)对着流体源或储罐抽液；对着物品或容器注液。"
+      "text": "抽液与注液，容量$(l)1000 mB$()。$(br2)对着流体源或储罐抽液；对着物品或容器注液。"
     },
     {
       "type": "patchouli:text",
