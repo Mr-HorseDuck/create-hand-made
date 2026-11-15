@@ -7,17 +7,17 @@
     {
       "type": "patchouli:spotlight",
       "item": "create_hand_made:infusion_gun",
-      "text": "Draws and injects fluids. Holds $(l)1000 mB$().\n\nPoint at a fluid source or a fluid handler to draw; point at an item or a tank to inject."
+      "text": "Draws and injects fluids. Holds $(l)1000 mB$().$(br2)Point at a fluid source or a fluid handler to draw; point at an item or a tank to inject."
     },
     {
       "type": "patchouli:text",
       "title": "Recipes it can do",
-      "text": "$(li)$(l)Filling$() recipes (item + fluid -> item)$(br)$(li)Exclusive infusion gun recipes\n\n$(italic)Exclusive recipes must declare at least one fluid ingredient, otherwise they fail to load.$()"
+      "text": "$(li)$(l)Filling$() recipes (item + fluid -> item)$(li)Exclusive infusion gun recipes$(br2)$(italic)Exclusive recipes must declare at least one fluid ingredient, otherwise they fail to load.$()"
     },
     {
       "type": "patchouli:text",
       "title": "Tips",
-      "text": "$(li)The fluid layer is rendered by the item itself, so it shows up in logistics grids too.$(br)$(li)Placing fluid respects $(c)mayInteract$() and the fluid placement event — protection plugins still work.$(br)$(li)Use a filter to control which outputs are accepted."
+      "text": "$(li)The fluid layer is rendered by the item itself, so it shows up in logistics grids too.$(li)Placing fluid respects $(c)mayInteract$() and the fluid placement event — protection plugins still work.$(li)Use a filter to control which outputs are accepted."
     }
   ]
 }
