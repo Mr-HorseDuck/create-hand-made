@@ -241,7 +241,15 @@ public final class PointerDataHelper {
 
         public static int getMode(net.minecraft.world.item.ItemStack stack) {
             if (stack.isEmpty()) return MODE_DEFAULT;
-            return stack.getOrCreateTag().getInt(NBT_MODE);
+            CompoundTag tag = stack.getTag();
+            // ★ 读不用 getOrCreateTag()：那个会给物品塞空 CompoundTag（空 {} 与 null 在
+            //   isSameItemSameTags 下不等），客户端栈会和服务端栈"标签不同"。
+            return tag == null ? MODE_DEFAULT : tag.getInt(NBT_MODE);
+        }
+
+        /** 模式值是否合法；网络包来自客户端，写库前必须核一遍。 */
+        public static boolean isValidMode(int mode) {
+            return mode >= 0 && mode < MODE_COUNT;
         }
 
         public static void setMode(net.minecraft.world.item.ItemStack stack, int mode) {

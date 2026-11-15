@@ -9,6 +9,7 @@ import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.util.ItemStacks;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.AllRecipeTypes;
@@ -507,7 +508,7 @@ public class HandSawItem extends Item {
             if (recipe == null) return false;
         } else {
             // ★ 优先按配方 ID 查找
-            String idStr = saw.getOrCreateTag().getString(NBT_RECIPE_ID);
+            String idStr = ItemStacks.getString(saw, NBT_RECIPE_ID);
             if (!idStr.isEmpty()) {
                 ResourceLocation targetId = ResourceLocation.tryParse(idStr);
                 if (targetId != null) {
@@ -523,7 +524,7 @@ public class HandSawItem extends Item {
 
             // 找不到（旧 NBT 或动态配方）→ 回退到索引
             if (recipe == null) {
-                int index = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
+                int index = ItemStacks.getInt(saw, NBT_RECIPE_INDEX);
                 if (index < 0 || index >= recipes.size()) index = 0;
                 recipe = recipes.get(index);
             }
@@ -603,16 +604,18 @@ public class HandSawItem extends Item {
     //     把对方刚算好的缓存清掉，等于缓存完全失效。做成键的一部分后两边各存各的。
     //
     //   失效：HandMadeRecipePool.cacheEpoch()（过滤器增删、资源/脚本重载都会 +1）变化时整表清空。
-    //   键的 ItemStack 用 copyWithCount(1)，其 equals/hashCode 比的是 item + NBT；
-    //   键一旦入表不再改动。表本身是 ConcurrentHashMap，双线程访问安全。
+    //
+    //   ★ 键里的物品必须用 {@link ItemStacks.Key}（物品 + NBT 值语义），不能直接塞 ItemStack：
+    //     1.20.1 的 ItemStack 没有重写 equals/hashCode，而 copyWithCount(1) 每次都 copy() 出
+    //     新实例，键永远不相等 —— 缓存会变成"只写不读"（早期就是这么写错的，已修）。
 
     private static final int CUTTING_CACHE_MAX = 512;
     private static final Map<CuttingKey, List<Recipe<?>>> CUTTING_CACHE = new ConcurrentHashMap<>();
     private static final Object CUTTING_CACHE_EPOCH_LOCK = new Object();
     private static volatile int cuttingCacheEpoch = Integer.MIN_VALUE;
 
-    /** 缓存键：同一份配方表（manager）+ 同一版本号 + 同一件输入物品。 */
-    private record CuttingKey(RecipeManager manager, int epoch, ItemStack input) {}
+    /** 缓存键：同一份配方表（manager）+ 同一版本号 + 同一件输入物品（值语义）。 */
+    private record CuttingKey(RecipeManager manager, int epoch, ItemStacks.Key input) {}
 
     public static List<Recipe<?>> getCuttingRecipes(Level level, ItemStack input) {
         if (level == null || input == null || input.isEmpty()) return List.of();
@@ -629,13 +632,14 @@ public class HandSawItem extends Item {
             }
         }
 
-        CuttingKey key = new CuttingKey(manager, epoch, input.copyWithCount(1));
+        CuttingKey key = new CuttingKey(manager, epoch, ItemStacks.Key.of(input));
         List<Recipe<?>> cached = CUTTING_CACHE.get(key);
         if (cached != null) return cached;
 
         // ★ 不用 List.copyOf：它对 null 元素会抛 NPE。这里要的是"不可变 + 允许 null"。
-        List<Recipe<?>> computed =
-                Collections.unmodifiableList(new ArrayList<>(computeCuttingRecipes(level, key.input())));
+        //   计算用的是数量归一到 1 的副本，和命中路径的键语义一致。
+        List<Recipe<?>> computed = Collections.unmodifiableList(
+                new ArrayList<>(computeCuttingRecipes(level, input.copyWithCount(1))));
 
         // 简单限长：条目到顶就整体清空，不做 LRU（物品种类本来就不该无上限增长）
         if (CUTTING_CACHE.size() >= CUTTING_CACHE_MAX) {
@@ -834,7 +838,7 @@ public class HandSawItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
-        int current = saw.getOrCreateTag().getInt(NBT_RECIPE_INDEX);
+        int current = ItemStacks.getInt(saw, NBT_RECIPE_INDEX);
         int next = (current + 1) % recipes.size();
         if (next == 0) {
     saw.removeTagKey(NBT_RECIPE_INDEX);

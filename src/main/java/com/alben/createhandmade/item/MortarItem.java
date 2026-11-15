@@ -8,6 +8,7 @@ import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.util.ItemStacks;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
@@ -160,7 +161,7 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
         }
 
         // ★ 保底音：加工确实产出了东西，但常规音效一次都没播
-        if (produced && !stack.getOrCreateTag().getBoolean(MortarGrindEffects.NBT_SOUND_PLAYED)) {
+        if (produced && !ItemStacks.getBoolean(stack, MortarGrindEffects.NBT_SOUND_PLAYED)) {
             level.playSound(null, entity.blockPosition(), SoundEvents.GRINDSTONE_USE,
                     SoundSource.PLAYERS, 0.8f, 2.0f + (level.random.nextFloat() - 0.5f) * 0.2f);
         }

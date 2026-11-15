@@ -61,6 +61,9 @@ public class HandMadeMaidExtension implements ILittleMaid {
 
             MinecraftForge.EVENT_BUS.register(MaidNetwork.class);
             MinecraftForge.EVENT_BUS.register(PointerMarker.class);
+            // ★ 液体模式的「换下手持物就清标记」在 PointerLiquidMarker 里；
+            //   以前漏了这一行，导致 clearLiquid() 全库没有调用点（标记永不失效）。
+            MinecraftForge.EVENT_BUS.register(PointerLiquidMarker.class);
             MinecraftForge.EVENT_BUS.register(PointerMaidIntegration.class);
             MinecraftForge.EVENT_BUS.register(HandMadeMaidExtension.class);
 

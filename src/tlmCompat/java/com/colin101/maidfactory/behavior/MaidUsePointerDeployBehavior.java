@@ -8,6 +8,7 @@ import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.item.PointerItem;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
+import com.alben.createhandmade.util.ItemStacks;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
@@ -322,20 +323,22 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
      * <p>★ 按物品去重：{@code findPointerRecipe} 内部要扫一遍 TOOL_RECIPE、再做序列组装 /
      * DEPLOYING / ITEM_APPLICATION 三次查询，每次还分配两套 ItemStackHandler + RecipeWrapper。
      * 物流箱里同一个物品常常占满几十个槽位，逐槽查会把同样的工作重复几十遍。
-     * 这里用 count 归一后的 ItemStack 做键（equals/hashCode 比 item + NBT），
+     * 这里用 {@link ItemStacks.Key}（物品 + NBT 的值语义，且构造时拷走 tag）做键，
      * 同一个物品只查一次：查出来能配就返回最先遇到的槽位，查不出来则后面同样的物品必然也不行。</p>
+     *
+     * <p>★ 别改回 {@code Set<ItemStack>}：ItemStack 没有重写 equals/hashCode，
+     * {@code add()} 永远成功，去重等于没做（早期就是这么写错的，已修）。</p>
      */
     private static int findDeployableInputSlot(ServerLevel level, IItemHandler inputInv, ItemStack target) {
-        Set<ItemStack> tried = new HashSet<>();
+        Set<ItemStacks.Key> tried = new HashSet<>();
 
         for (int i = 0; i < inputInv.getSlots(); i++) {
             ItemStack slot = inputInv.getStackInSlot(i);
             if (slot.isEmpty()) continue;
 
-            ItemStack key = slot.copyWithCount(1);
-            if (!tried.add(key)) continue;   // 同款物品已经查过，结果一样
+            if (!tried.add(ItemStacks.Key.of(slot))) continue;   // 同款物品已经查过，结果一样
 
-            Recipe<?> recipe = CreateHandMadeApi.findPointerRecipe(level, target, key);
+            Recipe<?> recipe = CreateHandMadeApi.findPointerRecipe(level, target, slot.copyWithCount(1));
             if (CreateHandMadeApi.isPointerApplicationRecipe(recipe)) {
                 return i;
             }

@@ -2,6 +2,7 @@ package com.alben.createhandmade.client;
 
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.item.HandSawItem;
+import com.alben.createhandmade.util.ItemStacks;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -83,7 +84,7 @@ public class HandSawHudRenderer {
         int total = recipes.size();
 
         // 读取当前选中索引（NBT）
-        int index = mainHand.getOrCreateTag().getInt(HandSawItem.NBT_RECIPE_INDEX);
+        int index = ItemStacks.getInt(mainHand, HandSawItem.NBT_RECIPE_INDEX);
         if (index < 0 || index >= total) index = 0;
 
         // 计算位置：多行网格，整体水平居中；垂直方向上"最下面一行"固定在屏幕 1/3 处

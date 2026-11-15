@@ -81,6 +81,11 @@ public class MaidNetwork {
                 MaidDebug.log("handlePointerMode: main hand not pointer");
                 return;
             }
+            // ★ 客户端可以发任意 int，写进 NBT 前先核值域（其它包都核了 reach/owner，这里别漏）
+            if (!PointerDataHelper.Mode.isValidMode(packet.mode())) {
+                MaidDebug.log("handlePointerMode: invalid mode {}, ignore", packet.mode());
+                return;
+            }
             PointerDataHelper.Mode.setMode(stack, packet.mode());
             MaidDebug.log("handlePointerMode: set mode={}, now={}",
                     packet.mode(), PointerDataHelper.Mode.getMode(stack));
