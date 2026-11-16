@@ -5,6 +5,7 @@ import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -296,6 +297,15 @@ public class PointerItem extends Item {
 
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
         //   不是一条普通的 DEPLOYING 配方，保持原样。
+        // Hand-only sequenced assembly (create_hand_made:hand_sequenced_assembly).
+        Optional<RecipeHolder<HandMadeApplicationRecipe>> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, wrapper.getItem(0),
+                        HandMadeApplicationRecipe.class);
+        if (handSequenced.isPresent()
+                && handSequenced.get().value().getTool() == HandMadeTool.POINTER) {
+            return handSequenced.get();
+        }
+
         Optional<RecipeHolder<DeployerApplicationRecipe>> sequenced =
                 SequencedAssemblyRecipe.getRecipe(level, wrapper,
                         AllRecipeTypes.DEPLOYING.getType(), DeployerApplicationRecipe.class);

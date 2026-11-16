@@ -4,6 +4,7 @@ import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.alben.createhandmade.util.CycleSoundWindow;
@@ -456,6 +457,14 @@ public class HandSawItem extends Item {
 
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
         //   不是一条普通的 CUTTING 配方，保持原样。
+        // Hand-only sequenced assembly (create_hand_made:hand_sequenced_assembly).
+        Optional<RecipeHolder<HandMadeCuttingRecipe>> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, input, HandMadeCuttingRecipe.class);
+        if (handSequenced.isPresent()
+                && handSequenced.get().value().getTool() == HandMadeTool.HAND_SAW) {
+            return List.<RecipeHolder<? extends Recipe<?>>>of(handSequenced.get());
+        }
+
         Optional<RecipeHolder<CuttingRecipe>> assembly = SequencedAssemblyRecipe.getRecipe(
                 level, input, AllRecipeTypes.CUTTING.getType(), CuttingRecipe.class);
         if (assembly.isPresent()) {

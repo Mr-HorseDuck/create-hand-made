@@ -3,6 +3,7 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.alben.createhandmade.util.CycleSoundWindow;
@@ -296,6 +297,14 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
         // 无法直接接受 SingleRecipeInput。这样既不需要 unchecked 强转，
         // 也不会在将来类型变化时静默出错。
         // CRUSHING 与 MILLING 这两段各自的顺序由配方池保证。
+        // Hand-only sequenced assembly (create_hand_made:hand_sequenced_assembly).
+        Optional<RecipeHolder<HandMadeCrushingRecipe>> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, input, HandMadeCrushingRecipe.class);
+        if (handSequenced.isPresent()
+                && handSequenced.get().value().getTool() == HandMadeTool.CRUSHER_MORTAR) {
+            return handSequenced.get();
+        }
+
         // L3 exclusive step: type = create_hand_made:tool_recipe, crusher mortar only.
         Optional<RecipeHolder<HandMadeCrushingRecipe>> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
                 level, input, HandMadeAssembly.toolRecipeType(), HandMadeCrushingRecipe.class);

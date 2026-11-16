@@ -82,7 +82,24 @@ public enum HandMadeRecipeTypes implements IRecipeTypeInfo {
      * 字段集也不同（{@code fan_type} 必填、禁止流体）。语义上它是<b>另一个</b> L3 类型，
      * 所以拿一个独立的常量 + 独立的 serializer（见 {@link HandMadeBellowsRecipeSerializer} 的类注释）。</p>
      */
-    BELLOWS_RECIPE(HandMadeBellowsRecipeSerializer::new);
+    BELLOWS_RECIPE(HandMadeBellowsRecipeSerializer::new),
+
+    /**
+     * 手搓专属序列组装（{@code create_hand_made:hand_sequenced_assembly}）。
+     *
+     * <p>与 Create 的 {@code create:sequenced_assembly} 是<b>两个独立类型</b>：</p>
+     * <ul>
+     *   <li>原版机器（部署器 / 压床 / 机械锯 / 注液器）只 {@code getAllRecipesFor}
+     *       {@code create:sequenced_assembly}，<b>看不到</b>本类型；</li>
+     *   <li>本类型只有本模组的手搓工具会查询并推进（见
+     *       {@link HandMadeSequencedAssemblyRecipe#getStepRecipe}）。</li>
+     * </ul>
+     *
+     * <p>JSON 字段与原版一致，{@code type} 换成 {@code create_hand_made:hand_sequenced_assembly} 即可；
+     * 但 {@code sequence} 里的每一步必须是本模组的手搓 L3 配方
+     * （{@code create_hand_made:tool_recipe}），serializer 会在加载期校验。</p>
+     */
+    HAND_SEQUENCED_ASSEMBLY(HandMadeSequencedAssemblyRecipeSerializer::new);
 
     /** 延迟注册器。必须是嵌套类，见类注释里的初始化顺序说明。 */
     private static final class Registers {

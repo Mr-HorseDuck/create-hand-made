@@ -5,6 +5,7 @@ import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadePressingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
@@ -361,6 +362,15 @@ public class PressHammerItem extends Item {
     public static RecipeHolder<?> findPressingRecipe(Level level, ItemStack stack) {
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
         //   不是一条普通的 PRESSING 配方，保持原样。
+        // Hand-only sequenced assembly (create_hand_made:hand_sequenced_assembly):
+        // a separate recipe type that Create machines never query.
+        Optional<RecipeHolder<HandMadePressingRecipe>> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, stack, HandMadePressingRecipe.class);
+        if (handSequenced.isPresent()
+                && handSequenced.get().value().getTool() == HandMadeTool.PRESS_HAMMER_DEPOT) {
+            return handSequenced.get();
+        }
+
         Optional<RecipeHolder<PressingRecipe>> sequenced =
                 SequencedAssemblyRecipe.getRecipe(level, stack,
                         AllRecipeTypes.PRESSING.getType(), PressingRecipe.class);

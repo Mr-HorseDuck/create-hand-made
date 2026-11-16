@@ -5,6 +5,7 @@ import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.recipe.HandMadeFillingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllParticleTypes;
@@ -813,6 +814,15 @@ public class InfusionGunItem extends Item {
 
         // ★ 序列组装不走配方池：它需要按「输入 + 中间物品」的组装进度解析，
         //   不是一条普通的 FILLING 配方，保持原样（含它自带的 matches + 流体判定谓词）。
+        // Hand-only sequenced assembly (create_hand_made:hand_sequenced_assembly).
+        Optional<RecipeHolder<HandMadeFillingRecipe>> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, target, HandMadeFillingRecipe.class);
+        if (handSequenced.isPresent()
+                && handSequenced.get().value().getTool() == HandMadeTool.INFUSION_GUN
+                && handSequenced.get().value().getRequiredFluid().test(fluid)) {
+            return handSequenced.get();
+        }
+
         Optional<RecipeHolder<FillingRecipe>> sequenced = SequencedAssemblyRecipe.getRecipe(
                 level, input, AllRecipeTypes.FILLING.getType(), FillingRecipe.class,
                 r -> r.value().matches(input, level) && r.value().getRequiredFluid().test(fluid));
