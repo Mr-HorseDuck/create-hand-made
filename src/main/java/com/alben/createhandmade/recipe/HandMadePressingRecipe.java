@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * 在语义上等价，只是 type 不同。</p>
  */
 public class HandMadePressingRecipe extends StandardProcessingRecipe<RecipeInput>
-        implements HandMadeToolRecipeLike {
+        implements HandMadeAssemblyRecipe {
 
     /** 这条独占配方归属哪个工具；由 {@link HandMadeToolRecipeSerializer} 在 decode 后写入。 */
     @Nullable

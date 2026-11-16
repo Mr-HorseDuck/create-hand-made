@@ -136,5 +136,8 @@
   "create_hand_made.configuration.tools.infusion_gun": "Infusion Gun",
   "create_hand_made.configuration.tools.infusion_gun.tooltip": "Infusion Gun long-press threshold and extraction cadence",
   "create_hand_made.configuration.tools.infusion_gun.long_press_threshold": "Infusion Gun long-press threshold (ticks)",
-  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "Infusion Gun extraction interval (ticks)"
+  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "Infusion Gun extraction interval (ticks)",
+
+  "create_hand_made.recipe.assembly.with_tool": "Craft by hand with: %s",
+  "create_hand_made.recipe.assembly.unknown_tool": "a hand tool"
 }

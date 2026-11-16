@@ -5,6 +5,7 @@ import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.recipe.HandMadeFillingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllParticleTypes;
 import com.simibubi.create.AllRecipeTypes;
@@ -816,6 +817,15 @@ public class InfusionGunItem extends Item {
                 level, input, AllRecipeTypes.FILLING.getType(), FillingRecipe.class,
                 r -> r.value().matches(input, level) && r.value().getRequiredFluid().test(fluid));
         if (sequenced.isPresent()) return sequenced.get();
+
+        // L3 exclusive step: type = create_hand_made:tool_recipe, infusion gun only.
+        Optional<RecipeHolder<HandMadeFillingRecipe>> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, input, HandMadeAssembly.toolRecipeType(), HandMadeFillingRecipe.class,
+                r -> r.value().getRequiredFluid().test(fluid));
+        if (sequencedExclusive.isPresent()
+                && sequencedExclusive.get().value().getTool() == HandMadeTool.INFUSION_GUN) {
+            return sequencedExclusive.get();
+        }
 
         // 候选集改由统一配方池提供；匹配与流体判定留在本类。
         // 这里没有 CAN_BE_AUTOMATED 过滤 —— 改造前就没有，不新增。

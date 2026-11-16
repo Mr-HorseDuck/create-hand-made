@@ -5,6 +5,7 @@ import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadePressingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
@@ -364,6 +365,16 @@ public class PressHammerItem extends Item {
                 SequencedAssemblyRecipe.getRecipe(level, stack,
                         AllRecipeTypes.PRESSING.getType(), PressingRecipe.class);
         if (sequenced.isPresent()) return sequenced.get();
+
+        // L3 exclusive step: type = create_hand_made:tool_recipe, so Create machines
+        // can never run it -- only the press hammer can advance it by hand.
+        Optional<RecipeHolder<HandMadePressingRecipe>> sequencedExclusive =
+                SequencedAssemblyRecipe.getRecipe(level, stack,
+                        HandMadeAssembly.toolRecipeType(), HandMadePressingRecipe.class);
+        if (sequencedExclusive.isPresent()
+                && sequencedExclusive.get().value().getTool() == HandMadeTool.PRESS_HAMMER_DEPOT) {
+            return sequencedExclusive.get();
+        }
 
         // 候选集改由统一配方池提供；matches 与 automation 过滤留在本类。
         // 用 instanceof 取出确切的 PressingRecipe 再调 matches：holder.value() 的

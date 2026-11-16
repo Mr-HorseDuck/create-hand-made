@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>能力上限与 {@code CuttingRecipe} 对齐（见各方法注释）。</p>
  */
 public class HandMadeCuttingRecipe extends StandardProcessingRecipe<RecipeInput>
-        implements HandMadeToolRecipeLike {
+        implements HandMadeAssemblyRecipe {
 
     /** 这条独占配方归属哪个工具；由 {@link HandMadeToolRecipeSerializer} 在 decode 后写入。 */
     @Nullable

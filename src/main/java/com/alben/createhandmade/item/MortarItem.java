@@ -4,9 +4,12 @@ import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.recipe.HandMadeCrushingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.alben.createhandmade.util.CycleSoundWindow;
 import com.alben.createhandmade.util.StickyUseSession;
+import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
+import java.util.Optional;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.item.CustomUseEffectsItem;
@@ -367,6 +370,15 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
         // holder.value() 的静态类型是 Recipe<?>，其 matches 的参数是通配符捕获，
         // 无法直接接受 SingleRecipeInput。instanceof 能拿到确切类型，
         // 因此既不需要 unchecked 强转，也不会在将来类型变化时静默出错。
+        // L3 exclusive step: type = create_hand_made:tool_recipe, mortar only.
+        Optional<RecipeHolder<HandMadeCrushingRecipe>> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, recipeInput.getItem(0), HandMadeAssembly.toolRecipeType(),
+                HandMadeCrushingRecipe.class);
+        if (sequencedExclusive.isPresent()
+                && sequencedExclusive.get().value().getTool() == HandMadeTool.MORTAR) {
+            return sequencedExclusive.get();
+        }
+
         for (RecipeHolder<?> holder : HandMadeRecipePool.getBaseRecipes(HandMadeTool.MORTAR, level)) {
             // L3 独占配方（碾磨家族）：只认归属研钵的那些（碾钵写下的不归研钵）
             if (holder.value() instanceof HandMadeCrushingRecipe exclusive) {

@@ -4,6 +4,7 @@ import com.alben.createhandmade.ServerConfig;
 import com.alben.createhandmade.ModDataComponents;
 import com.alben.createhandmade.recipe.HandMadeCuttingRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.alben.createhandmade.util.CycleSoundWindow;
 import com.alben.createhandmade.util.StickyUseSession;
@@ -459,6 +460,14 @@ public class HandSawItem extends Item {
                 level, input, AllRecipeTypes.CUTTING.getType(), CuttingRecipe.class);
         if (assembly.isPresent()) {
             return List.of(assembly.get());
+        }
+
+        // L3 exclusive step: type = create_hand_made:tool_recipe, hand-saw only.
+        Optional<RecipeHolder<HandMadeCuttingRecipe>> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, input, HandMadeAssembly.toolRecipeType(), HandMadeCuttingRecipe.class);
+        if (sequencedExclusive.isPresent()
+                && sequencedExclusive.get().value().getTool() == HandMadeTool.HAND_SAW) {
+            return List.<RecipeHolder<? extends Recipe<?>>>of(sequencedExclusive.get());
         }
 
         List<RecipeHolder<? extends Recipe<?>>> result = new ArrayList<>();

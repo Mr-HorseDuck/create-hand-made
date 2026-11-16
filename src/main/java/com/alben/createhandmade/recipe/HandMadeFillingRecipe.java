@@ -1,5 +1,7 @@
 package com.alben.createhandmade.recipe;
 
+import java.util.List;
+
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
 import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
 import net.minecraft.world.item.crafting.RecipeInput;
@@ -24,7 +26,18 @@ import org.jetbrains.annotations.Nullable;
  * 的 {@link IllegalStateException} 兜底。</p>
  */
 public class HandMadeFillingRecipe extends StandardProcessingRecipe<RecipeInput>
-        implements HandMadeToolRecipeLike {
+        implements HandMadeAssemblyRecipe {
+
+    /**
+     * 序列组装里把「这一步要注多少流体」交给 JEI 显示。
+     *
+     * <p>与 Create 的 {@code FillingRecipe.addAssemblyFluidIngredients} 等价：
+     * 流体输入不在 {@code ingredients} 里，需要单独登记。</p>
+     */
+    @Override
+    public void addAssemblyFluidIngredients(List<SizedFluidIngredient> list) {
+        list.add(getRequiredFluid());
+    }
 
     /** 这条独占配方归属哪个工具；由 {@link HandMadeToolRecipeSerializer} 在 decode 后写入。 */
     @Nullable

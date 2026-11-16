@@ -137,5 +137,8 @@
   "create_hand_made.configuration.tools.infusion_gun": "灌注枪",
   "create_hand_made.configuration.tools.infusion_gun.tooltip": "灌注枪的长按门槛与抽取节奏",
   "create_hand_made.configuration.tools.infusion_gun.long_press_threshold": "灌注枪长按门槛（tick）",
-  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "灌注枪抽取间隔（tick）"
+  "create_hand_made.configuration.tools.infusion_gun.extract_interval_ticks": "灌注枪抽取间隔（tick）",
+
+  "create_hand_made.recipe.assembly.with_tool": "用手搓工具手搓：%s",
+  "create_hand_made.recipe.assembly.unknown_tool": "手工工具"
 }

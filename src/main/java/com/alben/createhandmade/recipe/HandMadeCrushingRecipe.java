@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * {@code StandardProcessingRecipe<RecipeInput>}，所以 serializer 以它为返回类型，
  * 并通过 {@link HandMadeToolRecipeLike} 读写 {@code tool} 归属。</p>
  */
-public class HandMadeCrushingRecipe extends AbstractCrushingRecipe implements HandMadeToolRecipeLike {
+public class HandMadeCrushingRecipe extends AbstractCrushingRecipe implements HandMadeAssemblyRecipe {
 
     /**
      * 上限取「研磨 4」与「粉碎 7」的并集。

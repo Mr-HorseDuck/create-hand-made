@@ -1,7 +1,10 @@
 package com.alben.createhandmade.recipe;
 
+import java.util.List;
+
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeParams;
 import com.simibubi.create.content.processing.recipe.StandardProcessingRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -30,7 +33,20 @@ import org.jetbrains.annotations.Nullable;
  * </ul>
  */
 public class HandMadeApplicationRecipe extends StandardProcessingRecipe<RecipeInput>
-        implements HandMadeToolRecipeLike {
+        implements HandMadeAssemblyRecipe {
+
+    /**
+     * 序列组装里用来告诉 JEI「这一步还要准备手里那件物品」。
+     *
+     * <p>与 Create 的 {@code DeployerApplicationRecipe.addAssemblyIngredients} 一致：第 0 槽已被
+     * Create 换成过渡物品，真正需要额外准备的是第 1 槽（手持物品 / 试剂）。</p>
+     */
+    @Override
+    public void addAssemblyIngredients(List<Ingredient> list) {
+        if (ingredients.size() > 1) {
+            list.add(ingredients.get(1));
+        }
+    }
 
     /** 这条独占配方归属哪个工具；由 {@link HandMadeToolRecipeSerializer} 在 decode 后写入。 */
     @Nullable

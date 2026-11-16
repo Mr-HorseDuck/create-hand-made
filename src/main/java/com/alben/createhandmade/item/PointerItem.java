@@ -5,6 +5,7 @@ import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.PressParticlesPacket.ParticleStyle;
 import com.alben.createhandmade.recipe.HandMadeApplicationRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeTool;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -299,6 +300,14 @@ public class PointerItem extends Item {
                 SequencedAssemblyRecipe.getRecipe(level, wrapper,
                         AllRecipeTypes.DEPLOYING.getType(), DeployerApplicationRecipe.class);
         if (sequenced.isPresent()) return sequenced.get();
+
+        // L3 exclusive step: type = create_hand_made:tool_recipe, pointer only.
+        Optional<RecipeHolder<HandMadeApplicationRecipe>> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, wrapper, HandMadeAssembly.toolRecipeType(), HandMadeApplicationRecipe.class);
+        if (sequencedExclusive.isPresent()
+                && sequencedExclusive.get().value().getTool() == HandMadeTool.POINTER) {
+            return sequencedExclusive.get();
+        }
 
         // 候选集改由统一配方池提供。
         //
