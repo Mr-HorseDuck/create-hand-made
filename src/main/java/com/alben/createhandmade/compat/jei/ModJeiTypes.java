@@ -1,6 +1,7 @@
 package com.alben.createhandmade.compat.jei;
 
 import com.alben.createhandmade.recipe.HandMadeBellowsRecipe;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.simibubi.create.compat.jei.category.BlockCuttingCategory.CondensedBlockCuttingRecipe;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
@@ -132,4 +133,19 @@ public class ModJeiTypes {
     public static final RecipeType<RecipeHolder<HandMadeBellowsRecipe>> BELLOWS_EXCLUSIVE =
             RecipeType.createRecipeHolderType(
                     ResourceLocation.fromNamespaceAndPath("create_hand_made", "bellows_exclusive"));
+
+    /**
+     * 手搓流水线（{@code create_hand_made:hand_sequenced_assembly}）。
+     *
+     * <p>泛型直接绑 {@link HandMadeSequencedAssemblyRecipe}：它继承 Create 的
+     * {@code SequencedAssemblyRecipe}，本身就能提供起始原料、步骤序列与结果池，
+     * 不需要像压床/注液那样做显示代理。</p>
+     *
+     * <p><b>为什么是独立类别而不是复用 Create 的序列组装类别</b>：JEI 的
+     * {@code RecipeType} 在注册期固定，一个类别只能收一种 type；且 Create 的类别绑定了
+     * 压床/注液器/机械锯/部署器的动画子类别，对纯手搓步骤没有意义。</p>
+     */
+    public static final RecipeType<RecipeHolder<HandMadeSequencedAssemblyRecipe>> HAND_SEQUENCED_ASSEMBLY =
+            RecipeType.createRecipeHolderType(
+                    ResourceLocation.fromNamespaceAndPath("create_hand_made", "hand_sequenced_assembly"));
 }

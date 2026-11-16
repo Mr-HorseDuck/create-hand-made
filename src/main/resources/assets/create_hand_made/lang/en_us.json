@@ -92,6 +92,7 @@
   "jei.create_hand_made.bellows_splashing": "Bellows Splashing",
   "jei.create_hand_made.bellows_exclusive": "Bellows: Third-Party Compat",
   "jei.create_hand_made.bellows_exclusive.type": "Type: %s",
+  "jei.create_hand_made.hand_sequenced_assembly": "Handcrafted Assembly",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "Enable Tree Felling",

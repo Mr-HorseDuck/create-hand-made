@@ -512,6 +512,110 @@ ServerEvents.recipes(event => {
 
 ---
 
+---
+
+## 纯手搓序列组装（`create_hand_made:hand_sequenced_assembly`）
+
+**一句话**：一条只有手搓工具能推进的多步流水线 —— 原版机器连读都读不到。
+
+### 和「原版混合流水线」的区别
+
+| | `create_hand_made:hand_sequenced_assembly`（本节） | `create:sequenced_assembly` + L3 步骤 |
+|---|---|---|
+| 谁能查到 | 只有本模组的 6 个手搓工具 | Create 机器（只看得到 Create 自己的步骤）+ 手搓工具（看得到 L3 步骤） |
+| 步骤必须是什么 | **只能是** `create_hand_made:tool_recipe` | Create 步骤与 L3 步骤可以混用 |
+| 机器会不会干扰 | 完全不会（桶不同 + 类不同） | 不会（机器读不到 L3 那一环） |
+| JEI | 独立类别「手搓流水线 / Handcrafted Assembly」 | 显示在 Create 的序列组装类别里 |
+| 适用场景 | 纯手工流水线 | 机器 + 手工混合流水线 |
+
+### JSON 结构
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `ingredient` | ✅ | 起始原料（Ingredient） |
+| `transitional_item` | ✅ | 过渡物品（`{"id": ...}`），流程中的物品就是它，进度存在物品组件里 |
+| `sequence` | ✅ | 步骤数组，每一步都是一条 `create_hand_made:tool_recipe` 配方 |
+| `results` | ✅ | 最终产物池（支持 `chance`） |
+| `loops` | ❌ | 整条序列重复几圈，默认 1 |
+
+示例：
+
+```json
+{
+  "type": "create_hand_made:hand_sequenced_assembly",
+  "ingredient": { "item": "minecraft:iron_ingot" },
+  "transitional_item": { "id": "minecraft:paper" },
+  "results": [ { "id": "minecraft:iron_block" } ],
+  "loops": 2,
+  "sequence": [
+    {
+      "type": "create_hand_made:tool_recipe",
+      "tool": "press_hammer_depot",
+      "ingredients": [ { "item": "minecraft:iron_ingot" } ],
+      "results": [ { "id": "minecraft:iron_nugget" } ]
+    }
+  ]
+}
+```
+
+字段名与 `create:sequenced_assembly` **完全一致**，把 `type` 改掉即可迁移。
+
+### 步骤的要求
+
+- 只能写 `create_hand_made:tool_recipe`（L3 独占配方）。`tool` 必须是合法工具 id；
+  实际可用的有 6 个：`press_hammer_depot` / `hand_saw` / `infusion_gun` / `pointer` / `mortar` / `crusher_mortar`。
+  另外两个（`press_hammer_basin` / `stirring_staff`）属于工作盆家族，**流水线没有工作盆环节**，
+  写了也不会有任何工具能推进。
+- 写机器步骤（例如 `create:pressing`）会在**加载期**打一条明确的 WARN：
+  `step 'PressingRecipe' is NOT a hand-crafted step; this recipe will never advance.`，
+  配方仍会加载，但永远不会前进 —— 发现这种情况请改用 `create:sequenced_assembly`。
+
+### 玩家怎么推进
+
+| 家族 | 玩家怎么完成这一步 |
+|---|---|
+| 冲压（`press_hammer_depot`） | 冲压锤长按**置物台 / 传送带**上的过渡物品 |
+| 切削（`hand_saw`） | 手锯，过渡物品放**副手**，长按右键 |
+| 注液（`infusion_gun`） | 灌注枪先装好流体，短右键置物台 / 传送带上的过渡物品 |
+| 应用（`pointer`） | 指杆，过渡物品在置物台 / 传送带，**副手**放试剂 |
+| 碾磨（`mortar` / `crusher_mortar`） | 研钵 / 碾钵，过渡物品放**副手**，右键 |
+
+每完成一步，物品会变成「带新进度的过渡物品」；走满 `sequence.size() × loops` 步后产出 `results`。
+把过渡物品拿在手里时，Create 注册的进度 tooltip 会显示「第 N / M 步 + 接下来几步要做什么」。
+
+### KubeJS 写法
+
+KubeJS 侧的 `event.recipes.create_hand_made.*` schema 暂未提供：`sequence` 里的步骤需要 KubeJS 能解析
+`tool_recipe`，而一旦给它注册 schema，KubeJS 会用自己的 codec 重新序列化**所有**现有 L3 配方，
+并丢掉 `ProcessingOutput.chance`（带概率的产物会被静默改写）。因此请直接用原始 JSON：
+
+```js
+ServerEvents.recipes(event => {
+  event.custom({
+    type: 'create_hand_made:hand_sequenced_assembly',
+    ingredient: { item: 'minecraft:iron_ingot' },
+    transitional_item: { id: 'minecraft:paper' },
+    results: [{ id: 'minecraft:iron_block' }],
+    loops: 2,
+    sequence: [{
+      type: 'create_hand_made:tool_recipe',
+      tool: 'press_hammer_depot',
+      ingredients: [{ item: 'minecraft:iron_ingot' }],
+      results: [{ id: 'minecraft:iron_nugget' }]
+    }]
+  })
+})
+```
+
+### 常见问题
+
+- **为什么机器完全不推进？** 这个类型注册在 `create_hand_made:hand_sequenced_assembly` 桶里，
+  Create 的机器只 `getRecipesFor(create:sequenced_assembly)`，结构上读不到。
+- **进度到一半改了配方 id 会怎样？** 过渡物品里存的是**配方 id**。删掉或改了 id，
+  这个物品就找不到对应流水线，工具不会推进它（建议改 id 时保留旧配方，或用新物品）。
+- **能不能和原版序列组装混用？** 不能混在同一条配方里：一条配方只有一个 `type`。
+  需要机器步骤就用 `create:sequenced_assembly`，需要纯手工就用本节这个类型。
+
 ## 工具 ID 清单
 
 `tool_id` 就是 `HandMadeTool` 枚举常量名的小写下划线形式（`PRESS_HAMMER_BASIN` → `press_hammer_basin`）。用于 L2 的文件名/参数，以及 L3 的 `tool` 字段。

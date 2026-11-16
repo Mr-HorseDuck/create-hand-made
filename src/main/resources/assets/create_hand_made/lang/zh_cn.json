@@ -93,6 +93,7 @@
   "jei.create_hand_made.bellows_splashing": "风箱洗涤",
   "jei.create_hand_made.bellows_exclusive": "风箱 · 第三方兼容",
   "jei.create_hand_made.bellows_exclusive.type": "类型: %s",
+  "jei.create_hand_made.hand_sequenced_assembly": "手搓流水线",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
   "create_hand_made.configuration.enable_tree_felling": "启用连锁砍树",

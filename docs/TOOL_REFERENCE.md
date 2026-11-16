@@ -127,3 +127,45 @@
 - 工具物品：**8 个**（`HandMadeTool` 枚举有 **12** 个常量：冲压锤 3 + 研钵/碾钵 2 + 手锯 2 + 搅拌杖 3 + 指杆 1 + 灌注枪 1，因为部分工具有多个"配方场景"）。
 - L3 支持面：`tool_recipe` 覆盖 **8 个 id / 7 个工具**（`press_hammer_basin` 与 `press_hammer_depot` 是**同一个物品**冲压锤的两个使用场景；家族分派见 `HandMadeToolRecipeSerializer.java:108-118`）；此外**风箱**走独立的 `create_hand_made:bellows_recipe`（第 8 个工具，运行时已接通），**手锯切石**走独立的 `create_hand_made:stonecutting_recipe`。
 - 本表只描述"配方读取"；工具的战斗 / 工具属性（攻击力、挖掘速度、交互距离）见 `ModItems.java`，不在本表范围。
+---
+
+## 附：手搓专属序列组装（`hand_sequenced_assembly`）的底层机制
+
+> 用法见 [`RECIPE_API.md`](RECIPE_API.md) 的「纯手搓序列组装（L3 独占）」一节；
+> 这里只记录工具侧与实现侧的关键点，避免以后改代码时踩回去。
+
+### 工具侧的查询顺序（6 个工具统一）
+
+1. `HandMadeSequencedAssemblyRecipe.getStepRecipe(level, item, <家族类>)` —— 手搓专属类型
+   `create_hand_made:hand_sequenced_assembly`；
+2. `SequencedAssemblyRecipe.getRecipe(level, item, AllRecipeTypes.X.getType(), XRecipe.class)` ——
+   原版 `create:sequenced_assembly` 里的 L3 步骤；
+3. `HandMadeRecipePool.getBaseRecipes(tool, level)` —— 普通配方池（L1 + L3）。
+
+命中 1 或 2 后，Create 的 `enforceNextResult` 会把「前进后的过渡物品」强制设为第 0 个产物，
+所以工具只需照常 `rollResults(...)`，进度自动前进 —— 这是「只加查询、不改产物逻辑」的原因。
+
+### 为什么机器读不到
+
+- Create 的 4 处机器查询（部署器 `DeployerBlockEntity:577`、压床
+  `MechanicalPressBlockEntity:182`、机械锯 `SawBlockEntity:389`、注液器 `FillingBySpout:27,40`）
+  全部硬编码 `AllRecipeTypes.SEQUENCED_ASSEMBLY.getType()` + 自己的配方类；
+- 命中前还有两道判定：`recipe.getType() == 机器 type` 且 `机器配方类.isInstance(recipe)`。
+  我们的类型与配方类都不满足。
+
+### 过渡物品
+
+复用 Create 的 DataComponent `AllDataComponents.SEQUENCED_ASSEMBLY`
+（record `SequencedAssembly(id, step, progress)`，**不是 NBT**），因此：
+
+- 进度 tooltip、`/data get`、存档兼容全部免费；
+- 机器依然拿不到：`appliesTo(id, item)` 要求「组件里的 id == 该配方 id」，我们的 id 不在那个桶里。
+
+### 易踩点
+
+- **不要在校验失败时 `throw`**：配方解码在数据包加载的原子阶段，抛异常会让整个
+  `RecipeManager` 失败（实测专用服务器直接起不来）。当前实现降级为一行 WARN。
+- **步骤只能写 `tool_recipe`**：写机器步骤（`create:pressing` 等）会 WARN 且永不推进；
+  需要机器步骤请用 `create:sequenced_assembly`。
+- **工作盆家族不能做步骤**：`press_hammer_basin` / `stirring_staff` 没有对应的流水线介质。
+
