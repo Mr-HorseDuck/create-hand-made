@@ -1,0 +1,13 @@
+{
+  "name": "bookinformation",
+  "icon": "minecraft:paper",
+  "category": "create_hand_made:other",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "bookinformation",
+      "text": "Last revised: 26-11-16$(br)Version: V2$(br)Revised by: $(l:https://github.com/Colin1456/)Colin_101$()$(br)Based on the Patchouli$(br)Everyone can try my project awa, it allows visual editing of the handbook$(br)$(l:https://github.com/Colin1456/Patchouli-Helper)Patchouli-Helper"
+    }
+  ]
+}

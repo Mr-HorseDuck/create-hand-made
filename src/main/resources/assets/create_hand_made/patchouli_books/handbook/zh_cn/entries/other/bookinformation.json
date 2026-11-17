@@ -1,0 +1,13 @@
+{
+  "name": "书籍信息",
+  "icon": "minecraft:paper",
+  "category": "create_hand_made:other",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "书籍信息",
+      "text": "最后修订:26-11-16$(br)版本:V2$(br)修订者:$(l:https://github.com/Colin1456/)Colin_101$()$(br)基于帕秋莉手册$(br)大家可以去试试我的项目哦awa可以可视化编辑手册$(l:https://github.com/Colin1456/Patchouli-Helper)Patchouli-Helper"
+    }
+  ]
+}
