@@ -19,6 +19,7 @@
   - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
   - 也可以合成：**`1× 书` + `1× 冲压锤`**（无序合成，**冲压锤不消耗**，耐久/附魔原样退回）。配方类型是 `create_hand_made:handbook_craft`（继承原版无序配方，只覆写"剩余物"这一环），外层包 `forge:conditional` + `forge:mod_loaded`，没装 Patchouli 时不加载、也不报错。
+  - 还可以**砸出来**：把 `书` 放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**（三者互斥，一次只出一种；批量附魔时每份独立摇）。工作盆不参与。需要装 Patchouli，否则手册物品不存在、这条彩蛋自动失效。
 
 ### 修复
 
