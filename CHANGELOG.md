@@ -18,8 +18,7 @@
 - **首次进游戏自动送一本**：新玩家第一次进入世界时自动获得手册，每名玩家只送一次（记在玩家数据里，换存档不会重复）。
   - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
-  - 也可以合成：**`1× 书` + `1× 冲压锤`**（无序合成，**冲压锤不消耗**，耐久/附魔原样退回）。配方类型是 `create_hand_made:handbook_craft`（继承原版无序配方，只覆写"剩余物"这一环），外层包 `forge:conditional` + `forge:mod_loaded`，没装 Patchouli 时不加载、也不报错。
-  - 还可以**砸出来**：把 `书` 放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**（三者互斥，一次只出一种；批量附魔时每份独立摇）。工作盆不参与。需要装 Patchouli，否则手册物品不存在、这条彩蛋自动失效。
+  - 也可以**砸出来**：把 `书` 放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**（三者互斥，一次只出一种；批量附魔时每份独立摇）。工作盆不参与。需要装 Patchouli，否则手册物品不存在、这条彩蛋自动失效。
 
 ### 修复
 
@@ -34,7 +33,7 @@
 ### 内部
 
 - 手册完全**数据驱动**，没有引入 Patchouli 编译依赖：内容在 `assets/create_hand_made/patchouli_books/handbook/`，`book.json` 在 `data/create_hand_made/patchouli_books/handbook/`（1.20+ 要求 `use_resource_pack: true`，`book.json` 仍留在 `data/`）。
-- 送书与合成结果都用 `patchouli:guide_book` + NBT `patchouli:book`。已核对 Patchouli 1.20.1 源码（`ItemModBook` 只有无参构造、`BookRegistry` 不按书注册物品）：所有书**共用一个通用物品**，并不存在 `create_hand_made:handbook` 这个独立物品。
+- 送书与砸书结果都用 `patchouli:guide_book` + NBT `patchouli:book`。已核对 Patchouli 1.20.1 源码（`ItemModBook` 只有无参构造、`BookRegistry` 不按书注册物品）：所有书**共用一个通用物品**，并不存在 `create_hand_made:handbook` 这个独立物品。
 
 ### 升级注意
 
