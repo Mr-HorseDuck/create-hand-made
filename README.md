@@ -29,6 +29,18 @@
 | **风箱** | 用副手介质施加鼓风加工（熔炼 / 烟熏 / 缠魂 / 洗涤） |
 | **手锯** | 切削、砍树、剥皮、刮铜 |
 
+## 手工组装（手搓流水线）
+
+8 个工具还能被串成一条**只有手搓能推进**的多步流水线：
+
+- 配方类型 `create_hand_made:hand_sequenced_assembly` —— **原版机器完全读不到**（Create 的机器只查
+  `create:sequenced_assembly`），只有对应的手搓工具能一步步推进过渡物品；
+- 字段与 `create:sequenced_assembly` **完全一致**（`ingredient` / `transitional_item` / `sequence` /
+  `results` / `loops`），步骤写本模组的 `create_hand_made:tool_recipe`，改个 `type` 就能从原版格式迁移；
+- JEI 有独立类别 **「手工组装」**：步骤块居中、超过 6 步显示 `+N`（悬停列出被折叠的步骤）、
+  带概率的产物显示归一化百分比；
+- 想「机器 + 手搓」混合？把 L3 步骤直接写进原版 `create:sequenced_assembly` 就行。
+
 ## 风箱媒介（第三方）
 - 会主动搜索媒介并注册，并通过json兜底 所以几乎兼容都有模组的媒介
 - 目前已知支持 龙+ 更多触媒 创意传动 梦想与欲望（仅1.21）
@@ -59,17 +71,20 @@
 
 - **L2 · 过滤层** ——单独禁用某工具的某条 Create 配方
 - **L3 · 独占层** ——添加只有手搓工具能读的配方
+- **L3 · 容器型** ——用 `create_hand_made:hand_sequenced_assembly` 把多条手搓配方串成一条流水线
 
 | 文档 | 内容 |
 |---|---|
-| [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 完整写法、数据包 + KubeJS 示例、字段矩阵 |
+| [配方 API 参考](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 完整写法、手搓流水线（序列组装）、数据包 + KubeJS 示例、字段矩阵 |
 | [工具速查表](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | 每个工具的配方来源、L2/L3 支持、禁用连带、匹配顺序 |
 
 支持**数据包**和 **KubeJS** 两种方式。
 
 ## 未来展望
 
-- 暂无
+- **KubeJS 语法糖**（`event.recipes.create_hand_made.*`）—— 需要先补两个组件：混合「物品/流体」原料、以及能表达产物概率的类型
+- **JEI 标注无执行器的步骤**（工作盆 / 机器步骤目前只有服务器日志告警）
+- **车万女仆兼容**（见 1.20.1 分支的实现）
 
 
 ## 构建（开发者）

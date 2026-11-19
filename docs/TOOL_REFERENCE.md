@@ -50,6 +50,10 @@
 `L2 可过滤` 的判断依据：该场景的候选集是否来自 `HandMadeRecipePool.getBaseRecipes(...)`（池的最后一步是 `HandMadeRecipeFilters.isDisabled`，`HandMadeRecipePool.java:111`）。
 `L3 可独占` 的判断依据：是否有对应的 L3 配方类 —— `tool_recipe` 看家族分派表（`HandMadeToolRecipeSerializer.java:108-118`）；**风箱走独立的 `create_hand_made:bellows_recipe`（`HandMadeBellowsRecipe`），不在这张分派表里**。
 
+> 下表之外还有一条**优先级最高的来源**：6 个手搓工具会先查 `create_hand_made:hand_sequenced_assembly`
+> （手搓专属流水线的当前步骤），命中就直接推进，不落到下面任何一行。它不进配方池、不受 L2 过滤，
+> 详见 `RECIPE_API.md` 的「纯手搓序列组装」一节与文末附录。
+
 | 工具 | 使用场景 | 配方来源 | L2 可过滤 | L3 可独占 | 备注 |
 | --- | --- | --- | --- | --- | --- |
 | 冲压锤 | 工作盆 | `create:compacting` | ✅ | ✅ basin 家族（`HandMadeToolRecipe`） | 与压床同源：`BasinRecipe.match` + `BasinRecipe.apply`（`PressHammerItem.java:319-320`），**含热量校验** |
@@ -129,43 +133,18 @@
 - 本表只描述"配方读取"；工具的战斗 / 工具属性（攻击力、挖掘速度、交互距离）见 `ModItems.java`，不在本表范围。
 ---
 
-## 附：手搓专属序列组装（`hand_sequenced_assembly`）的底层机制
+## 附：手搓专属序列组装（`hand_sequenced_assembly`）实现要点
 
-> 用法见 [`RECIPE_API.md`](RECIPE_API.md) 的「纯手搓序列组装（L3 独占）」一节；
-> 这里只记录工具侧与实现侧的关键点，避免以后改代码时踩回去。
-
-### 工具侧的查询顺序（6 个工具统一）
-
-1. `HandMadeSequencedAssemblyRecipe.getStepRecipe(level, item, <家族类>)` —— 手搓专属类型
-   `create_hand_made:hand_sequenced_assembly`；
-2. `SequencedAssemblyRecipe.getRecipe(level, item, AllRecipeTypes.X.getType(), XRecipe.class)` ——
-   原版 `create:sequenced_assembly` 里的 L3 步骤；
-3. `HandMadeRecipePool.getBaseRecipes(tool, level)` —— 普通配方池（L1 + L3）。
-
-命中 1 或 2 后，Create 的 `enforceNextResult` 会把「前进后的过渡物品」强制设为第 0 个产物，
-所以工具只需照常 `rollResults(...)`，进度自动前进 —— 这是「只加查询、不改产物逻辑」的原因。
-
-### 为什么机器读不到
-
-- Create 的 4 处机器查询（部署器 `DeployerBlockEntity:577`、压床
-  `MechanicalPressBlockEntity:182`、机械锯 `SawBlockEntity:389`、注液器 `FillingBySpout:27,40`）
-  全部硬编码 `AllRecipeTypes.SEQUENCED_ASSEMBLY.getType()` + 自己的配方类；
-- 命中前还有两道判定：`recipe.getType() == 机器 type` 且 `机器配方类.isInstance(recipe)`。
-  我们的类型与配方类都不满足。
-
-### 过渡物品
-
-复用 Create 的 DataComponent `AllDataComponents.SEQUENCED_ASSEMBLY`
-（record `SequencedAssembly(id, step, progress)`，**不是 NBT**），因此：
-
-- 进度 tooltip、`/data get`、存档兼容全部免费；
-- 机器依然拿不到：`appliesTo(id, item)` 要求「组件里的 id == 该配方 id」，我们的 id 不在那个桶里。
-
-### 易踩点
-
-- **不要在校验失败时 `throw`**：配方解码在数据包加载的原子阶段，抛异常会让整个
-  `RecipeManager` 失败（实测专用服务器直接起不来）。当前实现降级为一行 WARN。
-- **步骤只能写 `tool_recipe`**：写机器步骤（`create:pressing` 等）会 WARN 且永不推进；
-  需要机器步骤请用 `create:sequenced_assembly`。
-- **工作盆家族不能做步骤**：`press_hammer_basin` / `stirring_staff` 没有对应的流水线介质。
+- **工具查询顺序**：我们的类型 → 原版 `create:sequenced_assembly` 里的 L3 步骤 → 普通配方池。
+  命中前两者后，Create 的 `enforceNextResult` 会把第 0 个产物换成「前进后的过渡物品」，
+  所以工具只需照常 `rollResults(...)`。
+- **机器读不到**：4 处机器查询硬编码 `create:sequenced_assembly` + 自己的配方类，
+  命中前还要 `getType()` 相等与 `isInstance` 双重判定。
+- **过渡物品**：复用 `AllDataComponents.SEQUENCED_ASSEMBLY`（record `id/step/progress`，不是 NBT），
+  进度 tooltip 因此免费；机器仍然拿不到（按 id 过滤）。
+- **校验别 `throw`**：配方解码在数据包加载的原子阶段，抛异常会让整个 `RecipeManager` 失败
+  （实测专用服务器起不来）；当前降级为一行 WARN。
+- **工作盆家族不能做步骤**：`press_hammer_basin` / `stirring_staff` 会 WARN
+  （`basin family ... has NO executor`）。工作盆的热量校验本身是生效的 ——
+  工具直接调 `BasinRecipe.match/apply`，里面就是 `getRequiredHeat().testBlazeBurner(...)`。
 

@@ -26,6 +26,20 @@ An addon for [Create](https://www.curseforge.com/minecraft/mc-mods/create) that 
 | **Bellows** | Apply fan processing via an offhand medium (blasting / smoking / haunting / splashing) |
 | **Hand Saw** | Cutting, tree felling, stripping, scraping |
 
+## Handcrafted Assembly (hand-only production line)
+
+The eight tools can also be chained into a multi-step line **only hand tools can advance**:
+
+- Recipe type `create_hand_made:hand_sequenced_assembly` — **Create's machines cannot see it at all**
+  (they only query `create:sequenced_assembly`); only the matching hand tool advances the
+  transitional item step by step;
+- Field-for-field identical to `create:sequenced_assembly` (`ingredient` / `transitional_item` /
+  `sequence` / `results` / `loops`); steps are `create_hand_made:tool_recipe` entries, so migrating
+  from the vanilla format is just a `type` change;
+- Its own JEI category **"Handcrafted Assembly"**: centered step row, `+N` when a line has more than
+  6 steps (hover to list the folded ones), and normalized chance percentages for probabilistic results;
+- Want machines **and** hands mixed? Drop L3 steps straight into vanilla `create:sequenced_assembly`.
+
 ## Dependencies
 
 | Dependency | Version | Type |
@@ -50,17 +64,22 @@ This mod provides a three-layer recipe API, letting you modify what hand tools c
 
 - **L2 · Filtering** — disable a specific Create recipe for one tool only
 - **L3 · Exclusive recipes** — add recipes only hand tools can read
+- **L3 · Container recipes** — chain several hand recipes into one production line with
+  `create_hand_made:hand_sequenced_assembly`
 
 | Document | Contents |
 |---|---|
-| [Recipe API reference](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 syntax, datapack + KubeJS examples, field matrix |
+| [Recipe API reference](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/RECIPE_API.md) | L1/L2/L3 syntax, handcrafted assembly (sequenced), datapack + KubeJS examples, field matrix |
 | [Tool reference](https://github.com/Mr-HorseDuck/create-hand-made/blob/main/docs/TOOL_REFERENCE.md) | Recipe sources per tool, L2/L3 support, disable side effects, match order |
 
 Both **datapack** and **KubeJS** are supported.
 
 ## Roadmap
 
-- Possible compatibility with Touhou Little Maid
+- **KubeJS sugar** (`event.recipes.create_hand_made.*`) — needs two missing KubeJS components first:
+  mixed item/fluid ingredients, and a chance-aware output type
+- **JEI markers for steps without an executor** (basin / machine steps currently only warn in the log)
+- **Touhou Little Maid compatibility** (see the 1.20.1 branch implementation)
 
 ## Building (Developers)
 
