@@ -1,0 +1,40 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "patchouli"
+        }
+      ],
+      "recipe": {
+        "type": "create_hand_made:tool_recipe",
+        "tool": "press_hammer_depot",
+        "ingredients": [
+          {
+            "item": "minecraft:book"
+          }
+        ],
+        "results": [
+          {
+            "item": "patchouli:guide_book",
+            "nbt": {
+              "patchouli:book": "create_hand_made:handbook"
+            },
+            "chance": 0.9
+          },
+          {
+            "item": "minecraft:leather",
+            "chance": 0.05
+          },
+          {
+            "item": "minecraft:paper",
+            "chance": 0.05
+          }
+        ],
+        "exclusive_chance": true
+      }
+    }
+  ]
+}

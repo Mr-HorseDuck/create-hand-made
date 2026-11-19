@@ -113,7 +113,7 @@ HandMadeEvents.toolFilter(event => {
   "results": [
     { "item": "create:crushed_raw_iron", "count": 1 }
   ],
-  "processing_time": 100
+  "processingTime": 100
 }
 ```
 
@@ -130,7 +130,32 @@ HandMadeEvents.toolFilter(event => {
 | `press_hammer_basin` | `BasinRecipe` | `HandMadeRecipes.Tool` | 整盆匹配 |
 | `stirring_staff` | `BasinRecipe` | `HandMadeRecipes.Tool` | 整盆匹配 |
 
-其余字段沿用 Create 的 `ProcessingRecipe` 序列化格式（`ingredients` / `results` / `processing_time` / `heat_requirement` / `fluidIngredients` / `fluidResults`）。
+其余字段沿用 Create 的 `ProcessingRecipe` 序列化格式（`ingredients` / `results` / `processingTime` / `heatRequirement` / `fluidIngredients` / `fluidResults`）。
+
+> ⚠️ 注意是 **camelCase**：Create 的 `ProcessingRecipeSerializer` 只读 `processingTime` / `heatRequirement`，写成 `processing_time` 会被静默忽略（时长退回默认 100 tick）。
+
+**`exclusive_chance`（布尔，可选，默认 `false`）** —— 把 `results` 当"互斥权重表"而不是 Create 默认的"每条独立摇"：
+
+```json
+{
+  "type": "create_hand_made:tool_recipe",
+  "tool": "press_hammer_depot",
+  "ingredients": [{ "item": "minecraft:book" }],
+  "results": [
+    { "item": "patchouli:guide_book",
+      "nbt": { "patchouli:book": "create_hand_made:handbook" }, "chance": 0.9 },
+    { "item": "minecraft:leather", "chance": 0.05 },
+    { "item": "minecraft:paper",   "chance": 0.05 }
+  ],
+  "exclusive_chance": true
+}
+```
+
+- 默认（`false`）= 原版语义：每个产物各自按 `chance` 摇一次，**可能同时出好几个**；
+- 打开后一次只摇出**一个**：把各条 `chance` 当权重累加，摇一次落在哪段就出哪个；
+- 权重总和 < 1 时，剩下那段表示"什么都没摇到"（料照扣，与概率配方摇空一致）；
+- 目前**只有 `press_hammer_depot` 家族支持**（`HandMadeRecipes.Pressing`），别的 `tool` 写了只会打一条 warning 并被忽略。
+- 模组自带的例子：[`handbook_press.json`](../src/main/resources/data/create_hand_made/recipes/handbook_press.json)（砸书 → 90% 手册 / 5% 皮革 / 5% 纸，外层包 `forge:conditional` 只在装了 Patchouli 时加载）。想关掉它，用 L2 过滤或 KubeJS 禁用即可。
 
 **为什么注液必须校验流体输入**：Create 的 `validate()` 只检查上限、不检查下限，没有流体输入的灌注配方能加载成功，然后在工具侧 `getRequiredFluid()` 抛 `IllegalStateException` 运行时崩。这里在**加载期**就拒绝。
 
@@ -166,7 +191,7 @@ HandMadeEvents.toolFilter(event => {
 
 - `fan_type` 必须是**带命名空间的完整 id**（`create:blasting`、`create:smoking`、`create:splashing`、`create:haunting`，或任何第三方注册进 `CreateBuiltInRegistries.FAN_PROCESSING_TYPE` 的类型）。
 - 旧短名（`blasting`）已不再接受，会抛 `Invalid fan_type ... Must be a full resource location`。
-- 输入上限 1、输出上限 12，不能指定 `processing_time`（风箱按次结算）。
+- 输入上限 1、输出上限 12，不能指定 `processingTime`（风箱按次结算）。
 - 同一物品同时命中 L3 与 Create 原生鼓风配方时，**L3 优先**（`BellowsItem.findL3Results` 先查 L3，未命中回落到 `FanProcessingType.canProcess`）。
 
 ### 3.4 `bellows_media/*.json`（副手介质 → 鼓风类型）

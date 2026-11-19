@@ -17,7 +17,7 @@
     {
       "type": "patchouli:text",
       "title": "Tips",
-      "text": "$(li)It reads Create's pressing recipes, so disabling a Create recipe also disables it here.$(li)Use a $(l)filter$() in the offhand to control outputs.$(li)Critical strikes only apply to the target you charged at, once.$(li)Pound a $(l)book$() on a Depot or belt: 90% it becomes this handbook, and 5% each it is ruined into leather or paper."
+      "text": "$(li)It reads Create's pressing recipes, so disabling a Create recipe also disables it here.$(li)Use a $(l)filter$() in the offhand to control outputs.$(li)Critical strikes only apply to the target you charged at, once.$(li)Pound a $(l)book$() on a Depot or belt: 90% it becomes this handbook, and 5% each it is ruined into leather or paper.$(br2)$(italic)That is a datapack recipe too — packs can retune or disable it.$()"
     }
   ]
 }

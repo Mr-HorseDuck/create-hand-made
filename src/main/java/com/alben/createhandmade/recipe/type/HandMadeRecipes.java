@@ -3,6 +3,7 @@ package com.alben.createhandmade.recipe.type;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
+import com.google.gson.JsonObject;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
@@ -11,8 +12,11 @@ import com.simibubi.create.content.kinetics.press.PressingRecipe;
 import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.processing.basin.BasinRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
+import com.simibubi.create.content.processing.recipe.ProcessingOutput;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeBuilder.ProcessingRecipeParams;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.GsonHelper;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -23,7 +27,9 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.items.wrapper.RecipeWrapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 本模组 L3 独占配方的全部实现类 + {@code fan_type} 枚举，都放在这一个文件里。
@@ -258,8 +264,69 @@ public final class HandMadeRecipes {
         @Nullable
         private ToolType tool;
 
+        /**
+         * 是否把 {@code results} 当作「互斥权重表」而不是 Create 默认的「每条独立摇」。
+         *
+         * <p>默认 {@code false} = 原版语义：每个产物各自按 chance 摇一次，可能同时出好几个。
+         * 置 true 后一次只摇出<b>一个</b>：把每条 chance 当权重累加，摇一次落在哪段就出哪个；
+         * 权重总和小于 1 时，剩下那段表示「什么也不出」（料照扣，和概率配方摇空一致）。</p>
+         *
+         * <p>由 JSON 的可选字段 {@code exclusive_chance} 打开，见
+         * {@link com.alben.createhandmade.recipe.serializer.HandMadeToolRecipeSerializer}。</p>
+         */
+        private boolean exclusiveChance;
+
         public Pressing(ProcessingRecipeParams params) {
             super(params);
+        }
+
+        public boolean isExclusiveChance() {
+            return exclusiveChance;
+        }
+
+        public void setExclusiveChance(boolean exclusiveChance) {
+            this.exclusiveChance = exclusiveChance;
+        }
+
+        /**
+         * ★ 工具侧真正走的是这个重载：{@code RecipeApplier.applyRecipeOn} 调的是
+         * {@code rollResults(getRollableResults())}，所以互斥逻辑必须覆盖带参版本。
+         */
+        @Override
+        public List<ItemStack> rollResults(List<ProcessingOutput> rollableResults) {
+            if (!exclusiveChance || rollableResults.isEmpty()) {
+                return super.rollResults(rollableResults);
+            }
+
+            float roll = ThreadLocalRandom.current().nextFloat();
+            float cursor = 0.0F;
+            for (ProcessingOutput output : rollableResults) {
+                cursor += output.getChance();
+                if (roll >= cursor) continue;
+                ItemStack picked = output.getStack().copy();
+                return picked.isEmpty() ? List.of() : List.of(picked);
+            }
+            // 权重总和不足 1：落在"什么都没摇到"那一段
+            return List.of();
+        }
+
+        // ================= JSON / 网络附加值 =================
+        // Create 的 ProcessingRecipe 预留了这四个钩子，由 ProcessingRecipeSerializer 在
+        // 解析 JSON 与 fromNetwork/toNetwork 时各调一次，所以只需要在这里读写、不必改 serializer。
+
+        @Override
+        public void readAdditional(JsonObject json) {
+            this.exclusiveChance = GsonHelper.getAsBoolean(json, "exclusive_chance", false);
+        }
+
+        @Override
+        public void readAdditional(FriendlyByteBuf buffer) {
+            this.exclusiveChance = buffer.readBoolean();
+        }
+
+        @Override
+        public void writeAdditional(FriendlyByteBuf buffer) {
+            buffer.writeBoolean(exclusiveChance);
         }
 
         @Override

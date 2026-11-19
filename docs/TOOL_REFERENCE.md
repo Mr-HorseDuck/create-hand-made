@@ -25,7 +25,8 @@
 - **禁用连带**：
   - 禁 `press_hammer_depot` 的配方 → 只影响置物台/传送带路径，工作盆照旧。
   - 禁 `press_hammer_basin` → 同时影响 `create:compacting` 与"可压缩合成"两类候选（它们走同一张过滤表）。
-- **彩蛋：砸书出手册**。把 `minecraft:book` 放在**置物台或传送带**上砸（工作盆不参与）：90% 变成《手搓学：从入门到入土》，5% 砸成皮革，5% 砸成纸——三者**互斥**，一次只出一种。需要装 Patchouli（否则手册物品不存在，这条彩蛋自动不生效）。批量附魔时每份独立摇。
+- **彩蛋：砸书出手册**。把 `minecraft:book` 放在**置物台或传送带**上砸（工作盆不参与）：90% 变成《手搓学：从入门到入土》，5% 砸成皮革，5% 砸成纸——三者**互斥**，一次只出一种。批量附魔时每份独立摇。需要装 Patchouli（否则手册物品不存在，这条彩蛋自动不生效）。
+  - 它是一条**普通的 L3 数据包配方**（`create_hand_made:tool_recipe`，`tool = press_hammer_depot`，靠可选字段 `exclusive_chance: true` 表示"权重表只出一个"），文件在 `data/create_hand_made/recipes/handbook_press.json`。整合包想改概率 / 换产物 / 干脆禁掉，走 L2 过滤或 KJS 即可，不需要改代码。
   - 压缩合成路径受 Create 的 `recipes.allowShapedSquareInPress` 门控，关掉后连候选都不会出现。
 - **批量**：附魔 **批量加工**（Batch Crafting）等级 n → 一次最多 2ⁿ 份（1→2、2→4、3→8）；某一份摇不出产物按"白磨"处理（消耗材料、不产出），整批零命中时不动原料也不扣耐久。
 - **耐久**：只有真的按压成功才扣 1 点；挥空、对着空气不扣。
@@ -67,7 +68,7 @@
 - **配方来源**：L3（`tool: infusion_gun`，`FillingRecipe` 家族，**必须声明至少一个流体输入**，否则加载期报错）→ L1 序列组装 / `create:filling` → L2 过滤。
 - **放置/抽取有保护检查**：放流体前走 `player.mayInteract` 与 `ForgeEventFactory.fireFluidPlaceBlockEvent`（被保护插件取消则放弃），抽流体只查 `mayInteract`。
 - **禁用连带**：`infusion_gun` 表作用于灌注枪的填充路径（L1 与 L3 都算）；枪本身的"抽/注流体"是方块交互，不走配方，无法用 L2 禁用。
-- **配置**：无专属时间参数（充液沿用填充配方自身的 `processing_time`）。
+- **配置**：无专属时间参数（充液沿用填充配方自身的 `processingTime`）。
 
 ---
 

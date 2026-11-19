@@ -13,7 +13,6 @@ import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.Config;
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.config.SyncedServerConfig;
-import com.alben.createhandmade.guidebook.GuideBookGiver;
 import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -50,7 +49,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -544,36 +542,6 @@ public class PressHammerItem extends Item {
         return tryPressTransported(level, pos, filter, 1);
     }
 
-    // ================= 彩蛋：书 → 手册（砸坏了就成皮革 / 纸） =================
-
-    /** 砸书的皮革概率（5%）。 */
-    private static final float BOOK_PRESS_LEATHER_CHANCE = 0.05F;
-    /** 砸书的纸概率（5%）。剩下 90% 出手册。 */
-    private static final float BOOK_PRESS_PAPER_CHANCE = 0.05F;
-
-    /**
-     * 书被冲压这一下摇出什么。
-     *
-     * <p>★ <b>三个结果互斥</b>，一次只出一种：0~5% 皮革、5~10% 纸、其余手册。
-     * 没有做成数据包配方，是因为 Create 配方里的 {@code chance} 是「每条独立摇」，
-     * 三条并列会同时出好几种（手册 + 皮革），跟"砸坏了"的语义对不上。</p>
-     *
-     * <p>★ 只在置物台 / 传送带上生效（走 {@link #tryPressTransported}），工作盆不参与。
-     * 手册用 {@link GuideBookGiver#createBook()} 造，Patchouli 没装时它是空栈 ——
-     * 调用方已经在外面挡掉了（{@code handbookAvailable}）。</p>
-     */
-    private static List<ItemStack> rollBookPress(Level level) {
-        float roll = level.random.nextFloat();
-        if (roll < BOOK_PRESS_LEATHER_CHANCE) {
-            return List.of(new ItemStack(Items.LEATHER));
-        }
-        if (roll < BOOK_PRESS_LEATHER_CHANCE + BOOK_PRESS_PAPER_CHANCE) {
-            return List.of(new ItemStack(Items.PAPER));
-        }
-        ItemStack handbook = GuideBookGiver.createBook();
-        return handbook.isEmpty() ? List.of() : List.of(handbook);
-    }
-
     /**
      * 批量加工版本。
      *
@@ -589,11 +557,6 @@ public class PressHammerItem extends Item {
 
         if (batchSize < 1) batchSize = 1;
 
-        // ★ 彩蛋：书被冲压 → 90% 手册 / 5% 皮革 / 5% 纸（见 rollBookPress）。
-        //   Patchouli 没装时 GuideBookGiver.createBook() 给的是空栈，就直接不接管，
-        //   退回原来的「没有冲压配方 → 什么也不做」。
-        final boolean handbookAvailable = !GuideBookGiver.createBook().isEmpty();
-
         int[] processed = {0};        // 已处理的份数（跨所有 item 累计）
         boolean[] sawItem = {false};  // 目标上是否有非空物品（用于区分 NO_INPUT / NO_RECIPE）
         boolean[] simulatedOk = {false};
@@ -606,10 +569,8 @@ public class PressHammerItem extends Item {
             if (stack.isEmpty()) return TransportedResult.doNothing();
             sawItem[0] = true;
 
-            // ★ 书走彩蛋路径，不看配方表（Create 里本来也没有"书 → 手册"的冲压配方）
-            boolean pressBook = handbookAvailable && stack.is(Items.BOOK);
-            Recipe<?> recipe = pressBook ? null : findPressingRecipe(level, stack);
-            if (!pressBook && recipe == null) return TransportedResult.doNothing();
+            Recipe<?> recipe = findPressingRecipe(level, stack);
+            if (recipe == null) return TransportedResult.doNothing();
 
             // ★ 本次从这个堆叠里拆出多少份（受剩余批量和堆叠数量双重限制）
             int toProcess = Math.min(maxBatch - processed[0], stack.getCount());
@@ -629,9 +590,8 @@ public class PressHammerItem extends Item {
             List<ItemStack> allResults = new ArrayList<>();
             int produced = 0;
             for (int i = 0; i < toProcess; i++) {
-                List<ItemStack> one = pressBook
-                        ? rollBookPress(level)
-                        : RecipeApplier.applyRecipeOn(level, stack.copyWithCount(1), recipe, true);
+                List<ItemStack> one = RecipeApplier.applyRecipeOn(
+                        level, stack.copyWithCount(1), recipe, true);
                 boolean anyNonEmpty = false;
                 for (ItemStack result : one) {
                     if (result.isEmpty()) continue;

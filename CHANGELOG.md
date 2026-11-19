@@ -19,6 +19,7 @@
   - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
   - 也可以**砸出来**：把 `书` 放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**（三者互斥，一次只出一种；批量附魔时每份独立摇）。工作盆不参与。需要装 Patchouli，否则手册物品不存在、这条彩蛋自动失效。
+  - 砸书是**数据包配方**而不是硬编码：`data/create_hand_made/recipes/handbook_press.json`，`tool: press_hammer_depot` + 新增的可选字段 **`exclusive_chance: true`**（把 `results` 当互斥权重表，一次只摇一个；Create 默认是每条独立摇，会同时出好几种）。整合包可改概率、换产物或用 L2 过滤 / KJS 禁掉。
 
 ### 修复
 
