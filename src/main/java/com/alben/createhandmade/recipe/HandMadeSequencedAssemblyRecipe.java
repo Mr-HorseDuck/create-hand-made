@@ -19,6 +19,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 import net.neoforged.neoforge.common.crafting.CompoundIngredient;
 
 /**
@@ -126,6 +127,13 @@ public class HandMadeSequencedAssemblyRecipe extends SequencedAssemblyRecipe {
         if (!assembly.supportsAssembly()) {
             return;
         }
+        // 纯流体步骤（例如只有 fluid_ingredients 的灌注配方）没有第 0 个物品槽，
+        // set(0, ...) 会抛 IndexOutOfBounds 并让整个 RecipeManager 加载失败 —— 必须守卫。
+        if (step.getRecipe()
+                .getIngredients()
+                .isEmpty()) {
+            return;
+        }
         Ingredient transit = Ingredient.of(getTransitionalItem());
         step.getRecipe()
                 .getIngredients()
@@ -161,9 +169,14 @@ public class HandMadeSequencedAssemblyRecipe extends SequencedAssemblyRecipe {
         return getIngredient().test(input);
     }
 
-    /** 下一个要执行的步骤。 */
+    /** 下一个要执行的步骤；序列为空时返回 {@code null}（调用方负责判空）。 */
+    @Nullable
     public SequencedRecipe<?> getNextStep(ItemStack input) {
-        return getSequence().get(getStepFor(input) % Math.max(1, getSequence().size()));
+        List<SequencedRecipe<?>> sequence = getSequence();
+        if (sequence.isEmpty()) {
+            return null;
+        }
+        return sequence.get(getStepFor(input) % sequence.size());
     }
 
     /**
@@ -226,6 +239,9 @@ public class HandMadeSequencedAssemblyRecipe extends SequencedAssemblyRecipe {
                 continue;
             }
             SequencedRecipe<?> next = holder.value().getNextStep(item);
+            if (next == null) {
+                continue;
+            }
             ProcessingRecipe<?, ?> step = next.getRecipe();
             if (!recipeClass.isInstance(step)) {
                 continue;

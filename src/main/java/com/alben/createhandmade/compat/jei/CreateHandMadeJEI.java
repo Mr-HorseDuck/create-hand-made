@@ -326,7 +326,7 @@ public class CreateHandMadeJEI implements IModPlugin {
         );
         allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));
 
-        // ==================== 手搓流水线（L3 独占序列组装） ====================
+        // ==================== 手工组装（L3 独占序列组装） ====================
         // 独立 RecipeType：create_hand_made:hand_sequenced_assembly。
         // 机器读不到它，只有本模组的手搓工具会推进；JEI 里单独一页展示
         // 「起始原料 → 每一步用的工具 + 额外原料 → 产物」。
@@ -334,10 +334,10 @@ public class CreateHandMadeJEI implements IModPlugin {
                 new CreateRecipeCategory.Info<>(
                         ModJeiTypes.HAND_SEQUENCED_ASSEMBLY,
                         Component.translatable("jei.create_hand_made.hand_sequenced_assembly"),
-                        new EmptyBackground(177, 70),
+                        new EmptyBackground(177, 92),
                         new DoubleItemIcon(
-                                () -> new ItemStack(ModItems.PRESS_HAMMER.get()),
-                                () -> new ItemStack(Items.PAPER)),
+                                () -> new ItemStack(AllItems.PRECISION_MECHANISM.get()),
+                                () -> new ItemStack(AllItems.BRASS_HAND.get())),
                         CreateHandMadeJEI::collectHandSequencedAssemblyRecipes,
                         List.of(
                                 () -> new ItemStack(ModItems.PRESS_HAMMER.get()),

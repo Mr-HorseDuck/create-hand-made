@@ -6,6 +6,7 @@ import java.util.function.Supplier;
 
 import com.alben.createhandmade.compat.jei.category.sequenced.HandMadeAssemblySubCategory;
 import com.simibubi.create.compat.jei.category.sequencedAssembly.SequencedAssemblySubCategory;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.content.processing.sequenced.IAssemblyRecipe;
 
 import net.minecraft.network.chat.Component;
@@ -66,14 +67,20 @@ public interface HandMadeAssemblyRecipe extends IAssemblyRecipe, HandMadeToolRec
     /**
      * 序列组装 tooltip / JEI 里显示的「这一步要做什么」。
      *
+     * <p>格式：{@code <工具>}，有额外需求时追加 {@code · <附加物/流体>} —— 例如
+     * {@code 指杆 · 燧石}、{@code 灌注枪 · 250 mB 水}，让玩家拿着过渡物品就知道下一步要准备什么
+     * （Create 自己的写法是 “deploying item: sandpaper” / “spout filling fluid: water”）。</p>
+     *
      * <p>Create 的四个实现在这里都标了 {@code @OnlyIn(Dist.CLIENT)}；我们这里只用
      * {@link Component#translatable} 拼语言键，没有客户端类引用，因此不注解，
      * 保持 common 侧随时可调用。</p>
      */
     @Override
     default Component getDescriptionForAssembly() {
-        return Component.translatable("create_hand_made.recipe.assembly.with_tool",
-                Component.translatable(HandMadeAssembly.toolItemKey(getTool())));
+        Component detail = this instanceof ProcessingRecipe<?, ?> recipe
+                ? HandMadeAssembly.stepDetail(recipe)
+                : null;
+        return HandMadeAssembly.stepDescription(getTool(), detail);
     }
 
     /** 「这一步需要的机器」＝归属工具物品（JEI 显示用）。 */

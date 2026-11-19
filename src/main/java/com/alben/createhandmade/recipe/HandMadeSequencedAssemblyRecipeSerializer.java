@@ -13,6 +13,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ExtraCodecs;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import org.jetbrains.annotations.NotNull;
@@ -74,11 +75,16 @@ public class HandMadeSequencedAssemblyRecipeSerializer
                                                         List<ProcessingOutput> results,
                                                         int loops,
                                                         boolean initSteps) {
-        warnAboutBadSteps(sequence);
+        warnAboutBadSteps(sequence, transitional.getStack());
+        warnAboutDegenerateData(transitional.getStack(), sequence, results, loops);
+
+        // 过渡物品为空时不能改写步骤的 ingredients[0]（Ingredient.of(empty) 会抛异常），
+        // 直接跳过初始化，让这条配方"能加载但不会推进"，而不是炸整个数据包加载。
+        boolean canInitSteps = initSteps && !transitional.getStack().isEmpty();
 
         HandMadeSequencedAssemblyRecipe recipe = new HandMadeSequencedAssemblyRecipe(
                 HandMadeRecipeTypes.HAND_SEQUENCED_ASSEMBLY.getSerializer());
-        recipe.applyDecoded(ingredient, sequence, transitional, results, loops, initSteps);
+        recipe.applyDecoded(ingredient, sequence, transitional, results, loops, canInitSteps);
         return recipe;
     }
 
@@ -96,8 +102,25 @@ public class HandMadeSequencedAssemblyRecipeSerializer
      * 因此这里降级为<b>明确的一行 WARN</b>：服务器照常启动，作者在日志里能一眼看到问题，
      * 而这条配方在游戏里不会有任何工具去执行它（工具按家族类匹配，机器步骤永远匹配不上）。</p>
      */
-    private static void warnAboutBadSteps(List<SequencedRecipe<?>> sequence) {
+    private static void warnAboutBadSteps(List<SequencedRecipe<?>> sequence, ItemStack transitionalItem) {
+        int index = 0;
         for (SequencedRecipe<?> step : sequence) {
+            index++;
+
+            // 惯例检查：序列组装推进时，第 0 个产物会被替换成「前进后的过渡物品」
+            // （ProcessingRecipe#enforceNextResult），所以步骤里写别的物品只会让 UI 显示成
+            // 一个永远拿不到的产物 —— Create 自己的数据包也是把过渡物品写进步骤的 results。
+            List<ProcessingOutput> stepResults = step.getRecipe().getRollableResults();
+            if (!stepResults.isEmpty() && !transitionalItem.isEmpty()) {
+                ItemStack declared = stepResults.get(0).getStack();
+                if (!declared.isEmpty() && !ItemStack.isSameItemSameComponents(declared, transitionalItem)) {
+                    CreateHandMade.LOGGER.warn(
+                            "[hand_sequenced_assembly] step #{} declares results[0] = {} but it will be replaced by "
+                                    + "the transitional item {}; write the transitional item there instead "
+                                    + "(extra results after the first are kept as byproducts).",
+                            index, declared.getHoverName().getString(), transitionalItem.getHoverName().getString());
+                }
+            }
             if (!(step.getAsAssemblyRecipe() instanceof HandMadeAssemblyRecipe)) {
                 CreateHandMade.LOGGER.warn(
                         "[hand_sequenced_assembly] step '{}' is NOT a hand-crafted step; "
@@ -106,10 +129,53 @@ public class HandMadeSequencedAssemblyRecipeSerializer
                         step.getRecipe()
                                 .getClass()
                                 .getSimpleName());
+                continue;
+            }
+
+            // 工作盆家族（press_hammer_basin / stirring_staff）能解析，但**没有任何执行器**：
+            // 序列组装的推进只接在「置物台 / 传送带 / 副手」这些路径上，工作盆路径只查普通配方池。
+            // 而且 Create 原版同样不支持工作盆步骤（MixingRecipe / BasinRecipe 没有实现 IAssemblyRecipe，
+            // 也没有任何机器会去查它），所以我们不打算补这套语义 —— 这里只做防呆。
+            if (step.getAsAssemblyRecipe() instanceof HandMadeAssemblyRecipe assembly) {
+                HandMadeTool tool = assembly.getTool();
+                if (tool == HandMadeTool.PRESS_HAMMER_BASIN || tool == HandMadeTool.STIRRING_STAFF) {
+                    CreateHandMade.LOGGER.warn(
+                            "[hand_sequenced_assembly] step uses tool '{}' (basin family) which has NO executor; "
+                                    + "this step will never advance. Create itself does not support basin steps in "
+                                    + "sequenced assembly either -- use a depot / belt / offhand tool step instead.",
+                            tool.name()
+                                    .toLowerCase(java.util.Locale.ROOT));
+                }
             }
         }
     }
 
+    /**
+     * 明显写不完整的配方：只 WARN，不阻断加载。
+     *
+     * <p>这几种形态在运行时要么永远不推进、要么会让下游（比如 Create 的
+     * {@code getResultItem()} / 结果池抽取）抛异常，所以在加载期先把话说清楚。</p>
+     */
+    private static void warnAboutDegenerateData(ItemStack transitionalItem, List<SequencedRecipe<?>> sequence,
+                                                List<ProcessingOutput> results, int loops) {
+        if (transitionalItem.isEmpty()) {
+            CreateHandMade.LOGGER.warn(
+                    "[hand_sequenced_assembly] 'transitional_item' is empty; steps will not be rewritten and this "
+                            + "recipe will never advance.");
+        }
+        if (sequence.isEmpty()) {
+            CreateHandMade.LOGGER.warn(
+                    "[hand_sequenced_assembly] 'sequence' is empty; this recipe will never advance.");
+        }
+        if (results.isEmpty()) {
+            CreateHandMade.LOGGER.warn(
+                    "[hand_sequenced_assembly] 'results' is empty; finishing the line would yield nothing.");
+        }
+        if (loops < 1) {
+            CreateHandMade.LOGGER.warn(
+                    "[hand_sequenced_assembly] 'loops' is {} (< 1); the recipe completes immediately.", loops);
+        }
+    }
     @Override
     public @NotNull MapCodec<HandMadeSequencedAssemblyRecipe> codec() {
         return CODEC;

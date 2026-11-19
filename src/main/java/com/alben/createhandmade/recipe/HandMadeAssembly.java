@@ -1,10 +1,18 @@
 package com.alben.createhandmade.recipe;
 
-import com.alben.createhandmade.item.ModItems;
+import java.util.List;
 
+import com.alben.createhandmade.item.ModItems;
+import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
+
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -81,5 +89,57 @@ public final class HandMadeAssembly {
             case POINTER -> "pointer";
             case INFUSION_GUN -> "infusion_gun";
         };
+    }
+
+    /**
+     * 一步的「额外准备」：指杆这类步骤的手持物、灌注枪这类步骤的流体。
+     *
+     * <p>序列组装初始化时第 0 槽已被换成过渡物品，所以物品从 1 开始看。
+     * 与 Create 的 {@code addAssemblyIngredients} / {@code addAssemblyFluidIngredients}
+     * 是同一份数据，只是这里压成一行的文本，供 tooltip 与 JEI 使用。</p>
+     *
+     * <p>例：{@code 燧石}、{@code 250 mB 水}；没有额外需求时返回 {@code null}。</p>
+     */
+    @Nullable
+    public static Component stepDetail(ProcessingRecipe<?, ?> recipe) {
+        List<Ingredient> ingredients = recipe.getIngredients();
+        for (int i = 1; i < ingredients.size(); i++) {
+            ItemStack[] stacks = ingredients.get(i)
+                    .getItems();
+            if (stacks.length > 0) {
+                return stacks[0].getHoverName();
+            }
+        }
+
+        if (!recipe.getFluidIngredients()
+                .isEmpty()) {
+            SizedFluidIngredient fluid = recipe.getFluidIngredients()
+                    .get(0);
+            FluidStack[] stacks = fluid.getFluids();
+            Component fluidName = stacks.length > 0
+                    ? stacks[0].getHoverName()
+                    : Component.translatable("create_hand_made.recipe.assembly.some_fluid");
+            return Component.literal(fluid.amount() + " mB ")
+                    .append(fluidName);
+        }
+
+        return null;
+    }
+
+    /**
+     * 序列组装 tooltip 里「这一步要做什么」的文本：{@code <工具>}，有额外需求时追加
+     * {@code · <附加物/流体>}。
+     *
+     * <p>与 Create 的 {@code getDescriptionForAssembly()} 语义一致（Create 会写成
+     * “deploying item: sandpaper” / “spout filling fluid: water”，这里用中点分隔以保持精简）。</p>
+     */
+    public static Component stepDescription(@Nullable HandMadeTool tool, @Nullable Component detail) {
+        Component base = Component.translatable(toolItemKey(tool));
+        if (detail == null) {
+            return base;
+        }
+        return base.copy()
+                .append(Component.literal(" · "))
+                .append(detail);
     }
 }
