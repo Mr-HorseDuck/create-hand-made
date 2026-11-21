@@ -221,6 +221,56 @@ HandMadeEvents.toolFilter(event => {
 
 ---
 
+## 纯手搓序列组装（`create_hand_made:hand_sequenced_assembly`）
+
+只有本模组的手搓工具能推进的流水线；**原版机器连读都读不到**。字段与 `create:sequenced_assembly`
+完全一致（1.20.1 同样是 NBT 进度，物品 NBT 键 `SequencedAssembly:{id,Step,Progress}`），把 `type` 改掉即可迁移。
+
+| | 本类型 | `create:sequenced_assembly` + L3 步骤 |
+|---|---|---|
+| 谁能读到 | 只有 6 个手搓工具 | Create 机器（只看得到自己的步骤）+ 手搓工具 |
+| 步骤 | 只能是 `create_hand_made:tool_recipe` | Create 步骤与 L3 步骤可混用 |
+| JEI | 独立类别「手搓流水线」 | Create 的序列组装类别 |
+
+```json
+{
+  "type": "create_hand_made:hand_sequenced_assembly",
+  "ingredient": { "item": "minecraft:iron_ingot" },
+  "transitionalItem": { "item": "minecraft:paper" },
+  "results": [ { "item": "minecraft:iron_block" } ],
+  "loops": 2,
+  "sequence": [
+    {
+      "type": "create_hand_made:tool_recipe",
+      "tool": "press_hammer_depot",
+      "ingredients": [ { "item": "minecraft:paper" } ],
+      "results": [ { "item": "minecraft:iron_nugget" } ]
+    }
+  ]
+}
+```
+
+**约束**
+
+- 步骤 `type` 必须是 `create_hand_made:tool_recipe`；写机器步骤（`create:pressing` 等）→ **加载期直接报错**（1.20.1 这份实现比 1.21 更严：宁可加载失败，也不要"能加载但永远不前进"）。
+- **步骤的 `results[0]` 会被覆盖成「前进后的过渡物品」**（`enforceNextResult`），所以按惯例要写成过渡物品本身；第 2 个及之后的产物作为**副产物**保留。
+- `results` 的 `chance` 是**权重**，不是独立概率（Create 也是先求和再抽一个产物），JEI 显示归一化后的百分比。
+- L2 过滤（`disabled` / `disabled_by_mod`）**管不到流水线步骤**：步骤是内联配方，没有自己的 id。
+
+**提示文本**：过渡物品的工具提示里，「下一步」显示成 `<工具> · <附加物/流体>`
+（例如 `指杆 · 燧石`、`灌注枪 · 250 mB 水`），与 Create 的 “deploying item: …” 同义。
+
+**玩家怎么推进**：把过渡物品放到介质上，再用该步的工具操作 ——
+置物台 / 传送带（冲压锤、指杆、灌注枪）、副手 / 直接使用（手锯、研钵、碾钵）。
+
+**KubeJS**：用原始 JSON（`event.custom`），**不提供** `event.recipes.create_hand_made.*` schema ——
+KubeJS 的产物组件表达不了 `chance`，`ingredients` 也只认纯物品（我们的配方是物品 / 流体混合数组），
+注册 schema 会让带流体的步骤整条解析失败。
+
+**JEI**：步骤块按步数居中，最多 6 列；更多的在右上角显示 `+N`，悬停可看被折叠步骤的工具与附加物/流体。
+
+---
+
 ## 4. Java API
 
 对外请统一绑 `com.alben.createhandmade.api`，不要直接依赖 `item` / `recipe` 内部类（签名视为不稳定）。

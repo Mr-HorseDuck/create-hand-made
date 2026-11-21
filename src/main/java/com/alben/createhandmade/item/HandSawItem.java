@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.Config;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.CreateHandMade;
@@ -660,6 +662,20 @@ public class HandSawItem extends Item {
     /** 真正干活的部分：不缓存，只由 {@link #getCuttingRecipes} 在未命中时调用。 */
     private static List<Recipe<?>> computeCuttingRecipes(Level level, ItemStack input) {
     if (input.isEmpty()) return List.of();
+
+        // ---- 手搓序列组装（create_hand_made:hand_sequenced_assembly） ----
+        // ★ 只有本模组工具会查这个桶，Create 机器永远读不到（见 HandMadeSequencedAssemblyRecipe）。
+        Optional<HandMadeRecipes.Cutting> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, input, HandMadeRecipes.Cutting.class);
+        if (handSequenced.isPresent() && handSequenced.get().getTool() == ToolType.HAND_SAW) {
+            return List.<Recipe<?>>of(handSequenced.get());
+        }
+        // ---- L3 独占配方作为序列组装的一步（type = tool_recipe，机器读不到） ----
+        Optional<HandMadeRecipes.Cutting> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, input, HandMadeAssembly.toolRecipeType(), HandMadeRecipes.Cutting.class);
+        if (sequencedExclusive.isPresent() && sequencedExclusive.get().getTool() == ToolType.HAND_SAW) {
+            return List.<Recipe<?>>of(sequencedExclusive.get());
+        }
 
         // ---- 段 1：L3 独占切削（独立 type） ----
         List<Recipe<?>> custom = new ArrayList<>();

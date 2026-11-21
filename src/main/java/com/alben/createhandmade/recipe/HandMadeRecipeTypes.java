@@ -4,6 +4,7 @@ import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.recipe.serializer.HandMadeBellowsRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeStonecuttingRecipeSerializer;
 import com.alben.createhandmade.recipe.serializer.HandMadeToolRecipeSerializer;
+import com.alben.createhandmade.recipe.serializer.HandMadeSequencedAssemblyRecipeSerializer;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.foundation.recipe.IRecipeTypeInfo;
@@ -104,6 +105,31 @@ public class HandMadeRecipeTypes {
         return (T) BELLOWS_RECIPE.get();
     }
     };
+
+    // ==================== hand_sequenced_assembly（手搓专属序列组装） ====================
+
+    /** L3 通用类型的完整 id：序列组装的步骤必须是这个 type，加载期用它做校验。 */
+    public static final String TOOL_RECIPE_ID = CreateHandMade.MODID + ":tool_recipe";
+
+    /**
+     * create_hand_made:hand_sequenced_assembly —— 手搓专属序列组装。
+     *
+     * <p>与 Create 的 {@code create:sequenced_assembly} 是<b>两个独立类型</b>：
+     * 原版机器（部署器 / 压床 / 机械锯 / 注液器）只查 Create 自己的桶，看不到本类型；
+     * 本类型只有本模组的手搓工具会查询并推进（见
+     * {@link HandMadeSequencedAssemblyRecipe#getStepRecipe}）。</p>
+     *
+     * <p>JSON 字段与原版一致，{@code type} 换成 {@code create_hand_made:hand_sequenced_assembly} 即可；
+     * 但 {@code sequence} 里的每一步必须是本模组的 L3 配方（{@code create_hand_made:tool_recipe}），
+     * serializer 会在加载期校验。</p>
+     */
+    public static final RegistryObject<RecipeType<HandMadeSequencedAssemblyRecipe>> HAND_SEQUENCED_ASSEMBLY =
+            RECIPE_TYPES.register("hand_sequenced_assembly", () -> RecipeType.simple(
+                    new ResourceLocation(CreateHandMade.MODID, "hand_sequenced_assembly")));
+
+    public static final RegistryObject<RecipeSerializer<HandMadeSequencedAssemblyRecipe>> HAND_SEQUENCED_ASSEMBLY_SERIALIZER =
+            RECIPE_SERIALIZERS.register("hand_sequenced_assembly",
+                    HandMadeSequencedAssemblyRecipeSerializer::new);
 
     public static void register(IEventBus modEventBus) {
         RECIPE_TYPES.register(modEventBus);

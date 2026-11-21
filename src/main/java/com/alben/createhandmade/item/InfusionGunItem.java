@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.item.contents.InfusionGunContents;
 import com.alben.createhandmade.item.renderer.InfusionGunRenderer;
@@ -646,6 +648,20 @@ public class InfusionGunItem extends Item {
     @Nullable
     private static Recipe<?> findFillingRecipe(Level level, ItemStack target, FluidStack fluid) {
         if (target.isEmpty()) return null;
+
+        // ---- 手搓序列组装（create_hand_made:hand_sequenced_assembly） ----
+        // ★ 只有本模组工具会查这个桶，Create 机器永远读不到（见 HandMadeSequencedAssemblyRecipe）。
+        Optional<HandMadeRecipes.Filling> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, target, HandMadeRecipes.Filling.class);
+        if (handSequenced.isPresent() && handSequenced.get().getTool() == ToolType.INFUSION_GUN) {
+            return handSequenced.get();
+        }
+        // ---- L3 独占配方作为序列组装的一步（type = tool_recipe，机器读不到） ----
+        Optional<HandMadeRecipes.Filling> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, target, HandMadeAssembly.toolRecipeType(), HandMadeRecipes.Filling.class);
+        if (sequencedExclusive.isPresent() && sequencedExclusive.get().getTool() == ToolType.INFUSION_GUN) {
+            return sequencedExclusive.get();
+        }
 
         // ★ 懒创建：没有 L3 配方时不必提前分配
         RecipeWrapper wrapper = null;

@@ -118,4 +118,16 @@ public static final RecipeType<HandMadeRecipes.Bellows> BELLOWS_EXCLUSIVE =
         RecipeType.create(
                 "create_hand_made", "bellows_exclusive",
                 HandMadeRecipes.Bellows.class);
+
+    /**
+     * 手搓流水线（{@code create_hand_made:hand_sequenced_assembly}）。
+     *
+     * <p>泛型直接绑 {@link com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe}：
+     * 它继承 Create 的 {@code SequencedAssemblyRecipe}，本身就能提供起始原料、步骤序列与结果池，
+     * 不需要像压床/注液那样做显示代理。</p>
+     */
+    public static final RecipeType<com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe>
+            HAND_SEQUENCED_ASSEMBLY = RecipeType.create(
+                    "create_hand_made", "hand_sequenced_assembly",
+                    com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe.class);
 }

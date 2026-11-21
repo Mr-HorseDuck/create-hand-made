@@ -356,5 +356,10 @@
   "message.maidfactory.bubble.crusher_mortar.high.continuous.1": "Just leave it. I'll crush it on the way.",
   "message.maidfactory.bubble.crusher_mortar.high.continuous.2": "This little bit? Not even enough to crush.",
   "message.maidfactory.bubble.crusher_mortar.high.durability.1": "Swap it. I'll take care of this one.",
-  "message.maidfactory.bubble.crusher_mortar.high.durability.2": "This crusher mortar's mine. Don't touch it."
+  "message.maidfactory.bubble.crusher_mortar.high.durability.2": "This crusher mortar's mine. Don't touch it.",
+  "jei.create_hand_made.hand_sequenced_assembly": "Handcrafted Assembly",
+  "create_hand_made.recipe.assembly.chance": "Chance: %s%%",
+  "create_hand_made.recipe.assembly.more_steps": "+%s more step(s) not shown",
+  "create_hand_made.recipe.assembly.some_fluid": "Fluid",
+  "create_hand_made.recipe.assembly.unknown_tool": "a hand tool"
 }

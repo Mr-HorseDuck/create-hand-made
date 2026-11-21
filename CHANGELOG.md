@@ -5,6 +5,38 @@
 
 ---
 
+## 未发布（1.20.1）
+
+基准：`0.6.4-beta`。从 1.21.1 分支（`main`，0.7.0-beta）移植「手搓序列组装」到 1.20.1。
+
+### 新增
+
+- **手搓序列组装**（`create_hand_made:hand_sequenced_assembly`）：一条**只有手搓工具能推进**的多步流水线。
+  - 注册成**独立 RecipeType**，Create 的机器（部署器 / 压床 / 机械锯 / 注液器）只查 `create:sequenced_assembly`，**读不到也跑不了**。
+  - JSON 字段与 `create:sequenced_assembly` 完全一致（`ingredient` / `transitionalItem` / `sequence` / `results` / `loops`），把 `type` 改掉即可迁移；进度沿用原版 NBT（`SequencedAssembly:{id,Step,Progress}`），所以 Create 自带的「第 N / M 步」tooltip 照常显示。
+  - `sequence` 里每一步必须是 `create_hand_made:tool_recipe`；**加载期校验**，写机器步骤会直接报错，而不是"能加载但永远卡住"。
+  - 六个工具都能推进对应家族的步骤：冲压锤（置物台 / 传送带）、手锯（切削）、研钵与碾钵（碾磨）、灌注枪（注液）、指杆（应用）。
+- **L3 配方可以直接作为原版序列组装的步骤**：L3 家族类现在实现了 Create 的 `IAssemblyRecipe`，
+  整合包作者在 `create:sequenced_assembly` 的 `sequence` 里写 `create_hand_made:tool_recipe` 不再加载失败。
+  （机器仍然执行不了这些步骤——它们只在手搓时被推进。）
+- **JEI 新类别「手搓流水线」**：起始原料 → 每步的工具 + 额外原料/流体 → 产物；
+  步骤多于 6 步时右上角显示 `+N`，悬停可看被折叠的步骤。
+
+### 内部
+
+- 新增 `recipe/HandMadeAssembly`（工具 → 物品 / 语言键 / 步骤描述）、`recipe/HandMadeAssemblyRecipe`
+  （`IAssemblyRecipe` 的公共实现）、`recipe/HandMadeSequencedAssemblyRecipe`（继承 `SequencedAssemblyRecipe`，
+  重写父类的私有步进逻辑）、对应 serializer，以及 JEI 类别 `HandSequencedAssemblyCategory` + 子类别。
+- 1.20.1 差异：`RecipeHolder` 不存在（直接用配方实例）、进度存 NBT 而非 DataComponent、
+  `ProcessingRecipe` 单泛型参数、流体用 Create 的 `FluidIngredient`。
+
+### 注意
+
+- 序列组装的**过渡物品**会把 `ingredients[0]` 换成「过渡物品 ∪ 起始原料」，所以手搓工具的第 0 槽匹配语义沿用原版。
+- 步骤的 `results[0]` 会被覆盖成「前进后的过渡物品」（`enforceNextResult`），按惯例写成过渡物品本身。
+
+---
+
 ## 0.6.4-beta — 2026-11-15
 
 基准：`0.6.3-beta`。这一版加了**帕秋莉手册**（游戏内指南书），中英双语；另修掉一轮排查发现的 5 处静默失效。玩法无破坏性改动。

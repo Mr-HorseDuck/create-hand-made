@@ -1,5 +1,7 @@
 package com.alben.createhandmade.item;
 
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.HighlightBlockPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
@@ -297,6 +299,20 @@ public class PointerItem extends Item {
     @Nullable
     public static Recipe<?> findRecipe(Level level, ItemStack target, ItemStack tool) {
         if (target.isEmpty()) return null;
+
+        // ---- 手搓序列组装（create_hand_made:hand_sequenced_assembly） ----
+        // ★ 只有本模组工具会查这个桶，Create 机器永远读不到（见 HandMadeSequencedAssemblyRecipe）。
+        Optional<HandMadeRecipes.Application> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, target, HandMadeRecipes.Application.class);
+        if (handSequenced.isPresent() && handSequenced.get().getTool() == ToolType.POINTER) {
+            return handSequenced.get();
+        }
+        // ---- L3 独占配方作为序列组装的一步（type = tool_recipe，机器读不到） ----
+        Optional<HandMadeRecipes.Application> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, target, HandMadeAssembly.toolRecipeType(), HandMadeRecipes.Application.class);
+        if (sequencedExclusive.isPresent() && sequencedExclusive.get().getTool() == ToolType.POINTER) {
+            return sequencedExclusive.get();
+        }
 
         // ---- 段 1：L3 独立 type ----
         // ★ 懒创建：只有真的遇到 tool=pointer 的 L3 配方才需要 ItemStackHandler/RecipeWrapper。

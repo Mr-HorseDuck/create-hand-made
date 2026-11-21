@@ -1,10 +1,12 @@
 package com.alben.createhandmade.recipe.type;
 
+import com.alben.createhandmade.recipe.HandMadeAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
 import com.google.gson.JsonObject;
 import com.simibubi.create.AllRecipeTypes;
+import com.simibubi.create.compat.jei.category.sequencedAssembly.SequencedAssemblySubCategory;
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
 import com.simibubi.create.content.kinetics.crusher.AbstractCrushingRecipe;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
@@ -14,7 +16,9 @@ import com.simibubi.create.content.processing.basin.BasinRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipeBuilder.ProcessingRecipeParams;
+import com.simibubi.create.foundation.fluid.FluidIngredient;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.Container;
@@ -23,12 +27,15 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.SingleItemRecipe;
+import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.items.wrapper.RecipeWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -105,7 +112,7 @@ public final class HandMadeRecipes {
      * （父类唯一 public 构造要求），传 ITEM_APPLICATION；getType() 覆写为独立 type。</p>
      */
     public static class Application extends ItemApplicationRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         @Nullable
         private ToolType tool;
@@ -126,6 +133,45 @@ public final class HandMadeRecipes {
 
         @Nullable @Override public ToolType getTool() { return tool; }
         @Override public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
+        /**
+         * 序列组装里用来告诉 JEI「这一步还要准备手里那件物品」。
+         *
+         * <p>与 Create 的 {@code DeployerApplicationRecipe.addAssemblyIngredients} 一致：
+         * 第 0 槽已被换成过渡物品，真正需要额外准备的是第 1 槽（手持物品 / 试剂）。</p>
+         */
+        @Override
+        public void addAssemblyIngredients(List<Ingredient> list) {
+            if (ingredients.size() > 1) {
+                list.add(ingredients.get(1));
+            }
+        }
+
     }
 
     /**
@@ -168,7 +214,7 @@ public final class HandMadeRecipes {
      * CrushingRecipe，所以工具侧与 JEI 侧的 instanceof 判定需要放宽。</p>
      */
     public static class Crushing extends AbstractCrushingRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         /** 上限取「研磨 4」与「粉碎 7」的并集，取最大值不误拒碾钵的多产物配方。 */
         private static final int MAX_OUTPUT_COUNT = 7;
@@ -196,6 +242,32 @@ public final class HandMadeRecipes {
 
         @Override
         public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
     }
 
     /**
@@ -203,7 +275,7 @@ public final class HandMadeRecipes {
      * matches / 上限 / canSpecifyDuration 全部沿用父类 CuttingRecipe。
      */
     public static class Cutting extends CuttingRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         @Nullable
         private ToolType tool;
@@ -224,6 +296,32 @@ public final class HandMadeRecipes {
 
         @Nullable @Override public ToolType getTool() { return tool; }
         @Override public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
     }
 
     /**
@@ -231,7 +329,7 @@ public final class HandMadeRecipes {
      * matches / 上限 / getRequiredFluid 全部沿用父类 FillingRecipe。
      */
     public static class Filling extends FillingRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         @Nullable
         private ToolType tool;
@@ -252,6 +350,44 @@ public final class HandMadeRecipes {
 
         @Nullable @Override public ToolType getTool() { return tool; }
         @Override public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
+
+        /**
+         * 序列组装里把「这一步要注多少流体」交给 JEI 显示。
+         *
+         * <p>与 Create 的 {@code FillingRecipe.addAssemblyFluidIngredients} 等价：
+         * 流体输入不在 {@code ingredients} 里，需要单独登记。</p>
+         */
+        @Override
+        public void addAssemblyFluidIngredients(List<FluidIngredient> list) {
+            list.add(getRequiredFluid());
+        }
+
     }
 
     /**
@@ -259,7 +395,7 @@ public final class HandMadeRecipes {
      * matches / 上限 / canSpecifyDuration 全部沿用父类 PressingRecipe。
      */
     public static class Pressing extends PressingRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         @Nullable
         private ToolType tool;
@@ -341,6 +477,32 @@ public final class HandMadeRecipes {
 
         @Nullable @Override public ToolType getTool() { return tool; }
         @Override public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
     }
 
     /** 手锯的切石配方（{@code create_hand_made:stonecutting_recipe}）。 */
@@ -373,7 +535,7 @@ public final class HandMadeRecipes {
      * 匹配走静态 BasinRecipe.match，所以本类不需要覆写 matches。</p>
      */
     public static class Tool extends BasinRecipe
-            implements HandMadeToolRecipeLike {
+            implements HandMadeAssemblyRecipe {
 
         @Nullable
         private ToolType tool;
@@ -387,5 +549,31 @@ public final class HandMadeRecipes {
 
         @Override
         public void setTool(@Nullable ToolType tool) { this.tool = tool; }
+
+        // ==================== 序列组装（IAssemblyRecipe） ====================
+        // ★ 必须显式覆写并委托给接口默认实现：切削 / 冲压 / 注液的 Create 父类已经实现了
+        //   这几个方法（继承来的实体方法优先于接口默认方法），不覆写就会显示 Create 自己的
+        //   文案与子类别，而不是「工具 · 附加物」。
+
+        @Override
+        public boolean supportsAssembly() {
+            return HandMadeAssemblyRecipe.super.supportsAssembly();
+        }
+
+        @Override
+        public Component getDescriptionForAssembly() {
+            return HandMadeAssemblyRecipe.super.getDescriptionForAssembly();
+        }
+
+        @Override
+        public void addRequiredMachines(Set<ItemLike> list) {
+            HandMadeAssemblyRecipe.super.addRequiredMachines(list);
+        }
+
+        @Override
+        public Supplier<Supplier<SequencedAssemblySubCategory>> getJEISubCategory() {
+            return HandMadeAssemblyRecipe.super.getJEISubCategory();
+        }
+
     }
 }

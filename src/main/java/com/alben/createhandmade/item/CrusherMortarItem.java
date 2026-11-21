@@ -1,11 +1,15 @@
 package com.alben.createhandmade.item;
 
+import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.item.contents.MortarContents;
 import com.alben.createhandmade.item.renderer.MortarItemRenderer;
 import com.alben.createhandmade.api.HandMadeResult;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
+import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.util.ItemStacks;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
@@ -198,6 +202,20 @@ public class CrusherMortarItem extends Item implements CustomUseEffectsItem {
     @Nullable
     public static Recipe<?> findRecipe(Level level, ItemStack input) {
         if (input.isEmpty()) return null;
+
+        // ---- 手搓序列组装（create_hand_made:hand_sequenced_assembly） ----
+        // ★ 只有本模组工具会查这个桶，Create 机器永远读不到（见 HandMadeSequencedAssemblyRecipe）。
+        Optional<HandMadeRecipes.Crushing> handSequenced =
+                HandMadeSequencedAssemblyRecipe.getStepRecipe(level, input, HandMadeRecipes.Crushing.class);
+        if (handSequenced.isPresent() && handSequenced.get().getTool() == ToolType.CRUSHER_MORTAR) {
+            return handSequenced.get();
+        }
+        // ---- L3 独占配方作为序列组装的一步（type = tool_recipe，机器读不到） ----
+        Optional<HandMadeRecipes.Crushing> sequencedExclusive = SequencedAssemblyRecipe.getRecipe(
+                level, input, HandMadeAssembly.toolRecipeType(), HandMadeRecipes.Crushing.class);
+        if (sequencedExclusive.isPresent() && sequencedExclusive.get().getTool() == ToolType.CRUSHER_MORTAR) {
+            return sequencedExclusive.get();
+        }
 
         // ★ 懒创建：没有 L3 配方时不必提前分配
         RecipeWrapper wrapper = null;

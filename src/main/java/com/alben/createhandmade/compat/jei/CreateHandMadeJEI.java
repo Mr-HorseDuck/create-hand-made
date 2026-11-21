@@ -11,12 +11,14 @@ import com.alben.createhandmade.compat.jei.category.HandPressBasinCategory;
 import com.alben.createhandmade.compat.jei.category.HandPressDepotCategory;
 import com.alben.createhandmade.compat.jei.category.HandSawCategory;
 import com.alben.createhandmade.compat.jei.category.HandSawStonecuttingCategory;
+import com.alben.createhandmade.compat.jei.category.HandSequencedAssemblyCategory;
 import com.alben.createhandmade.compat.jei.category.MortarMillingCategory;
 import com.alben.createhandmade.compat.jei.category.PointerApplicationCategory;
 import com.alben.createhandmade.compat.jei.category.StirringStaffMixingCategory;
 import com.alben.createhandmade.registry.ModItems;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
 import com.alben.createhandmade.recipe.ToolType;
@@ -315,6 +317,29 @@ public class CreateHandMadeJEI implements IModPlugin {
         allCategories.add(new BellowsExclusiveCategory(bellowsExclusiveInfo));  
         CreateHandMade.LOGGER.info("[HandMade-JEI] after exclusive add, size={}", allCategories.size());      
         CreateHandMade.LOGGER.info("[HandMade-JEI] before register, size={}", allCategories.size());
+        // ==================== 手工组装（L3 独占序列组装） ====================
+        // 独立 RecipeType：create_hand_made:hand_sequenced_assembly。
+        // 机器读不到它，只有本模组的手搓工具会推进；JEI 里单独一页展示
+        // 「起始原料 → 每一步用的工具 + 额外原料 → 产物」。
+        CreateRecipeCategory.Info<HandMadeSequencedAssemblyRecipe> handSequencedAssemblyInfo =
+                new CreateRecipeCategory.Info<>(
+                        ModJeiTypes.HAND_SEQUENCED_ASSEMBLY,
+                        Component.translatable("jei.create_hand_made.hand_sequenced_assembly"),
+                        new EmptyBackground(177, 92),
+                        new DoubleItemIcon(
+                                () -> new ItemStack(AllItems.PRECISION_MECHANISM.get()),
+                                () -> new ItemStack(AllItems.BRASS_HAND.get())),
+                        CreateHandMadeJEI::collectHandSequencedAssemblyRecipes,
+                        List.<java.util.function.Supplier<? extends ItemStack>>of(
+                                () -> new ItemStack(ModItems.PRESS_HAMMER.get()),
+                                () -> new ItemStack(ModItems.HAND_SAW.get()),
+                                () -> new ItemStack(ModItems.INFUSION_GUN.get()),
+                                () -> new ItemStack(ModItems.POINTER.get()),
+                                () -> new ItemStack(ModItems.MORTAR.get()),
+                                () -> new ItemStack(ModItems.CRUSHER_MORTAR.get()))
+                );
+        allCategories.add(new HandSequencedAssemblyCategory(handSequencedAssemblyInfo));
+
         registration.addRecipeCategories(allCategories.toArray(CreateRecipeCategory[]::new));
         
     }
@@ -647,6 +672,19 @@ public class CreateHandMadeJEI implements IModPlugin {
         return filtered(ToolType.POINTER, result);
     }
 
+
+    /**
+     * 手工组装：直接取 {@code create_hand_made:hand_sequenced_assembly} 这个桶。
+     *
+     * <p>与本类其余收集器不同：那些要拼 L1（Create 原生配方）+ L3（本模组独占），
+     * 而序列组装本身就是我们自己的类型，桶里全是自己的配方，不需要代理或去重。</p>
+     */
+    private static List<HandMadeSequencedAssemblyRecipe> collectHandSequencedAssemblyRecipes() {
+        var level = Minecraft.getInstance().level;
+        if (level == null) return List.of();
+        return new ArrayList<>(level.getRecipeManager()
+                .getAllRecipesFor(HandMadeSequencedAssemblyRecipe.recipeType()));
+    }
     /**
      * 按 tool id 过一遍 L2（数据包 + KubeJS 过滤器）。
      *

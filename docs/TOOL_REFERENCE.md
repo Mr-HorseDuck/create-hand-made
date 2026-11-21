@@ -171,3 +171,18 @@
 | 手锯 · 切削 | `create:cutting` | `hand_saw` | `hand_saw` | **L3（短路）→ L1** | `hand_saw.*` |
 | 手锯 · 切石 | `minecraft:stonecutting` + `stonecutting_recipe` | `hand_saw_stonecutting` | — | 切削全空时回退 | `hand_saw.enable_tree_felling` |
 | 风箱 | 无 | 无 | `bellows_recipe`（`fan_type`） | L3 → Create 鼓风类型 | `bellows.*` |
+
+## 序列组装（手搓流水线）
+
+`create_hand_made:hand_sequenced_assembly` 让多件工具接力加工同一个人物品：把过渡物品放到介质上，
+用当前步骤对应的工具操作，它会带着进度前进，走完 `loops` 圈后从结果池抽产物。
+
+| 步骤归属 | 怎么推进 |
+|---|---|
+| 冲压锤 · 置物台 | 过渡物品放置物台 / 传送带，蓄力砸 |
+| 指杆 | 过渡物品放置物台 / 传送带，手持试剂右键 |
+| 灌注枪 | 过渡物品放置物台 / 传送带，枪内有对应流体 |
+| 手锯 | 过渡物品拿在副手，主手手锯切削 |
+| 研钵 / 碾钵 | 过渡物品拿在副手，主手研磨/碾磨 |
+
+过渡物品的物品提示里会显示进度（第 N / M 步）和「下一步要做什么」——形如 `指杆 · 燧石`。
