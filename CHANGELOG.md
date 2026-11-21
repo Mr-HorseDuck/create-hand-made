@@ -5,9 +5,11 @@
 
 ---
 
-## 未发布（1.20.1）
+## 0.7.0-beta — 2026-11-21
 
-基准：`0.6.4-beta`。从 1.21.1 分支（`main`，0.7.0-beta）移植「手搓序列组装」到 1.20.1。
+基准：`0.6.4-beta`。这一版把 Create 的**序列组装**搬到手搓工具上（从 1.21.1 分支 `main` 的 0.7.0-beta 移植），
+并把手册的获取方式从「合成」改成「砸」。玩法没有破坏性改动，老存档直接升；
+唯一的例外是**手册的工作台配方被移除了**（见「升级注意」）。
 
 ### 新增
 
@@ -15,25 +17,56 @@
   - 注册成**独立 RecipeType**，Create 的机器（部署器 / 压床 / 机械锯 / 注液器）只查 `create:sequenced_assembly`，**读不到也跑不了**。
   - JSON 字段与 `create:sequenced_assembly` 完全一致（`ingredient` / `transitionalItem` / `sequence` / `results` / `loops`），把 `type` 改掉即可迁移；进度沿用原版 NBT（`SequencedAssembly:{id,Step,Progress}`），所以 Create 自带的「第 N / M 步」tooltip 照常显示。
   - `sequence` 里每一步必须是 `create_hand_made:tool_recipe`；**加载期校验**，写机器步骤会直接报错，而不是"能加载但永远卡住"。
+    步骤的 `tool` 也校验：只有置物台 / 传送带 / 副手那几个工具有推进路径，写工作盆家族（`press_hammer_basin` / `stirring_staff`）或 `bellows` 同样报错。
   - 六个工具都能推进对应家族的步骤：冲压锤（置物台 / 传送带）、手锯（切削）、研钵与碾钵（碾磨）、灌注枪（注液）、指杆（应用）。
 - **L3 配方可以直接作为原版序列组装的步骤**：L3 家族类现在实现了 Create 的 `IAssemblyRecipe`，
   整合包作者在 `create:sequenced_assembly` 的 `sequence` 里写 `create_hand_made:tool_recipe` 不再加载失败。
   （机器仍然执行不了这些步骤——它们只在手搓时被推进。）
-- **JEI 新类别「手搓流水线」**：起始原料 → 每步的工具 + 额外原料/流体 → 产物；
-  步骤多于 6 步时右上角显示 `+N`，悬停可看被折叠的步骤。
+- **JEI 新类别「手搓流水线」**：起始原料 → 每步的工具 + 额外原料/流体 → 产物。
+  版式刻意与 Create 自己的序列组装对齐（背景 180×115、罗马数字标步、长箭头 + `xN` 圈数图标、
+  随机产物的 `?` 底纹、单步 tooltip），差别只有产物是**权重池**：主槽画权重最大的那条，
+  其余注册成隐藏产物（看不见，但「用途查询」照样能反查到），槽位 tooltip 列出全池的归一化百分比。
+  最多画 5 列，多出的在右上角显示 `+N`，悬停可看被折叠的步骤。
+- **砸书出手册**：把书放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**
+  （三者互斥，一次只出一种；带批量附魔时每份独立摇）。工作盆不参与。
+  这是一条**数据包配方**而不是硬编码：`data/create_hand_made/recipes/handbook_press.json`，
+  `tool: press_hammer_depot` + 新增的可选字段 **`exclusive_chance: true`**（把 `results` 当互斥权重表，
+  一次只摇一个；Create 默认是每条独立摇，可能同时出好几种）。整合包可改概率、换产物或用 L2 过滤 / KJS 禁掉。
+  没装 Patchouli 时这条配方不加载（外层 `forge:conditional`）。
+
+### 变更
+
+- **手册的工作台合成配方已移除**（`0.6.4` 的「书 ×1 + 冲压锤 ×1」无序合成）。现在获取途径是：
+  首次进世界赠送、冲压锤砸书、`/give`。老玩家手里的手册不受影响。
 
 ### 内部
 
 - 新增 `recipe/HandMadeAssembly`（工具 → 物品 / 语言键 / 步骤描述）、`recipe/HandMadeAssemblyRecipe`
   （`IAssemblyRecipe` 的公共实现）、`recipe/HandMadeSequencedAssemblyRecipe`（继承 `SequencedAssemblyRecipe`，
-  重写父类的私有步进逻辑）、对应 serializer，以及 JEI 类别 `HandSequencedAssemblyCategory` + 子类别。
+  重写父类四处私有步进逻辑）、对应 serializer，以及 JEI 类别 `HandSequencedAssemblyCategory` + 子类别。
+- 新增可选配方字段 `exclusive_chance`：`HandMadeRecipes.Pressing` 覆写
+  `rollResults(List<ProcessingOutput>)`（`RecipeApplier.applyRecipeOn` 走的正是这个重载），
+  值由 `ProcessingRecipe` 预留的 `readAdditional` / `writeAdditional` 钩子读写，不需要动 serializer。
+- JEI 步骤列改走 Create 的 `SequencedAssemblySubCategory` 通道（一列一步、宽 25、
+  附加物 / 流体槽落在列内 `x+4, y=15`），不再自己算槽位坐标。
 - 1.20.1 差异：`RecipeHolder` 不存在（直接用配方实例）、进度存 NBT 而非 DataComponent、
   `ProcessingRecipe` 单泛型参数、流体用 Create 的 `FluidIngredient`。
 
-### 注意
+### 注意（给整合包作者）
 
 - 序列组装的**过渡物品**会把 `ingredients[0]` 换成「过渡物品 ∪ 起始原料」，所以手搓工具的第 0 槽匹配语义沿用原版。
 - 步骤的 `results[0]` 会被覆盖成「前进后的过渡物品」（`enforceNextResult`），按惯例写成过渡物品本身。
+- **步数 = `sequence.size()` × `loops`**，收尾判定 `(step + 1) / size >= loops`；只写一步 + `loops: 3` 就是连做 3 下出产物。
+- **过渡物品可以就是起始原料本身**（进度只存在 NBT 里，物品身份不变也算「在流程中」），
+  所以「同一个东西原地被砸 N 下」不需要额外造过渡物品；代价是它和普通同种物品不堆叠。
+- **L2 过滤管不到流水线步骤**：步骤是内联配方，没有自己的 id。
+
+### 升级注意
+
+1. **手册不能再合成**：`0.6.4` 的「书 ×1 + 冲压锤 ×1」配方已移除。已经拿到手册的玩家不受影响；要再来一本就砸书或用 `/give`。
+2. 没有方块 / 物品 ID 变化，旧存档、旧工具、旧标记、旧配方全部继续有效。
+3. 客户端与服务端**协议版本未变**（仍为 2），可与 `0.6.4` 互通，但建议同步升级。
+4. 对外 `API_VERSION` 仍为 **3**：这一版只新增了配方类型与内部类，没动任何对外方法签名。
 
 ---
 
@@ -50,8 +83,7 @@
 - **首次进游戏自动送一本**：新玩家第一次进入世界时自动获得手册，每名玩家只送一次（记在玩家数据里，换存档不会重复）。
   - 可用配置项 `guidebook.give_on_first_join` 关掉（默认 `true`，位置在存档的 `serverconfig/create_hand_made-server.toml`）。
   - 手动补一本：`/give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}`。
-  - 也可以**砸出来**：把 `书` 放在置物台 / 传送带上用冲压锤砸 —— **90% 出手册、5% 砸成皮革、5% 砸成纸**（三者互斥，一次只出一种；批量附魔时每份独立摇）。工作盆不参与。需要装 Patchouli，否则手册物品不存在、这条彩蛋自动失效。
-  - 砸书是**数据包配方**而不是硬编码：`data/create_hand_made/recipes/handbook_press.json`，`tool: press_hammer_depot` + 新增的可选字段 **`exclusive_chance: true`**（把 `results` 当互斥权重表，一次只摇一个；Create 默认是每条独立摇，会同时出好几种）。整合包可改概率、换产物或用 L2 过滤 / KJS 禁掉。
+  - 也可以**合成**：`书 ×1 + 冲压锤 ×1`（无序合成，外层 `forge:conditional` + `mod_loaded(patchouli)`，没装 Patchouli 时这条配方不加载）。**冲压锤不消耗**——耐久、附魔、自定义名字都原样留在格子里，可以连着合好几本（覆写 `getRemainingItems` 实现）。
 
 ### 修复
 
@@ -66,7 +98,7 @@
 ### 内部
 
 - 手册完全**数据驱动**，没有引入 Patchouli 编译依赖：内容在 `assets/create_hand_made/patchouli_books/handbook/`，`book.json` 在 `data/create_hand_made/patchouli_books/handbook/`（1.20+ 要求 `use_resource_pack: true`，`book.json` 仍留在 `data/`）。
-- 送书与砸书结果都用 `patchouli:guide_book` + NBT `patchouli:book`。已核对 Patchouli 1.20.1 源码（`ItemModBook` 只有无参构造、`BookRegistry` 不按书注册物品）：所有书**共用一个通用物品**，并不存在 `create_hand_made:handbook` 这个独立物品。
+- 送出的手册用 `patchouli:guide_book` + NBT `patchouli:book`。已核对 Patchouli 1.20.1 源码（`ItemModBook` 只有无参构造、`BookRegistry` 不按书注册物品）：所有书**共用一个通用物品**，并不存在 `create_hand_made:handbook` 这个独立物品。
 
 ### 升级注意
 

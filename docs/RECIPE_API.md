@@ -253,6 +253,8 @@ HandMadeEvents.toolFilter(event => {
 **约束**
 
 - 步骤 `type` 必须是 `create_hand_made:tool_recipe`；写机器步骤（`create:pressing` 等）→ **加载期直接报错**（1.20.1 这份实现比 1.21 更严：宁可加载失败，也不要"能加载但永远不前进"）。
+- 步骤的 `tool` 必须是**有推进路径**的那六个：`press_hammer_depot` / `hand_saw` / `hand_saw_stonecutting` / `mortar` / `crusher_mortar` / `pointer` / `infusion_gun`。
+  写工作盆家族（`press_hammer_basin` / `stirring_staff`）或 `bellows` 同样**加载期报错**——它们在流水线上没有执行器。
 - **步骤的 `results[0]` 会被覆盖成「前进后的过渡物品」**（`enforceNextResult`），所以按惯例要写成过渡物品本身；第 2 个及之后的产物作为**副产物**保留。
 - `results` 的 `chance` 是**权重**，不是独立概率（Create 也是先求和再抽一个产物），JEI 显示归一化后的百分比。
 - L2 过滤（`disabled` / `disabled_by_mod`）**管不到流水线步骤**：步骤是内联配方，没有自己的 id。

@@ -166,6 +166,16 @@ public class HandMadeSequencedAssemblyRecipe extends SequencedAssemblyRecipe {
                     + " does not support sequenced assembly");
         }
 
+        // ★ 工作盆家族没有「推进器」：压盆 / 搅杖的步骤进了流水线也永远不会前进
+        //   （手搓工具查流水线时只认置物台 / 传送带 / 副手 / 直接使用那几条路径）。
+        //   与其让它"能加载但永远卡住"，不如在加载期直接报错说清楚。
+        if (recipe instanceof HandMadeToolRecipeLike like && !assembleableTool(like.getTool())) {
+            throw new JsonParseException("Step " + index + " of " + parentId
+                    + " uses tool '" + (like.getTool() == null ? "unknown" : like.getTool().id)
+                    + "', which has no sequenced-assembly executor (basin steps are not supported)."
+                    + " Use a depot / belt / offhand tool such as press_hammer_depot instead.");
+        }
+
         // ★ 空守卫：纯流体步骤没有第 0 个物品槽，set(0, ...) 会抛 IndexOutOfBounds
         if (!recipe.getIngredients().isEmpty()) {
             Ingredient transit = Ingredient.of(parent.getTransitionalItem());
@@ -174,6 +184,23 @@ public class HandMadeSequencedAssemblyRecipe extends SequencedAssemblyRecipe {
                     : transit);
         }
         return new SequencedRecipe<>(recipe);
+    }
+
+    /**
+     * 这个工具在流水线上有没有「把过渡物品推进一格」的执行路径。
+     *
+     * <p>只有查过 {@link #getStepRecipe} 的六个工具算数 —— 冲压锤（置物台 / 传送带）、手锯、研钵、
+     * 碾钵、灌注枪、指杆。工作盆家族（压盆 / 搅杖）与风箱没有这条路径，写进步骤只会「能加载但永远卡住」。</p>
+     */
+    private static boolean assembleableTool(@Nullable ToolType tool) {
+        if (tool == null) {
+            return false;
+        }
+        return switch (tool) {
+            case PRESS_HAMMER_DEPOT, HAND_SAW, HAND_SAW_STONECUTTING, MORTAR, CRUSHER_MORTAR,
+                 POINTER, INFUSION_GUN -> true;
+            case PRESS_HAMMER_BASIN, STIRRING_STAFF, BELLOWS -> false;
+        };
     }
 
     // ==================== 步进逻辑（父类里都是 private，这里重新实现） ====================
