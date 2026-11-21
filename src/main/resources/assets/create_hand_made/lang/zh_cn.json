@@ -359,6 +359,7 @@
   "message.maidfactory.bubble.crusher_mortar.high.durability.2": "这碾钵归我管，你别碰。",
   "jei.create_hand_made.hand_sequenced_assembly": "手搓流水线",
   "create_hand_made.recipe.assembly.chance": "概率：%s%%",
+  "create_hand_made.recipe.assembly.nothing": "另有 %s%% 概率什么都不产出",
   "create_hand_made.recipe.assembly.more_steps": "还有 %s 步未显示",
   "create_hand_made.recipe.assembly.some_fluid": "流体",
   "create_hand_made.recipe.assembly.unknown_tool": "某件手搓工具"

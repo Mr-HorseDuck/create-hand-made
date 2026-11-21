@@ -1,26 +1,24 @@
 package com.alben.createhandmade.compat.jei.category;
 
+import com.alben.createhandmade.compat.jei.category.sequenced.HandMadeAssemblySubCategory;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.recipe.HandMadeAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
+import com.simibubi.create.compat.jei.category.sequencedAssembly.SequencedAssemblySubCategory;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
-import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedRecipe;
 import com.simibubi.create.foundation.gui.AllGuiTextures;
 import com.simibubi.create.foundation.gui.AllIcons;
-import com.simibubi.create.foundation.fluid.FluidIngredient;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.ArrayList;
@@ -29,55 +27,81 @@ import java.util.List;
 /**
  * JEI 类别：手工组装（{@code create_hand_made:hand_sequenced_assembly}）。
  *
- * <p>布局（177×92，两条横带 + 箭头）：</p>
+ * <p><b>布局刻意与 Create 自己的序列组装类别一致</b>（背景 180×115，坐标系可以逐像素对照），
+ * 这样玩家在两个类别之间切换时不需要重新学一遍读法：</p>
  * <pre>
- *  y=14  [附加物/流体] [附加物/流体] …                          [+N]
- *  y=40  [起始原料] [工具1] [工具2] [工具3] …            [产物1]
- *                                                          [产物2]
- *  y=64            ─────────── 长箭头 ───────────
- *  y=75                     ↻ x3（圈数，箭头下方居中）
+ *  y=2    I     II    III   IV    V                  ← 罗马数字（第几步）
+ *  y=15   [附加物/流体] …                            ← 每列上方的槽位
+ *  y=50   [工具] …                                   ← 每列的工具图标
+ *  y=91   [起始原料]            [产物]                ← 主横带
+ *  y=94   ─────── 长箭头 ───────  x3  [ ? ]
  * </pre>
  *
- * <p><b>概率</b>：序列组装的 {@code results} 与 {@code create:sequenced_assembly} 一样是
- * <b>权重池</b>（Create 的 {@code rollResult} 先求和再按权重抽一个，不是每个产物独立判定），
- * 所以这里显示<b>归一化</b>后的百分比，底纹也用归一化值决定。</p>
+ * <p><b>与 Create 唯一的差别：产物是权重池。</b>Create 的序列组装只有一个产物 + 一个概率，
+ * 这里 {@code results} 可以有多条，游戏内是「先求和、再按权重抽一个」。
+ * 所以：</p>
+ * <ul>
+ *   <li>主产物槽画<b>权重最大</b>的那一条，底纹按<b>归一化</b>后的概率；</li>
+ *   <li>其余产物用 {@code addInvisibleIngredients} 注册成隐藏产物 —— 看不见，但 JEI 的
+ *       「用途查询」照样能从它们反查到这条配方（这是可见性 vs 可发现性的取舍）；</li>
+ *   <li>把池子里的全部条目连同归一化百分比塞进主产物槽的 tooltip，一眼能看全；</li>
+ *   <li>权重总和 &lt; 1 时（有概率什么都不出）额外画一个 {@code ?} 底纹，语义同 Create 的
+ *       "Random salvage" 槽。</li>
+ * </ul>
+ *
+ * <p>步骤列由 {@link HandMadeAssemblySubCategory} 负责（一列一步，宽 25）。
+ * 步数超过 {@link #MAX_STEPS} 时折叠成右上角的 {@code +N}，悬停列出被折叠的步骤 ——
+ * 被折叠的步骤在游戏内<b>照常参与推进</b>，只是这一行放不下。</p>
  *
  * <p>★ 移植自 1.21.1 分支（0.7.0-beta），按 1.20.1 的 API 改写：
- * {@code ProcessingRecipe} 单泛型参数、流体用 {@code FluidIngredient}、
- * 流体槽走 Create 现成的 {@code addFluidSlot} 重载。</p>
+ * {@code ProcessingRecipe} 单泛型参数、{@code getTooltipStrings} 返回 {@code List<Component>}
+ * （1.20.1 的 JEI 还没换成 {@code ITooltipBuilder} 重载）、流体用 Create 的 {@code FluidIngredient}。</p>
  */
 @ParametersAreNonnullByDefault
 public class HandSequencedAssemblyCategory extends CreateRecipeCategory<HandMadeSequencedAssemblyRecipe> {
 
-    /** 一行最多画几步（再多的部分在右上角显示 {@code +N}，悬停可看剩余步骤的工具）。 */
-    private static final int MAX_STEPS = 6;
-    /** 列间距：18（槽宽）+ 1 间隙。 */
-    private static final int STEP_DX = 19;
-    private static final int SLOT = 18;
+    /** 一行最多画几步。5 列 × 25 + 4 × 3 = 137px，正好给右上角的 {@code +N} 留出位置。 */
+    private static final int MAX_STEPS = 5;
+    /** 列间距（Create 的 margin）。 */
+    private static final int MARGIN = 3;
 
-    /** 步骤附加物 / 流体所在横带。 */
-    private static final int EXTRA_Y = 14;
-    /** {@code +N} 文字的位置与鼠标热区（躲开第二个产物槽）。 */
-    private static final int MORE_TEXT_Y = 4;
-    private static final int MORE_HIT_Y0 = 0;
-    private static final int MORE_HIT_Y1 = 20;
-    /** 起始原料、工具、产物所在横带。 */
-    private static final int MAIN_Y = 40;
-    /** 长箭头。 */
+    /** 罗马数字：与 Create 一致，第 7 步起显示 {@code -}。 */
+    private static final String[] ROMANS = {"I", "II", "III", "IV", "V", "VI", "-"};
+
+    // ---- 主横带（数值全部照抄 Create 的 SequencedAssemblyCategory） ----
+    private static final int MAIN_Y = 91;
+    private static final int INPUT_X = 27;
+    private static final int OUTPUT_X = 132;
+    /** 产物是随机池时整体左移 7，给 {@code ?} 底纹让位。 */
+    private static final int RANDOM_OFFSET = -7;
+
+    /** 箭头与 ? 底纹所在横带（都在 translate(0,15) 之内，即实际 y = 常量 + 15）。 */
+    private static final int BAND_Y = 75;
     private static final int ARROW_X = 52;
-    private static final int ARROW_Y = 64;
-    /** 圈数图标 + 文字（箭头下方居中）。 */
-    private static final int LOOP_Y = 74;
-    /** {@code I_SEQ_REPEAT} 图标宽度（Create 的 16×16 图标）。 */
-    private static final int LOOP_ICON = 16;
+    private static final int ARROW_Y = 79;
+    private static final int CHANCE_SLOT_X = 150;
+    private static final int CHANCE_SLOT_Y = 75;
+    private static final int LOOP_ICON_X = 50;
+    private static final int LOOP_TEXT_X = 66;
 
-    private static final int INPUT_X = 9;
-    private static final int OUTPUT_X = 150;
-    private static final int OUTPUT_DY = 18;
+    /** 步骤横带的鼠标热区（罗马数字上方到工具图标下方）。 */
+    private static final int STEP_HIT_Y0 = 5;
+    private static final int STEP_HIT_Y1 = 84;
+    /** 圈数热区（箭头所在的横向区间）。 */
+    private static final int REPEAT_HIT_X0 = 55;
+    private static final int REPEAT_HIT_W = 65;
+    private static final int REPEAT_HIT_Y0 = 92;
+    private static final int REPEAT_HIT_Y1 = 116;
+    /** {@code +N} 的位置与热区。 */
+    private static final int MORE_X = 162;
+    private static final int MORE_Y = 2;
+    private static final int MORE_HIT_X0 = 158;
+    private static final int MORE_HIT_X1 = 180;
+    private static final int MORE_HIT_Y0 = 0;
+    private static final int MORE_HIT_Y1 = 14;
 
-    /** 步骤块可用的横向区间：[起始原料槽右缘 + 4, 产物槽左缘 - 4]。 */
-    private static final int STEP_SPAN_START = INPUT_X + SLOT + 4;
-    private static final int STEP_SPAN_END = OUTPUT_X - 4;
+    /** 一个子类别实例够用：它无状态（不像 Create 的动画子类要记 offset）。 */
+    private final SequencedAssemblySubCategory stepColumn = new HandMadeAssemblySubCategory();
 
     public HandSequencedAssemblyCategory(Info<HandMadeSequencedAssemblyRecipe> info) {
         super(info);
@@ -85,76 +109,188 @@ public class HandSequencedAssemblyCategory extends CreateRecipeCategory<HandMade
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, HandMadeSequencedAssemblyRecipe recipe,
-                             IFocusGroup focuses) {
+                          IFocusGroup focuses) {
+        int xOffset = isDeterministic(recipe) ? 0 : RANDOM_OFFSET;
+
         // 起始原料
-        builder.addSlot(RecipeIngredientRole.INPUT, INPUT_X, MAIN_Y)
+        builder.addSlot(RecipeIngredientRole.INPUT, INPUT_X + xOffset, MAIN_Y)
                 .setBackground(getRenderedSlot(), -1, -1)
                 .addIngredients(recipe.getIngredient());
 
-        // 步骤块居中
-        int steps = Math.min(recipe.getSequence().size(), MAX_STEPS);
-        int startX = stepStartX(steps);
-        for (int i = 0; i < steps; i++) {
-            addStep(builder, recipe.getSequence().get(i), startX + i * STEP_DX);
+        addOutputSlots(builder, recipe, xOffset);
+        addStepColumns(builder, recipe, focuses);
+    }
+
+    /** 产物槽：主槽画权重最大的那条，其余注册成隐藏产物（保证 JEI 用途查询能找到）。 */
+    private void addOutputSlots(IRecipeLayoutBuilder builder, HandMadeSequencedAssemblyRecipe recipe,
+                                int xOffset) {
+        float total = totalWeight(recipe);
+        ProcessingOutput primary = primaryOutput(recipe);
+        if (primary == null) {
+            return;
         }
 
-        // 产物：概率按权重池归一化后再画底纹 / 显示百分比
-        float totalWeight = totalWeight(recipe);
-        int y = MAIN_Y;
+        float normalized = total <= 0f ? 1f : primary.getChance() / total;
+        var slot = builder.addSlot(RecipeIngredientRole.OUTPUT, OUTPUT_X + xOffset, MAIN_Y)
+                .setBackground(getRenderedSlot(normalized), -1, -1)
+                .addItemStack(primary.getStack());
+
+        slot.addRichTooltipCallback((view, tooltip) -> {
+            for (ProcessingOutput output : recipe.resultPool) {
+                tooltip.add(poolLine(output, total));
+            }
+            float nothing = 1f - total;
+            if (nothing > 1e-4f) {
+                tooltip.add(Component.translatable("create_hand_made.recipe.assembly.nothing",
+                                Math.round(nothing * 100f))
+                        .withStyle(ChatFormatting.DARK_GRAY));
+            }
+        });
+
         for (ProcessingOutput output : recipe.resultPool) {
-            if (y < 0) {
-                break;
+            if (output == primary) {
+                continue;
             }
-            float normalized = totalWeight <= 0f ? 1f : output.getChance() / totalWeight;
-
-            var slot = builder.addSlot(RecipeIngredientRole.OUTPUT, OUTPUT_X, y)
-                    .setBackground(getRenderedSlot(normalized), -1, -1)
+            builder.addInvisibleIngredients(RecipeIngredientRole.OUTPUT)
                     .addItemStack(output.getStack());
-            if (normalized < 1f) {
-                slot.addRichTooltipCallback((view, tooltip) -> tooltip.add(
-                        Component.translatable("create_hand_made.recipe.assembly.chance",
-                                        Math.round(normalized * 100f))
-                                .withStyle(ChatFormatting.GOLD)));
-            }
-            y -= OUTPUT_DY;
         }
     }
 
-    /** 步骤块居中：按步数算整块宽度，再在可用区间里居中。 */
-    private static int stepStartX(int steps) {
+    /** 步骤列：按 Create 的规则累加宽度后整体居中，每列自己往里摆槽位。 */
+    private void addStepColumns(IRecipeLayoutBuilder builder, HandMadeSequencedAssemblyRecipe recipe,
+                                IFocusGroup focuses) {
+        List<SequencedRecipe<?>> sequence = recipe.getSequence();
+        int visible = Math.min(sequence.size(), MAX_STEPS);
+        int x = stepStartX(visible);
+        for (int i = 0; i < visible; i++) {
+            stepColumn.setRecipe(builder, sequence.get(i), focuses, x);
+            x += stepColumn.getWidth() + MARGIN;
+        }
+    }
+
+    /** 步骤块左缘：整块在背景里居中。 */
+    private int stepStartX(int steps) {
         if (steps <= 0) {
-            return STEP_SPAN_START;
+            return getBackground().getWidth() / 2;
         }
-        int blockWidth = (steps - 1) * STEP_DX + SLOT;
-        int center = (STEP_SPAN_START + STEP_SPAN_END) / 2;
-        int startX = center - blockWidth / 2;
-        return Math.max(STEP_SPAN_START, Math.min(startX, STEP_SPAN_END - blockWidth));
+        int blockWidth = steps * stepColumn.getWidth() + (steps - 1) * MARGIN;
+        return (getBackground().getWidth() - blockWidth) / 2;
     }
 
-    /** 一步：下带工具图标（{@code RENDER_ONLY}），上带附加物或流体。 */
-    private void addStep(IRecipeLayoutBuilder builder, SequencedRecipe<?> step, int x) {
-        if (step.getAsAssemblyRecipe() instanceof HandMadeAssemblyRecipe assembly) {
-            Item tool = HandMadeAssembly.toolItem(assembly.getTool());
-            if (tool != null) {
-                builder.addSlot(RecipeIngredientRole.RENDER_ONLY, x, MAIN_Y)
-                        .setBackground(getRenderedSlot(), -1, -1)
-                        .addItemStack(new ItemStack(tool));
+    @Override
+    public void draw(HandMadeSequencedAssemblyRecipe recipe, IRecipeSlotsView slotsView,
+                     GuiGraphics graphics, double mouseX, double mouseY) {
+        Font font = Minecraft.getInstance().font;
+        boolean deterministic = isDeterministic(recipe);
+        int xOffset = deterministic ? 0 : RANDOM_OFFSET;
+
+        // ---- 下横带：长箭头 / 圈数 / ? 底纹（整条平移 15px，与 Create 一致） ----
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 15, 0);
+
+        AllGuiTextures.JEI_LONG_ARROW.render(graphics, ARROW_X + xOffset, ARROW_Y);
+
+        if (!deterministic) {
+            AllGuiTextures.JEI_CHANCE_SLOT.render(graphics, CHANCE_SLOT_X + xOffset, CHANCE_SLOT_Y);
+            Component mark = Component.literal("?").withStyle(ChatFormatting.BOLD);
+            graphics.drawString(font, mark,
+                    CHANCE_SLOT_X + xOffset + 8 - font.width(mark) / 2,
+                    CHANCE_SLOT_Y + 5, 0xefefef, false);
+        }
+
+        if (recipe.getLoops() > 1) {
+            AllIcons.I_SEQ_REPEAT.render(graphics, LOOP_ICON_X + xOffset, BAND_Y);
+            graphics.drawString(font, Component.literal("x" + recipe.getLoops()),
+                    LOOP_TEXT_X + xOffset, BAND_Y + 5, 0x888888, false);
+        }
+
+        graphics.pose().popPose();
+
+        // ---- 步骤列：罗马数字 + 工具图标 ----
+        List<SequencedRecipe<?>> sequence = recipe.getSequence();
+        int visible = Math.min(sequence.size(), MAX_STEPS);
+        int x = stepStartX(visible);
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, 0, 0);
+        for (int i = 0; i < visible; i++) {
+            Component numeral = Component.literal(ROMANS[Math.min(i, ROMANS.length - 1)]);
+            graphics.drawString(font, numeral,
+                    (stepColumn.getWidth() - font.width(numeral)) / 2, 2, 0x888888, false);
+            stepColumn.draw(sequence.get(i), graphics, mouseX, mouseY, i);
+            graphics.pose().translate(stepColumn.getWidth() + MARGIN, 0, 0);
+        }
+        graphics.pose().popPose();
+
+        // ---- 折叠步数 ----
+        if (sequence.size() > MAX_STEPS) {
+            graphics.drawString(font, Component.literal("+" + (sequence.size() - MAX_STEPS)),
+                    MORE_X, MORE_Y, 0x888888, false);
+        }
+    }
+
+    /**
+     * 悬停提示：产物池明细 / 圈数 / 单步说明 / 被折叠的步数。
+     *
+     * <p>这些步骤仍然参与游戏内的推进，只是这一行放不下。</p>
+     */
+    @Override
+    @SuppressWarnings("removal")   // JEI 15.x 仍调用它；未来换成 ITooltipBuilder 重载即可
+    public List<Component> getTooltipStrings(HandMadeSequencedAssemblyRecipe recipe,
+                                             IRecipeSlotsView slotsView, double mouseX, double mouseY) {
+        List<SequencedRecipe<?>> sequence = recipe.getSequence();
+        List<Component> tooltip = new ArrayList<>();
+
+        // 被折叠的步骤
+        if (sequence.size() > MAX_STEPS
+                && mouseX >= MORE_HIT_X0 && mouseX <= MORE_HIT_X1
+                && mouseY >= MORE_HIT_Y0 && mouseY <= MORE_HIT_Y1) {
+            tooltip.add(Component.translatable("create_hand_made.recipe.assembly.more_steps",
+                            sequence.size() - MAX_STEPS)
+                    .withStyle(ChatFormatting.GRAY));
+            for (int i = MAX_STEPS; i < sequence.size(); i++) {
+                tooltip.add(stepLine(i + 1, sequence.get(i)));
+            }
+            return tooltip;
+        }
+
+        // 圈数
+        int xOffset = isDeterministic(recipe) ? 0 : RANDOM_OFFSET;
+        if (recipe.getLoops() > 1
+                && mouseX >= REPEAT_HIT_X0 + xOffset && mouseX < REPEAT_HIT_X0 + REPEAT_HIT_W + xOffset
+                && mouseY >= REPEAT_HIT_Y0 && mouseY < REPEAT_HIT_Y1) {
+            tooltip.add(Component.translatable("create.recipe.assembly.repeat", recipe.getLoops())
+                    .withStyle(ChatFormatting.GRAY));
+            return tooltip;
+        }
+
+        // 单步说明：按列宽反查鼠标落在哪一列
+        if (mouseY > STEP_HIT_Y0 && mouseY < STEP_HIT_Y1) {
+            int visible = Math.min(sequence.size(), MAX_STEPS);
+            double relativeX = mouseX - stepStartX(visible);
+            for (int i = 0; i < visible; i++) {
+                if (relativeX >= 0 && relativeX < stepColumn.getWidth()) {
+                    tooltip.add(Component.translatable("create.recipe.assembly.step", i + 1)
+                            .withStyle(ChatFormatting.GRAY));
+                    tooltip.add(stepDescription(sequence.get(i)));
+                    return tooltip;
+                }
+                relativeX -= stepColumn.getWidth() + MARGIN;
             }
         }
 
-        ProcessingRecipe<?> stepRecipe = step.getRecipe();
-        List<Ingredient> ingredients = stepRecipe.getIngredients();
-        for (int i = 1; i < ingredients.size(); i++) {
-            builder.addSlot(RecipeIngredientRole.INPUT, x, EXTRA_Y)
-                    .setBackground(getRenderedSlot(), -1, -1)
-                    .addIngredients(ingredients.get(i));
-            return; // 一步只有一个附加槽位（应用家族最多一个手持物）
-        }
+        return tooltip;
+    }
 
-        List<FluidIngredient> fluids = stepRecipe.getFluidIngredients();
-        if (!fluids.isEmpty()) {
-            addFluidSlot(builder, x, EXTRA_Y, fluids.get(0));
-        }
+    // ==================== 小工具 ====================
+
+    /**
+     * 产物是否确定：只有一条且概率补满 1。
+     *
+     * <p>不确定时整体左移 {@code -7} 并画 {@code ?} 底纹，与 Create 的判定口径一致。</p>
+     */
+    private static boolean isDeterministic(HandMadeSequencedAssemblyRecipe recipe) {
+        return recipe.resultPool.size() == 1 && recipe.resultPool.get(0).getChance() >= 1f;
     }
 
     private static float totalWeight(HandMadeSequencedAssemblyRecipe recipe) {
@@ -165,73 +301,40 @@ public class HandSequencedAssemblyCategory extends CreateRecipeCategory<HandMade
         return total;
     }
 
-    @Override
-    public void draw(HandMadeSequencedAssemblyRecipe recipe, IRecipeSlotsView slotsView,
-                        GuiGraphics graphics, double mouseX, double mouseY) {
-        AllGuiTextures.JEI_LONG_ARROW.render(graphics, ARROW_X, ARROW_Y);
-
-        var font = Minecraft.getInstance().font;
-        int seqSize = recipe.getSequence().size();
-
-        // 圈数：Create 的「序列循环」图标 + xN，整组在箭头下方居中
-        if (recipe.getLoops() > 1) {
-            Component loops = Component.literal("x" + recipe.getLoops());
-            int textW = font.width(loops);
-            int groupW = LOOP_ICON + 2 + textW;
-            int groupX = ARROW_X + 30 - groupW / 2;
-            AllIcons.I_SEQ_REPEAT.render(graphics, groupX, LOOP_Y - 2);
-            graphics.drawString(font, loops, groupX + LOOP_ICON + 2, LOOP_Y + 3, 0x888888, false);
-        }
-
-        // 步骤多于上限：右上角 +N（悬停看剩余步骤，见 getTooltipStrings）
-        if (seqSize > MAX_STEPS) {
-            graphics.drawString(font, Component.literal("+" + (seqSize - MAX_STEPS)),
-                    OUTPUT_X + 6, MORE_TEXT_Y, 0x888888, false);
-        }
-    }
-
-    /**
-     * {@code +N} 的 tooltip：把被折叠掉的步骤逐条列出来，避免「看不到 = 不知道」。
-     *
-     * <p>这些步骤仍然参与游戏内的推进，只是 JEI 一行放不下。</p>
-     */
-    @Override
-    @SuppressWarnings("removal")   // JEI 15.x 仍调用它；未来换成 ITooltipBuilder 重载即可
-    public List<Component> getTooltipStrings(HandMadeSequencedAssemblyRecipe recipe,
-                                                IRecipeSlotsView slotsView, double mouseX, double mouseY) {
-        int seqSize = recipe.getSequence().size();
-        if (seqSize <= MAX_STEPS) {
-            return List.of();
-        }
-        if (mouseX < OUTPUT_X - 2 || mouseX > OUTPUT_X + 20 || mouseY < MORE_HIT_Y0 || mouseY > MORE_HIT_Y1) {
-            return List.of();
-        }
-
-        List<Component> tooltip = new ArrayList<>();
-        tooltip.add(Component.translatable("create_hand_made.recipe.assembly.more_steps",
-                        seqSize - MAX_STEPS)
-                .withStyle(ChatFormatting.GRAY));
-        for (int i = MAX_STEPS; i < seqSize; i++) {
-            SequencedRecipe<?> step = recipe.getSequence().get(i);
-            Component line = Component.literal("#" + (i + 1) + " ").append(stepName(step));
-            Component detail = HandMadeAssembly.stepDetail(step.getRecipe());
-            if (detail != null) {
-                line = line.copy()
-                        .append(Component.literal(" · ").withStyle(ChatFormatting.DARK_GRAY))
-                        .append(detail);
+    /** 权重最大的产物（并列时取靠前的）；产物池为空时返回 {@code null}。 */
+    private static ProcessingOutput primaryOutput(HandMadeSequencedAssemblyRecipe recipe) {
+        ProcessingOutput best = null;
+        for (ProcessingOutput output : recipe.resultPool) {
+            if (best == null || output.getChance() > best.getChance()) {
+                best = output;
             }
-            tooltip.add(line);
         }
-        return tooltip;
+        return best;
     }
 
-    /** 折叠步骤的工具名（机器步骤则退回配方类名）。 */
-    private static Component stepName(SequencedRecipe<?> step) {
+    /** 产物池的一行：{@code 物品名 40%}。 */
+    private static Component poolLine(ProcessingOutput output, float total) {
+        int percent = Math.round((total <= 0f ? 1f : output.getChance() / total) * 100f);
+        return Component.empty()
+                .append(output.getStack().getHoverName())
+                .append(Component.literal(" " + percent + "%").withStyle(ChatFormatting.GOLD));
+    }
+
+    /** 单步的一行：{@code #2 冲压锤 · 燧石}。 */
+    private static Component stepLine(int index, SequencedRecipe<?> step) {
+        return Component.literal("#" + index + " ")
+                .append(stepDescription(step));
+    }
+
+    /** 一步的说明文本：{@code <工具>}，有附加物 / 流体时追加 {@code · <细节>}。 */
+    private static Component stepDescription(SequencedRecipe<?> step) {
         if (step.getAsAssemblyRecipe() instanceof HandMadeAssemblyRecipe assembly) {
-            return Component.translatable(HandMadeAssembly.toolItemKey(assembly.getTool()));
+            return HandMadeAssembly.stepDescription(assembly.getTool(),
+                    HandMadeAssembly.stepDetail(step.getRecipe()))
+                    .copy()
+                    .withStyle(ChatFormatting.DARK_GREEN);
         }
-        return Component.literal(step.getRecipe()
-                .getClass()
-                .getSimpleName());
+        return Component.literal(step.getRecipe().getClass().getSimpleName())
+                .withStyle(ChatFormatting.DARK_GREEN);
     }
 }

@@ -325,7 +325,8 @@ public class CreateHandMadeJEI implements IModPlugin {
                 new CreateRecipeCategory.Info<>(
                         ModJeiTypes.HAND_SEQUENCED_ASSEMBLY,
                         Component.translatable("jei.create_hand_made.hand_sequenced_assembly"),
-                        new EmptyBackground(177, 92),
+                        // 与 Create 自己的序列组装类别同尺寸（180×115），坐标系可以逐像素对照
+                        new EmptyBackground(180, 115),
                         new DoubleItemIcon(
                                 () -> new ItemStack(AllItems.PRECISION_MECHANISM.get()),
                                 () -> new ItemStack(AllItems.BRASS_HAND.get())),
