@@ -1,0 +1,31 @@
+{
+  "type": "create_hand_made:hand_sequenced_assembly",
+  "ingredient": {
+    "item": "minecraft:obsidian"
+  },
+  "transitionalItem": {
+    "item": "minecraft:obsidian"
+  },
+  "loops": 3,
+  "results": [
+    {
+      "item": "create:sturdy_sheet"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create_hand_made:tool_recipe",
+      "tool": "press_hammer_depot",
+      "ingredients": [
+        {
+          "item": "minecraft:obsidian"
+        }
+      ],
+      "results": [
+        {
+          "item": "minecraft:obsidian"
+        }
+      ]
+    }
+  ]
+}

@@ -260,6 +260,11 @@ HandMadeEvents.toolFilter(event => {
 **提示文本**：过渡物品的工具提示里，「下一步」显示成 `<工具> · <附加物/流体>`
 （例如 `指杆 · 燧石`、`灌注枪 · 250 mB 水`），与 Create 的 “deploying item: …” 同义。
 
+**模组自带的例子**：[`obsidian_to_sturdy_sheet.json`](../src/main/resources/data/create_hand_made/recipes/obsidian_to_sturdy_sheet.json)
+（黑曜石 → 冲压锤连砸 3 下 → 坚固板）。它把过渡物品**直接设成起始原料本身**（`minecraft:obsidian`）：
+每一砸这个物品都在原地被重新打上 `SequencedAssembly` 进度，外观不变、只有工具提示显示「第 N / 3 步」。
+想改成看得见的东西，把 `transitionalItem` 换成别的物品即可（步骤的 `results[0]` 不用跟着改，反正会被覆盖）。
+
 **玩家怎么推进**：把过渡物品放到介质上，再用该步的工具操作 ——
 置物台 / 传送带（冲压锤、指杆、灌注枪）、副手 / 直接使用（手锯、研钵、碾钵）。
 
