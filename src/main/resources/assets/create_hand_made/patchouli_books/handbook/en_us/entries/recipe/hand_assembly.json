@@ -1,0 +1,33 @@
+{
+  "name": "Handcrafted Assembly",
+  "category": "create_hand_made:recipe",
+  "icon": "create_hand_made:press_hammer",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "Handcrafted Assembly",
+      "text": "Some things need $(l)several steps$() to make. Create calls that sequenced assembly, but that is a job for $(l)machines$().$(br2)$(c)create_hand_made:hand_sequenced_assembly$() is the hand-tool version:$(li)only this mod's tools can advance it$(li)Create's deployers, presses, saws and spouts $(l)cannot read or run it$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "How to advance it",
+      "text": "Put the transitional item on a medium, then work it with the step's tool:$(br)$(li)Press Hammer / Pointer / Infusion Gun - $(l)depot or belt$()$(li)Hand Saw / Mortar / Crusher Mortar - $(l)hold in offhand$()$(br2)$(italic)One charged use = one step$(). The item tooltip shows \"step N / M\".$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Writing a recipe",
+      "text": "$(c)data/<namespace>/recipes/*.json$() with $(c)type$() set to $(c)create_hand_made:hand_sequenced_assembly$(). Fields are $(l)identical$() to Create's sequenced assembly:$(br)$(c)ingredient$(), $(c)transitionalItem$(), $(c)sequence$(), $(c)results$(), $(c)loops$().$(br2)Migrating an existing recipe is just a $(c)type$() change."
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Three things to know",
+      "text": "$(li)$(l)Steps = sequence size x loops$(): one step plus $(c)loops: 3$() means three uses per product$(li)$(l)The transitional item can be the ingredient itself$(): progress lives in item data, so hitting the same piece N times needs no extra intermediate item$(li)$(l)Step result #1 is overwritten$() with the advanced transitional item - write it as the transitional item"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "Mistakes are caught early",
+      "text": "These fail at load time instead of \"loads but never advances\":$(br)$(li)step type is not $(c)create_hand_made:tool_recipe$()$(li)step tool is a basin-family tool (basin press / stirring staff) or bellows - no advancement path$(li)empty $(c)transitionalItem$() / $(c)sequence$() / $(c)results$(), or $(c)loops < 1$()$(br2)$(italic)Full pack-author docs: $(c)docs/RECIPE_API.md$().$()"
+    }
+  ]
+}

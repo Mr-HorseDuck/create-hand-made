@@ -1,0 +1,33 @@
+{
+  "name": "手搓流水线",
+  "category": "create_hand_made:recipe",
+  "icon": "create_hand_made:press_hammer",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "title": "手搓流水线",
+      "text": "有些东西要用「几步加工」才做得出来。Create 把这叫序列组装，但那是$(l)机器$()的活儿。$(br2)$(c)create_hand_made:hand_sequenced_assembly$() 是它的手搓版：$(li)只有本模组的手搓工具能推进$(li)Create 的部署器 / 压床 / 机械锯 / 注液器$(l)读不到也跑不了$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "怎么推进",
+      "text": "把过渡物品放到介质上，再用该步的工具操作：$(br)$(li)冲压锤 / 指杆 / 灌注枪 —— $(l)置物台或传送带$()$(li)手锯 / 研钵 / 碾钵 —— $(l)副手持着操作$()$(br2)$(italic)一次蓄力 = 推进一步$()，物品提示里会显示「第 N / M 步」。$()"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "怎么写（配方）",
+      "text": "$(c)data/<命名空间>/recipes/*.json$()，$(c)type$() 写 $(c)create_hand_made:hand_sequenced_assembly$()，字段和 Create 的序列组装$(l)完全一致$()：$(br)$(c)ingredient$() 起始原料、$(c)transitionalItem$() 过渡物品、$(c)sequence$() 步骤数组、$(c)results$() 产物池、$(c)loops$() 重复次数。$(br2)把已有配方的 $(c)type$() 改掉就能迁移。"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "三个要点",
+      "text": "$(li)$(l)步数 = 步骤数 × loops$()：只写一步 + $(c)loops: 3$()，就是连做 3 下出产物$(li)$(l)过渡物品可以就是原料本身$()：进度只存在物品数据里，同一个东西原地被砸 N 下不需要额外造中间物品$(li)$(l)步骤的产物第一条会被覆盖$()成「前进后的过渡物品」，按惯例写成过渡物品本身即可"
+    },
+    {
+      "type": "patchouli:text",
+      "title": "写错会被拦下",
+      "text": "加载期就会报错、而不是「能加载但永远卡住」：$(br)$(li)步骤 type 不是 $(c)create_hand_made:tool_recipe$()$(li)步骤 tool 是工作盆家族（压盆 / 搅杖）或风箱 —— 它们没有推进路径$(li)$(c)transitionalItem$() / $(c)sequence$() / $(c)results$() 为空，或 $(c)loops < 1$()$(br2)$(italic)整合包写法的完整说明在 $(c)docs/RECIPE_API.md$()。$()"
+    }
+  ]
+}

@@ -372,7 +372,6 @@
   "message.maidfactory.bubble.crusher_mortar.high.durability.1": "Swap it. I'll take care of this one.",
   "message.maidfactory.bubble.crusher_mortar.high.durability.2": "This crusher mortar's mine. Don't touch it.",
   "jei.create_hand_made.hand_sequenced_assembly": "Handcrafted Assembly",
-  "create_hand_made.recipe.assembly.chance": "Chance: %s%%",
   "create_hand_made.recipe.assembly.nothing": "%s%% chance of nothing",
   "create_hand_made.recipe.assembly.more_steps": "+%s more step(s) not shown",
   "create_hand_made.recipe.assembly.some_fluid": "Fluid",

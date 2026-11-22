@@ -32,7 +32,11 @@
 - 液体模式只需标输入盆 + 输出，过剩输出可选（不标则输出塞不下就停手）
 - 两类标记互斥：一只女仆要么听加工目标，要么听液体搬运目标
 - 有附魔「批量加工」可以一次性加工多个物品 一级2个 二级 4个 三级8个
-- /chm reload可以热重载
+- **手搓流水线**：`create_hand_made:hand_sequenced_assembly` —— 只有手搓工具能一步步推进的多步加工，
+  Create 的机器**读不到也跑不了**；数据包作者可以用它做「必须自己动手」的高级产物
+- **模组自带的配置界面**：机械动力风，模组列表里点「配置」或游戏里敲 `/chm config` 打开
+  （**不再需要 Cloth Config**）；时间类参数（起手 / 加工 / 冷却）都是一个能拖的条
+- `/chm reload` 热重载配置；`/chm book` 补发手册（默认只发一次，需要时用它救急）
 
 ## 依赖
 
@@ -44,7 +48,7 @@
 | JEI | 15.2.0+ | 可选 |
 | KubeJS | 2001.6.5+ | 可选 |
 | TLM | 1.5.3+ | 可选 |
-| Patchouli（帕秋莉手册） | 1.20.1-84+ | 可选（提供游戏内手册） |
+| Patchouli（帕秋莉手册） | 1.20.1-84+ | 可选（提供游戏内手册与「砸书出手册」彩蛋） |
 
 ## 补充
 - 和女仆流水线有联动
@@ -77,7 +81,7 @@
 
 安装 [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) 后，首次进入世界会自动获得《手搓学：从入门到入土》（中英双语）。内容涵盖 8 件工具、女仆兼容（9 种行为与指杆指定目标）、三层配方系统与配置说明。
 
-不想要自动送书，可以在存档的 `serverconfig/create_hand_made-server.toml` 里把 `[guidebook]` 的 `give_on_first_join` 设为 `false`。书丢了也能再弄一本：把**书**放在置物台 / 传送带上，用**冲压锤**砸（九成出手册，小概率砸成皮革或纸）。手动补一本：
+不想要自动送书，可以在存档的 `serverconfig/create_hand_made-server.toml` 里把 `[guidebook]` 的 `give_on_first_join` 设为 `false`。书丢了也能再弄一本：把**书**放在置物台 / 传送带上，用**冲压锤**砸（九成出手册，小概率砸成皮革或纸）；或者用 `/chm book`（权限 2）直接补发，`/chm book @a` 可以给全服补。手动补一本：
 
 ```
 /give @s patchouli:guide_book{patchouli:book:"create_hand_made:handbook"}
