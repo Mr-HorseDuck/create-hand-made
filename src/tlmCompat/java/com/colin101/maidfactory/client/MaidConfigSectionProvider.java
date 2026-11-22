@@ -102,19 +102,28 @@ public class MaidConfigSectionProvider implements ConfigSectionProvider {
                 () -> new ArrayList<>(MaidStartupConfig.INSTANCE.blockedMods.get()),
                 value -> MaidStartupConfig.INSTANCE.blockedMods.set(value));
 
+        // ★ 这一页不是服务端权威：blocked_mods 在 MaidStartupConfig（COMMON，
+        //   config/create_hand_made-maid.toml），改的是本地文件，多人游戏里也能改。
         return new ConfigCategorySpec(Component.translatable(CAT + "maid.blocked_mods"),
-                List.of(blocked));
+                List.of(blocked), false);
     }
 
     // ==================== 落盘 ====================
 
     /**
-     * 两个 SPEC 都要存：{@code MaidConfig} 是 SERVER（存档 serverconfig/），
-     * {@code MaidStartupConfig} 是 COMMON（config/，因为启动阶段要读 blocked_mods）。
+     * 两个 SPEC 分开处理：
+     * <ul>
+     *   <li>{@code MaidConfig} 是 SERVER（存档 {@code serverconfig/}）—— 只有单人存档里才加载过，
+     *       多人游戏里客户端不该去写它；</li>
+     *   <li>{@code MaidStartupConfig} 是 COMMON（{@code config/}，因为启动阶段就要读
+     *       {@code blocked_mods}）—— 本地文件，什么时候都能存。</li>
+     * </ul>
      */
     @Override
-    public void save() {
-        MaidConfig.SPEC.save();
+    public void save(boolean serverConfigsLoaded) {
+        if (serverConfigsLoaded) {
+            MaidConfig.SPEC.save();
+        }
         MaidStartupConfig.SPEC.save();
     }
 

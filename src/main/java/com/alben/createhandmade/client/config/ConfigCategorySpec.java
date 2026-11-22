@@ -16,9 +16,24 @@ public final class ConfigCategorySpec {
     public final Component title;
     public final List<ConfigOption> options;
 
+    /**
+     * 这一页的值是不是<b>服务端权威</b>（{@code ModConfig.Type.SERVER}）。
+     *
+     * <p>只读判定要跟着它走，而不是整页一刀切：模组里还有 {@code COMMON} 类型的本地配置
+     * （女仆的 `blocked_mods` 在 {@code config/create_hand_made-maid.toml}），
+     * 那种在多人游戏里<b>改的是自己机器上的文件</b>，不该锁。</p>
+     */
+    public final boolean serverAuthoritative;
+
+    /** 服务端权威的页（主配置全部、女仆的 SERVER 项）。 */
     public ConfigCategorySpec(Component title, List<ConfigOption> options) {
+        this(title, options, true);
+    }
+
+    public ConfigCategorySpec(Component title, List<ConfigOption> options, boolean serverAuthoritative) {
         this.title = title;
         this.options = List.copyOf(options);
+        this.serverAuthoritative = serverAuthoritative;
     }
 
     /** 语言键简写。 */

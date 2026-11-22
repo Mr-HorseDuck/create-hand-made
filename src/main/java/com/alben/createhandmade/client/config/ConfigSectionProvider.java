@@ -19,6 +19,13 @@ public interface ConfigSectionProvider {
     /** 要追加到界面里的分类（按顺序排在主配置后面）。 */
     List<ConfigCategorySpec> categories();
 
-    /** 落盘：把本提供方的配置 SPEC 写回 toml。 */
-    void save();
+    /**
+     * 落盘：把本提供方的配置 SPEC 写回 toml。
+     *
+     * @param serverConfigsLoaded 当前是否处在「服务端配置已加载」的环境（单人存档里为 true）。
+     *                            提供方应当只在 true 时保存 {@code SERVER} 类型的 SPEC，
+     *                            {@code COMMON} 类型的本地配置（如女仆 {@code blocked_mods}）
+     *                            任何时候都可以存。
+     */
+    void save(boolean serverConfigsLoaded);
 }

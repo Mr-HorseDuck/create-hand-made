@@ -138,6 +138,7 @@
   "config.create_hand_made.category.maid.cooldowns_2": "Maid · Cooldowns II",
   "config.create_hand_made.category.maid.blocked_mods": "Maid · Blocked mods",
   "command.create_hand_made.config.player_only": "Only a player can open the config screen",
+  "config.create_hand_made.local_config_hint": "Local config: only affects your own game, restart required",
   "config.create_hand_made.multiplayer_hint": "Multiplayer config is managed by the server. Edit serverconfig/create_hand_made-server.toml inside the world folder on the server.",
   "config.create_hand_made.server_config_hint": "Server config is stored per-world. Enter a singleplayer world to edit it.",
 

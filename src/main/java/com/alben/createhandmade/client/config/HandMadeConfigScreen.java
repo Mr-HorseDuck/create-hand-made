@@ -72,7 +72,8 @@ public class HandMadeConfigScreen extends Screen {
     private final Screen parent;
     private final List<ConfigCategorySpec> categories;
     private final Runnable saveCallback;
-    private final boolean readOnly;
+    /** 当前是否不在存档里（{@code getSingleplayerServer() == null}）—— 只读判定的前提之一。 */
+    private final boolean multiplayer;
 
     private final List<Button> categoryButtons = new ArrayList<>();
     private final List<AbstractWidget> rowWidgets = new ArrayList<>();
@@ -90,12 +91,12 @@ public class HandMadeConfigScreen extends Screen {
     private boolean hideGuiCaptured;
 
     public HandMadeConfigScreen(Screen parent, List<ConfigCategorySpec> categories,
-                                Runnable saveCallback, boolean readOnly) {
+                                Runnable saveCallback, boolean multiplayer) {
         super(Component.translatable("config.create_hand_made.title"));
         this.parent = parent;
         this.categories = List.copyOf(categories);
         this.saveCallback = saveCallback;
-        this.readOnly = readOnly;
+        this.multiplayer = multiplayer;
     }
 
     // ==================== 构建 ====================
@@ -134,7 +135,7 @@ public class HandMadeConfigScreen extends Screen {
                         b -> resetCurrentCategory())
                 .bounds(LEFT_X, bottomY, LEFT_W, BTN_H)
                 .build();
-        resetButton.visible = !readOnly;
+        resetButton.visible = !pageReadOnly();
         addRenderableWidget(resetButton);
 
         layoutCategoryButtons();
@@ -146,6 +147,9 @@ public class HandMadeConfigScreen extends Screen {
             return;
         }
         selected = index;
+        if (resetButton != null) {
+            resetButton.visible = !pageReadOnly();
+        }
         for (int i = 0; i < categoryButtons.size(); i++) {
             // 当前页的按钮置灰（原版选项页也是这个语感：点不动 = 已经在这一页）
             categoryButtons.get(i).active = i != index;
@@ -161,7 +165,7 @@ public class HandMadeConfigScreen extends Screen {
         rowWidgets.clear();
         tooltipTargets.clear();
 
-        if (readOnly) {
+        if (pageReadOnly()) {
             return;
         }
         for (Placement placement : layout()) {
@@ -232,6 +236,16 @@ public class HandMadeConfigScreen extends Screen {
         return option instanceof ConfigOption.Strings ? ROW_H_STRINGS : ROW_H;
     }
 
+    /**
+     * 当前这一页是不是只读：<b>多人游戏 + 该页是服务端权威</b>才只读。
+     *
+     * <p>{@code COMMON} 类型的本地配置（女仆 {@code blocked_mods}）在多人里照样能改 ——
+     * 改的是自己机器上的文件。以前按整页一刀切，把这种本地项也锁住了。</p>
+     */
+    private boolean pageReadOnly() {
+        return multiplayer && categories.get(selected).serverAuthoritative;
+    }
+
     private int panelX() {
         return LEFT_X + LEFT_W + PANEL_GAP;
     }
@@ -276,10 +290,13 @@ public class HandMadeConfigScreen extends Screen {
         graphics.drawString(this.font, categories.get(selected).title,
                 panelX(), CONTENT_TOP - 12, 0xA0A0A0, false);
 
-        if (readOnly) {
+        if (pageReadOnly()) {
             renderReadOnlyHints(graphics);
         } else {
             renderStringLabels(graphics);
+            if (!categories.get(selected).serverAuthoritative) {
+                renderLocalConfigHint(graphics);
+            }
         }
 
         for (Map.Entry<AbstractWidget, ConfigOption> entry : tooltipTargets.entrySet()) {
@@ -303,6 +320,13 @@ public class HandMadeConfigScreen extends Screen {
                 graphics.drawString(this.font, placement.option.label, x, placement.y, 0xE0E0E0, false);
             }
         }
+    }
+
+    /** 「这一页是本地配置」的灰字提示（多人游戏里尤其需要，否则玩家会奇怪为什么这页能改）。 */
+    private void renderLocalConfigHint(GuiGraphics graphics) {
+        graphics.drawString(this.font,
+                Component.translatable("config.create_hand_made.local_config_hint"),
+                panelX(), this.height - BOTTOM_MARGIN - 12, 0x707070, false);
     }
 
     private void renderReadOnlyHints(GuiGraphics graphics) {
@@ -359,7 +383,7 @@ public class HandMadeConfigScreen extends Screen {
     /** 「完成」与 Esc 都走这里：先落盘 + 广播，再回上一级。 */
     @Override
     public void onClose() {
-        if (!readOnly && saveCallback != null) {
+        if (saveCallback != null) {
             saveCallback.run();
         }
         this.minecraft.setScreen(this.parent);

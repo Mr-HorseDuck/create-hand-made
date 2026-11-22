@@ -26,6 +26,8 @@
   左侧分类栏 + 右侧选项列表，开关 / 整数滑块 / 列表输入框都是原版控件。
   顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面；女仆配置拆成 4 页
   （基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
+  **只读是按页判定的**：只有 SERVER 类型的页在多人游戏里只读；女仆「屏蔽模组」是
+  `MaidStartupConfig`（COMMON，`config/create_hand_made-maid.toml`，本地文件），多人游戏里照样能改。
   打开时把背景**做一次模糊**（复用原版的 `minecraft:shaders/post/blur.json`，自己建
   `PostChain` 每帧处理主渲染目标，等价 1.21 的 `processBlurEffect`，不动全局后处理；
   光影模组跑不起来就自动停用），同时临时打开 `Options.hideGui` **隐藏 HUD**

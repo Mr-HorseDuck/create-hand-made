@@ -161,22 +161,27 @@ public final class ConfigScreens {
      * 广播丢回服务端线程执行，因为单人游戏里「客户端线程」并不等于「集成服务端线程」。</p>
      */
     private static void saveAll() {
-        try {
-            Config.SPEC.save();
-        } catch (Throwable t) {
-            CreateHandMade.LOGGER.error("[HandMade] 保存主配置失败", t);
+        MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
+        boolean singleplayer = server != null;
+
+        // ★ 主配置是 SERVER 类型：只有在单人存档里才加载过，多人游戏里客户端不该去写它
+        if (singleplayer) {
+            try {
+                Config.SPEC.save();
+            } catch (Throwable t) {
+                CreateHandMade.LOGGER.error("[HandMade] 保存主配置失败", t);
+            }
         }
 
         ConfigSectionProvider maid = maidProvider();
         if (maid != null) {
             try {
-                maid.save();
+                maid.save(singleplayer);
             } catch (Throwable t) {
                 CreateHandMade.LOGGER.error("[HandMade] 保存女仆配置失败", t);
             }
         }
 
-        MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
         if (server != null) {
             server.execute(ModNetwork::broadcastConfigSync);
         }

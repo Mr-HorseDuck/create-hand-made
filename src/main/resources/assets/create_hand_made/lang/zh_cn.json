@@ -142,6 +142,7 @@
   "config.create_hand_made.category.maid.cooldowns_2": "女仆 · 冷却（二）",
   "config.create_hand_made.category.maid.blocked_mods": "女仆 · 屏蔽模组",
   "command.create_hand_made.config.player_only": "只有玩家可以打开配置界面",
+  "config.create_hand_made.local_config_hint": "本地配置：只影响你自己的游戏，改动后需重启",
   "config.create_hand_made.multiplayer_hint": "多人游戏配置由服务端管理。请在服务端存档的 serverconfig/create_hand_made-server.toml 中修改。",
   "config.create_hand_made.server_config_hint": "SERVER 配置按世界独立存储，需进入单人世界后才能修改。",
 
