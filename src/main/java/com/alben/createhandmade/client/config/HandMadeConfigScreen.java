@@ -70,10 +70,12 @@ public class HandMadeConfigScreen extends Screen {
     private static final int BOTTOM_MARGIN = 30;
 
     /**
-     * 背景提亮层：白色 + 这个 alpha 盖在 {@link #renderBackground}（或模糊后的世界）之上。
+     * 存档里的背景提亮层：白色 + 这个 alpha 盖在「原版半透明渐变 + 糊过的世界」之上。
      *
-     * <p>想更亮就调大 alpha（0x50 ≈ 31%），想更暗就调小。原版背景是「0xC0 黑罩 / 0.25 亮度泥土」，
-     * 这一层把它整体抬一档，白字仍然看得清。</p>
+     * <p>想更亮就调大 alpha（0x50 ≈ 31%），想更暗就调小。原版那层是 {@code 0xC0} 的黑罩，
+     * 抬一档之后世界透得更明显，白字仍然看得清。</p>
+     *
+     * <p>★ 只作用于<b>存档里</b>；主菜单（{@code level == null}）保持原版泥土底，不做提亮。</p>
      */
     private static final int BACKDROP_LIGHTEN = 0x38FFFFFF;
 
@@ -329,14 +331,16 @@ public class HandMadeConfigScreen extends Screen {
      *   <li>主菜单里 —— 压暗的泥土底（{@code renderDirtBackground}）。</li>
      * </ul>
      *
-     * <p>然后统一盖一层 {@link #BACKDROP_LIGHTEN}，也就是「原版画法 + 提亮一档」——
-     * 不自己重画贴图，改亮度只改一个常量。控件上的白字仍然看得清。</p>
+     * <p>存档里再盖一层 {@link #BACKDROP_LIGHTEN}，也就是「原版画法 + 提亮一档」；
+     * <b>主菜单里不提亮</b>，保持原版泥土底。改亮度只改一个常量。</p>
      */
     private void renderBackdrop(GuiGraphics graphics) {
         // 原版那套画法（存档里半透明渐变 / 主菜单里压暗的泥土底）
         this.renderBackground(graphics);
-        // 再盖一层低透明度白色，把整体亮度抬一档（不自己重画贴图，免得跟版本细节较劲）
-        graphics.fill(0, 0, this.width, this.height, BACKDROP_LIGHTEN);
+        // 只有存档里才提亮：主菜单的泥土底保持原版观感
+        if (this.minecraft.level != null) {
+            graphics.fill(0, 0, this.width, this.height, BACKDROP_LIGHTEN);
+        }
     }
 
     /** 输入框类选项的标签画在框上方（按钮/滑块把标签塞在控件文字里，不需要）。 */
