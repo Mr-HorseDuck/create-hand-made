@@ -40,6 +40,12 @@ public class HandMadeCommands {
                 Commands.literal("chm")
                         .then(Commands.literal("config")
                                 .executes(ctx -> openConfig(ctx.getSource())))
+                        // ★ /chm book 要求权限等级 2（给物品属于作弊类操作）。
+                        //   子命令（reset / <targets>）不必各自再写 requires：
+                        //   Brigadier 在**解析阶段**就对沿途每个节点调 canUse，
+                        //   父节点 book 这个门一旦不通过，整棵子树（reset、targets）都进不来，
+                        //   tab 补全和用法提示也一样看不到。
+                        //   对比：/chm config 故意**不设**权限 —— 它只是打开自己的配置界面。
                         .then(Commands.literal("book")
                                 .requires(src -> src.hasPermission(2))
                                 // /chm book           → 给自己
