@@ -67,7 +67,7 @@ public class CreateHandMade {
         // ★ 提前初始化 TLM 兼容
         //   - MaidNetwork：通道注册必须在 Forge 通道锁关闭前完成
         //   - MaidConfig ：配置注册必须在 mod 构造阶段完成，否则 ConfigValue 没有关联
-        //                  的 ModConfig，Cloth Config 保存时会抛
+        //                  的 ModConfig，配置界面保存时会抛
         //                  "Cannot set config value without assigned Config object present"
         //   注：lang_2 / MaidLangOverride 已废弃，改为 lang 二合一
         if (ModList.get().isLoaded("touhou_little_maid")) {

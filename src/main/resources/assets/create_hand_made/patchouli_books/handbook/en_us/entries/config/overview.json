@@ -22,7 +22,7 @@
     {
       "type": "patchouli:text",
       "title": "In-game GUI",
-      "text": "With Cloth Config installed, the config button in the mod list edits the same settings, one category per TOML section.$(br2)$(italic)The maid page needs both Cloth Config and Touhou Little Maid. $()"
+      "text": "The config button in the mod list edits the same settings, one category on the left per TOML section.$(br2)The screen is $(l)built in$() - no extra config mod required.$(br2)$(italic)The maid pages only show up when Touhou Little Maid is installed.$()"
     }
   ]
 }

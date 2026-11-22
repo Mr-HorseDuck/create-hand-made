@@ -1,11 +1,13 @@
 package com.alben.createhandmade.command;
 
 import com.alben.createhandmade.CreateHandMade;
+import com.alben.createhandmade.network.ModNetwork;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -31,10 +33,28 @@ public class HandMadeCommands {
 
         dispatcher.register(
                 Commands.literal("chm")
+                        .then(Commands.literal("config")
+                                .executes(ctx -> openConfig(ctx.getSource())))
                         .then(Commands.literal("reload")
                                 .requires(src -> src.hasPermission(2))
                                 .executes(ctx -> reload(ctx.getSource())))
         );
+    }
+
+    /**
+     * 打开配置界面。
+     *
+     * <p>命令在服务端执行、界面在客户端，所以这里只发一个「请打开」的空包；
+     * 客户端收到后自己 {@code setScreen}。多人游戏里打开的是只读视图（SERVER 配置由服务端权威）。</p>
+     */
+    private static int openConfig(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.translatable(
+                    "command.create_hand_made.config.player_only"));
+            return 0;
+        }
+        ModNetwork.sendOpenConfigScreen(player);
+        return 1;
     }
 
     private static int reload(CommandSourceStack source) {

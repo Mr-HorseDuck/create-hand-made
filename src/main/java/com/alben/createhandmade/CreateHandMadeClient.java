@@ -1,14 +1,13 @@
 package com.alben.createhandmade;
 
 import com.alben.createhandmade.client.HandRenderHandlers;
+import com.alben.createhandmade.client.config.ConfigScreens;
 import com.alben.createhandmade.registry.ModItems;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.client.event.RegisterItemDecorationsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -50,41 +49,17 @@ public class CreateHandMadeClient {
     }
 
     /**
-     * 注册配置界面入口。
+     * 注册自绘的配置界面（Forge 的 Mods 列表 → Config 按钮）。
      *
-     * ★ 关键：整个方法只引用 Forge / Minecraft 的类，不 import 任何 Cloth Config 的类。
-     *   Cloth Config 的实际代码在 HandMadeClothConfigIntegration 里，
-     *   通过 Class.forName 延迟加载，确保未安装 Cloth Config 时不会 NoClassDefFoundError。
+     * <p>0.7.0 起不再用 Cloth Config：界面自己画，见
+     * {@link com.alben.createhandmade.client.config.HandMadeConfigScreen}。
+     * 所以这里也不再需要「没装 Cloth 就跳过」的守卫，也不需要 {@code Class.forName}。</p>
      */
     private static void registerConfigScreen() {
-        // 未安装 Cloth Config 则静默跳过
-        if (!ModList.get().isLoaded("cloth_config")) {
-            return;
-        }
-        try {
-            Class<?> integration = Class.forName(
-                    "com.alben.createhandmade.client.HandMadeClothConfigIntegration");
-            java.lang.reflect.Method create = integration.getMethod("create", Screen.class);
-
-            ConfigScreenHandler.ConfigScreenFactory factory =
-                    new ConfigScreenHandler.ConfigScreenFactory((mc, parent) -> {
-                        try {
-                            return (Screen) create.invoke(null, parent);
-                        } catch (Throwable t) {
-                            CreateHandMade.LOGGER.error(
-                                    "Failed to build Hand Made config screen", t);
-                            return null;
-                        }
-                    });
-
-            ModLoadingContext.get().registerExtensionPoint(
-                    ConfigScreenHandler.ConfigScreenFactory.class,
-                    () -> factory);
-
-            CreateHandMade.LOGGER.info("[HandMade] Cloth Config screen registered.");
-        } catch (Throwable t) {
-            CreateHandMade.LOGGER.error(
-                    "Failed to register Hand Made Cloth Config screen", t);
-        }
+        ConfigScreenHandler.ConfigScreenFactory factory =
+                new ConfigScreenHandler.ConfigScreenFactory((mc, parent) -> ConfigScreens.create(parent));
+        ModLoadingContext.get().registerExtensionPoint(
+                ConfigScreenHandler.ConfigScreenFactory.class, () -> factory);
+        CreateHandMade.LOGGER.info("[HandMade] Config screen registered (built-in).");
     }
 }

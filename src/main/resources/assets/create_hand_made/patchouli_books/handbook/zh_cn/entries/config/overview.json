@@ -22,7 +22,7 @@
     {
       "type": "patchouli:text",
       "title": "图形界面",
-      "text": "装了 Cloth Config 的话，模组列表里的配置按钮能直接改，分类和 TOML 一一对应。$(br2)$(italic)女仆页需要同时装 Cloth Config 与车万女仆。$()"
+      "text": "模组列表里的配置按钮能直接改，左边分类和 TOML 一一对应。$(br2)界面是模组$(l)自带的$()，不需要额外装配置模组。$(br2)$(italic)女仆那几页要装了车万女仆才会出现。$()"
     }
   ]
 }

@@ -10,7 +10,8 @@ import org.apache.commons.lang3.tuple.Pair;
  * ★ 由 CreateHandMade 主类通过反射调用 registerSpec()，避免 main 编译时依赖 tlmCompat。
  *
  * <p>★ 注册类型为 {@link ModConfig.Type#SERVER}，与主配置 {@code Config} 对齐：
- * 单人游戏由集成的服务端加载、可在本模组的 Cloth 配置界面里改；多人游戏里客户端只读，
+ * 单人游戏由集成的服务端加载、可在本模组自带的配置界面（Mods 列表 → 配置，或 /chm config）里改；
+ * 多人游戏里客户端只读，
  * 以服务端为准。文件位于存档的 {@code serverconfig/create_hand_made-maid-server.toml}。</p>
  *
  * <p>注意：{@code blocked_mods} 不在这里 —— 它在 mod 初始化阶段就要读，

@@ -24,9 +24,9 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  */
 public class ModNetwork {
 
-    // ★ 配置同步包（id 5）加入后升到 "2"：老客户端/服务端会直接被判为不兼容，
-    //   而不是收到包后按旧格式解出半截数据。
-    private static final String PROTOCOL_VERSION = "2";
+    // ★ 0.7.0 升到 "3"：新增 OpenConfigScreenPacket（/chm config）。
+    //   老客户端不认识这个包，宁可被判为不兼容，也不要收到包后崩在解码阶段。
+    private static final String PROTOCOL_VERSION = "3";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(CreateHandMade.MODID, "main"),
@@ -97,6 +97,16 @@ public class ModNetwork {
                                 com.alben.createhandmade.network.client.ClientPayloadHandler
                                         .handleConfigSync(packet)))
                 .add();
+
+        // ================= OpenConfigScreenPacket（/chm config） =================
+        CHANNEL.messageBuilder(OpenConfigScreenPacket.class, id++)
+                .encoder(OpenConfigScreenPacket::encode)
+                .decoder(OpenConfigScreenPacket::new)
+                .consumerMainThread((packet, ctx) ->
+                        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                                com.alben.createhandmade.network.client.ClientPayloadHandler
+                                        .handleOpenConfigScreen(packet)))
+                .add();
     }
 
     // ================= SERVER 配置 → 客户端 =================
@@ -105,6 +115,15 @@ public class ModNetwork {
     public static void sendConfigSync(ServerPlayer player) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                 new ConfigSyncPacket(SyncedServerConfig.capture()));
+    }
+
+    /**
+     * 让某个玩家打开配置界面（{@code /chm config} 的执行结果）。
+     *
+     * <p>界面在客户端，服务端只能发通知——这也是为什么这个包体是空的。</p>
+     */
+    public static void sendOpenConfigScreen(ServerPlayer player) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new OpenConfigScreenPacket());
     }
 
     /** 配置重载后广播给所有在线玩家；没有服务端（纯客户端环境）时什么也不做。 */

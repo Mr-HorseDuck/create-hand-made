@@ -6,6 +6,7 @@ import com.alben.createhandmade.network.BellowsBlastPacket;
 import com.alben.createhandmade.network.ConfigSyncPacket;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.HighlightBlockPacket;
+import com.alben.createhandmade.network.OpenConfigScreenPacket;
 import com.alben.createhandmade.network.PressParticlesPacket;
 import com.alben.createhandmade.network.StirringStatePacket;
 import com.alben.createhandmade.particle.BellowsAirParticle;
@@ -34,6 +35,15 @@ import java.util.List;
  *   - 主线程保证由 SimpleChannel 的 consumerMainThread 提供
  */
 public class ClientPayloadHandler {
+
+    /**
+     * {@code /chm config}：服务端让我们开配置界面。
+     *
+     * <p>不传 parent —— 命令不是从某个界面里点开的，关掉就回到游戏。</p>
+     */
+    public static void handleOpenConfigScreen(OpenConfigScreenPacket packet) {
+        com.alben.createhandmade.client.config.ConfigScreens.open(null);
+    }
 
     public static void handleHighlight(HighlightBlockPacket packet) {
         Level level = Minecraft.getInstance().level;
