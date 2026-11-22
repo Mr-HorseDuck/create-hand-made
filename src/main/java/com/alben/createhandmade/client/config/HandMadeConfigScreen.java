@@ -1,10 +1,17 @@
 package com.alben.createhandmade.client.config;
 
-import net.minecraft.ChatFormatting;
+import com.alben.createhandmade.CreateHandMade;
+import com.simibubi.create.foundation.gui.AllIcons;
+import com.simibubi.create.foundation.gui.widget.IconButton;
+import net.createmod.catnip.gui.AbstractSimiScreen;
+import net.createmod.catnip.gui.element.BoxElement;
+import net.createmod.catnip.gui.widget.AbstractSimiWidget;
+import net.createmod.catnip.theme.Color;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -16,77 +23,76 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 自绘的配置界面（<b>不依赖 Cloth Config</b>）。
+ * 机械动力风格的配置界面（<b>自绘，不依赖 Cloth Config</b>）。
  *
- * <p>版式照原版选项页的意思来：左边一列分类，右边是要改的项，底下一个「完成」。</p>
- * <pre>
- *  ┌───────────────────────────────────────────────┐
- *  │            机械动力：手搓学 配置              │
- *  ├──────────────┬────────────────────────────────┤
- *  │ 手锯         │  [ 整树砍伐：开 ]              │
- *  │ 冲压锤       │  [ 手锯起手时长：10    ▮▮▮ ]   │
- *  │ 风箱         │  [ 手锯切削时长：20    ▮▮▮ ]   │
- *  │ …            │                                │
- *  ├──────────────┴────────────────────────────────┤
- *  │ [恢复本页默认]            [      完成      ]  │
- *  └───────────────────────────────────────────────┘
- * </pre>
- *
- * <h2>几个刻意的取舍</h2>
+ * <p>骨架和零件全部借用 Create / Catnip 自己的那套 UI：</p>
  * <ul>
- *   <li><b>右侧不滚动</b>：每页最多 7 项（{@link #ROW_H} 固定行高，整块垂直居中）。
- *       分类因此拆得比较细——女仆配置的 12 项拆成「基础 / 冷却 / 屏蔽模组」三页。
- *       这样省掉整套自绘滚动列表，也不会出现「滚一半控件错位」。</li>
- *   <li><b>左侧分类可以滚</b>：分类数随可选模组变化（装了女仆就 +3 页），
- *       窗口矮的时候放不下，用滚轮滚；滚出可视区的按钮直接 {@code visible = false}，
- *       避免半截按钮露在标题栏上。</li>
- *   <li><b>改动即时生效</b>：控件一动就写进 {@code ForgeConfigSpec} 的值里，
- *       关界面（完成 / Esc）时统一落盘 + 广播 —— 与以前 Cloth 的 {@code setSaveConsumer} 一致。</li>
- *   <li><b>多人游戏整页只读</b>：SERVER 配置在多人里由服务端权威，
- *       与以前一样只显示两条提示文字，不给控件。</li>
- *   <li><b>打开时糊背景、藏 HUD</b>：{@link ScreenBackdrop} 把世界做一次模糊，
- *       同时临时把 {@code Options.hideGui} 打开 —— 物品栏、生命条、聊天、
- *       以及尊重该开关的小地图全部让位，关掉界面后原样恢复（原本按着 F1 的话也不会被改坏）。</li>
+ *   <li>窗口基类 {@link AbstractSimiScreen}（负责窗口居中、暗化背景、逐 tick 派发）；</li>
+ *   <li>面板 {@link BoxElement}——Create 所有界面用的那种「深色底 + 渐变描边」盒子，
+ *       两层描边 + 内发光都是代码画的，所以<b>不需要额外贴图</b>；</li>
+ *   <li>数值用 {@link ScrollInput}（就是 Create 方块实体界面上滚轮调数字那种控件）；</li>
+ *   <li>按钮用 {@link IconButton} + {@link AllIcons#I_CONFIG_SAVE} / {@link AllIcons#I_CONFIG_RESET} /
+ *       {@link AllIcons#I_CONFIG_LOCKED}——Create 自己的配置界面上用的就是这几个图标；</li>
+ *   <li>文字配色取 {@code UIRenderHelper.COLOR_TEXT*} 的同一组色值（#eeeeee / #a3a3a3 / #8ab6d6）。</li>
  * </ul>
+ *
+ * <p>数据层没变：仍然是 {@link ConfigCategorySpec} / {@link ConfigOption}，
+ * 所以「主配置 8 页 + 女仆 4 页」「按页只读」「改动即时写回」这些语义与上一版完全一致。</p>
+ *
+ * <p>另外两点保留：打开时糊背景（{@link ScreenBackdrop}）、临时藏 HUD
+ * （{@code Options.hideGui}，{@link #removed()} 里还原）。</p>
  */
-public class HandMadeConfigScreen extends Screen {
+public class HandMadeConfigScreen extends AbstractSimiScreen {
 
-    // ---- 左侧分类栏 ----
-    private static final int LEFT_X = 10;
-    private static final int LEFT_W = 120;
-    private static final int BTN_H = 20;
-    private static final int BTN_GAP = 2;
-
-    // ---- 右侧内容区 ----
-    private static final int CONTENT_TOP = 34;
-    private static final int PANEL_GAP = 10;
+    // ==================== 版式 ====================
+    private static final int WIDTH = 360;
+    private static final int HEIGHT = 236;
+    private static final int PADDING = 10;
+    /** 左侧分类栏宽度。 */
+    private static final int CAT_W = 112;
+    private static final int CAT_ROW_H = 20;
+    private static final int CAT_ROW_GAP = 2;
+    /** 右侧每一行的高度。 */
     private static final int ROW_H = 24;
     /** 带输入框的行要额外给标签留一行。 */
-    private static final int ROW_H_STRINGS = 36;
+    private static final int ROW_H_STRINGS = 34;
     private static final int ROW_GAP = 4;
-    private static final int MIN_WIDGET_W = 110;
-    private static final int MAX_WIDGET_W = 240;
+    /** 滑块 / 输入框宽度。 */
+    private static final int CONTROL_W = 118;
+    private static final int CONTROL_H = 18;
 
-    private static final int BOTTOM_MARGIN = 30;
+    // ==================== 配色（与 Catnip 的文字色板同源） ====================
+    private static final int TEXT = 0xFFEEEEEE;
+    private static final int TEXT_DIM = 0xFFA3A3A3;
+    private static final int TEXT_FAINT = 0xFF808080;
+    /** Create 的浅蓝强调色。 */
+    private static final int ACCENT = 0xFF8AB6D6;
+    private static final int ACCENT_SOFT = 0x508AB6D6;
+    private static final int BRASS = 0xFFB98A5A;
+    private static final int ROW_HOVER = 0x18FFFFFF;
+    private static final int ROW_SELECTED = 0x308AB6D6;
 
     private final Screen parent;
     private final List<ConfigCategorySpec> categories;
     private final Runnable saveCallback;
-    /** 当前是否不在存档里（{@code getSingleplayerServer() == null}）—— 只读判定的前提之一。 */
     private final boolean multiplayer;
 
-    private final List<Button> categoryButtons = new ArrayList<>();
-    private final List<AbstractWidget> rowWidgets = new ArrayList<>();
-    /** 控件 → 选项，用来在 render 里出悬停说明（IdentityHashMap：控件没有值语义）。 */
-    private final Map<AbstractWidget, ConfigOption> tooltipTargets = new IdentityHashMap<>();
+    /** 面板（BoxElement 的两层描边 + 内发光都是代码画的，不需要贴图）。 */
+    private BoxElement panel;
+    private final ScreenBackdrop backdrop = new ScreenBackdrop();
 
+    /** 右侧当前页的控件。 */
+    private final List<AbstractWidget> rowWidgets = new ArrayList<>();
+    /** 布尔开关的按钮 → 它对应的选项（点一下取反）。 */
+    private final Map<IconButton, ConfigOption.Bool> boolButtons = new IdentityHashMap<>();
+    /** 数值控件 → 选项（为了悬停说明）。 */
+    private final Map<AbstractWidget, ConfigOption> hoverTargets = new IdentityHashMap<>();
+
+    private IconButton doneButton;
+    private IconButton resetButton;
     private int selected;
     private int categoryScroll;
-    private Button resetButton;
 
-    /** 背景模糊；界面关闭时一并释放。 */
-    private final ScreenBackdrop backdrop = new ScreenBackdrop();
-    /** 打开界面前 HUD 是否已经被玩家自己藏起来了（F1）——关界面时要还原成这个值。 */
     private boolean hideGuiBefore;
     private boolean hideGuiCaptured;
 
@@ -97,48 +103,48 @@ public class HandMadeConfigScreen extends Screen {
         this.categories = List.copyOf(categories);
         this.saveCallback = saveCallback;
         this.multiplayer = multiplayer;
+        // 必须在 super.init() 之前设置窗口尺寸（AbstractSimiScreen 的约定）
+        setWindowSize(WIDTH, HEIGHT);
     }
 
     // ==================== 构建 ====================
 
     @Override
     protected void init() {
-        // 隐藏 HUD：物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都会让位。
-        // 只在第一次 init 时记录原值——窗口缩放会重跑 init()，那不该把「已隐藏」当成原值。
+        super.init();   // 算出 guiLeft / guiTop
+
+        // 藏 HUD：只在第一次 init 时记原值（窗口缩放会重跑 init）
         if (!hideGuiCaptured) {
             hideGuiBefore = this.minecraft.options.hideGui;
             hideGuiCaptured = true;
         }
         this.minecraft.options.hideGui = true;
 
-        // 窗口尺寸变化会重跑 init()，Screen 已经把控件清空了，这里同步清掉自己的引用
-        categoryButtons.clear();
+        // 面板（BoxElement 画两层描边 + 内发光，位置是内容区左上角）
+        // ★ 不能链式调用：at()/withBounds() 在 RenderElement 接口上是泛型 <T extends RenderElement> T，
+        //   链起来静态类型会塌回接口，后面 withBackground 就找不到了。
+        BoxElement box = new BoxElement();
+        box.at(guiLeft + 3, guiTop + 3);
+        box.withBounds(WIDTH - 6, HEIGHT - 6);
+        box.withBackground(new Color(0xF0_1D1F24, true));
+        box.gradientBorder(new Color(0xFF_4C525B, true), new Color(0xA0_212429, true));
+        this.panel = box;
+
         rowWidgets.clear();
-        tooltipTargets.clear();
-        categoryScroll = 0;
+        boolButtons.clear();
+        hoverTargets.clear();
 
-        for (int i = 0; i < categories.size(); i++) {
-            int index = i;
-            Button button = Button.builder(categories.get(i).title, b -> selectCategory(index))
-                    .bounds(LEFT_X, CONTENT_TOP, LEFT_W, BTN_H)
-                    .build();
-            categoryButtons.add(button);
-            addRenderableWidget(button);
-        }
+        int buttonY = guiTop + HEIGHT - PADDING - 16;
+        doneButton = new IconButton(guiLeft + WIDTH - PADDING - 16, buttonY, AllIcons.I_CONFIG_SAVE);
+        doneButton.setToolTip(Component.translatable("gui.done"));
+        doneButton.withCallback(this::onClose);
+        addRenderableWidget(doneButton);
 
-        int bottomY = this.height - BOTTOM_MARGIN + 4;
-        addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> onClose())
-                .bounds(this.width / 2 - 60, bottomY, 120, BTN_H)
-                .build());
-
-        resetButton = Button.builder(Component.translatable("config.create_hand_made.reset"),
-                        b -> resetCurrentCategory())
-                .bounds(LEFT_X, bottomY, LEFT_W, BTN_H)
-                .build();
-        resetButton.visible = !pageReadOnly();
+        resetButton = new IconButton(guiLeft + WIDTH - PADDING - 16 - 20, buttonY, AllIcons.I_CONFIG_RESET);
+        resetButton.setToolTip(Component.translatable("config.create_hand_made.reset"));
+        resetButton.withCallback(this::resetCurrentCategory);
         addRenderableWidget(resetButton);
 
-        layoutCategoryButtons();
         selectCategory(Math.min(selected, Math.max(0, categories.size() - 1)));
     }
 
@@ -150,21 +156,21 @@ public class HandMadeConfigScreen extends Screen {
         if (resetButton != null) {
             resetButton.visible = !pageReadOnly();
         }
-        for (int i = 0; i < categoryButtons.size(); i++) {
-            // 当前页的按钮置灰（原版选项页也是这个语感：点不动 = 已经在这一页）
-            categoryButtons.get(i).active = i != index;
-        }
-        rebuildRows();
+        rebuildRowWidgets();
     }
 
-    /** 按当前分类重建右侧控件。 */
-    private void rebuildRows() {
+    /** 当前页是否只读：多人游戏 + 该页是服务端权威（COMMON 的本地配置在多人下照样能改）。 */
+    private boolean pageReadOnly() {
+        return multiplayer && categories.get(selected).serverAuthoritative;
+    }
+
+    private void rebuildRowWidgets() {
         for (AbstractWidget widget : rowWidgets) {
             removeWidget(widget);
         }
         rowWidgets.clear();
-        tooltipTargets.clear();
-
+        boolButtons.clear();
+        hoverTargets.clear();
         if (pageReadOnly()) {
             return;
         }
@@ -175,42 +181,72 @@ public class HandMadeConfigScreen extends Screen {
 
     private void addRowWidget(Placement placement) {
         ConfigOption option = placement.option;
-        int x = panelX();
-        int width = panelWidth();
-        int widgetY = placement.y + (placement.height - BTN_H) / 2;
+        int controlX = controlX();
+        int controlY = placement.y + (placement.height - CONTROL_H) / 2;
 
-        if (option instanceof ConfigOption.Bool bool) {
-            Button button = Button.builder(boolLabel(bool), b -> {
+        if (option instanceof ConfigOption.Int integer) {
+            track(new IntSlider(controlX, controlY, CONTROL_W, CONTROL_H, integer), option);
+        } else if (option instanceof ConfigOption.Bool bool) {
+            IconButton toggle = new IconButton(controlX + CONTROL_W - 16, controlY, 16, 16,
+                    bool.get() ? AllIcons.I_CONFIRM : AllIcons.I_DISABLE);
+            toggle.green = bool.get();
+            toggle.withCallback(() -> {
                 bool.set(!bool.get());
-                b.setMessage(boolLabel(bool));
-            }).bounds(x, widgetY, width, BTN_H).build();
-            track(button, option);
-        } else if (option instanceof ConfigOption.Int integer) {
-            track(new IntSlider(x, widgetY, width, BTN_H, integer), option);
+                toggle.setIcon(bool.get() ? AllIcons.I_CONFIRM : AllIcons.I_DISABLE);
+                toggle.green = bool.get();
+            });
+            boolButtons.put(toggle, bool);
+            track(toggle, option);
         } else if (option instanceof ConfigOption.Strings strings) {
-            EditBox box = new EditBox(this.font, x, placement.y + 13, width, BTN_H, option.label);
+            EditBox box = new EditBox(this.font, controlX, placement.y + 13, CONTROL_W, CONTROL_H,
+                    option.label);
+            box.setBordered(false);
             box.setMaxLength(1024);
-            // 先填值再挂 responder：setValue 会触发一次 responder，先挂上会多写一次配置
             box.setValue(strings.join());
             box.setResponder(text -> strings.set(ConfigOption.Strings.parse(text)));
-            box.setHint(Component.translatable("config.create_hand_made.list_hint")
-                    .withStyle(ChatFormatting.DARK_GRAY));
+            box.setTextColor(TEXT);
             track(box, option);
         }
     }
 
     private void track(AbstractWidget widget, ConfigOption option) {
-        tooltipTargets.put(widget, option);
+        hoverTargets.put(widget, option);
         rowWidgets.add(widget);
         addRenderableWidget(widget);
     }
 
-    // ==================== 布局 ====================
+    // ==================== 版式计算 ====================
 
     private record Placement(ConfigOption option, int y, int height) {
     }
 
-    /** 当前页每一项的纵向位置：整块在内容区里垂直居中。 */
+    /** 分类栏左缘 / 右缘。 */
+    private int catX() {
+        return guiLeft + PADDING;
+    }
+
+    private int catTop() {
+        return guiTop + 30;
+    }
+
+    private int catBottom() {
+        return guiTop + HEIGHT - PADDING - 20;
+    }
+
+    /** 右侧内容区左缘。 */
+    private int contentX() {
+        return catX() + CAT_W + PADDING;
+    }
+
+    private int contentRight() {
+        return guiLeft + WIDTH - PADDING;
+    }
+
+    private int controlX() {
+        return contentRight() - CONTROL_W;
+    }
+
+    /** 右侧每一项的纵向位置：整块垂直居中。 */
     private List<Placement> layout() {
         ConfigCategorySpec category = categories.get(selected);
         int total = 0;
@@ -220,8 +256,8 @@ public class HandMadeConfigScreen extends Screen {
         if (total > 0) {
             total -= ROW_GAP;
         }
-        int available = this.height - CONTENT_TOP - BOTTOM_MARGIN - 8;
-        int y = CONTENT_TOP + Math.max(0, (available - total) / 2);
+        int available = catBottom() - catTop();
+        int y = catTop() + Math.max(0, (available - total) / 2);
 
         List<Placement> placements = new ArrayList<>(category.options.size());
         for (ConfigOption option : category.options) {
@@ -236,71 +272,140 @@ public class HandMadeConfigScreen extends Screen {
         return option instanceof ConfigOption.Strings ? ROW_H_STRINGS : ROW_H;
     }
 
-    /**
-     * 当前这一页是不是只读：<b>多人游戏 + 该页是服务端权威</b>才只读。
-     *
-     * <p>{@code COMMON} 类型的本地配置（女仆 {@code blocked_mods}）在多人里照样能改 ——
-     * 改的是自己机器上的文件。以前按整页一刀切，把这种本地项也锁住了。</p>
-     */
-    private boolean pageReadOnly() {
-        return multiplayer && categories.get(selected).serverAuthoritative;
-    }
-
-    private int panelX() {
-        return LEFT_X + LEFT_W + PANEL_GAP;
-    }
-
-    private int panelWidth() {
-        int width = this.width - panelX() - 10;
-        return Math.max(MIN_WIDGET_W, Math.min(MAX_WIDGET_W, width));
-    }
-
-    /** 左侧分类按钮按滚动量重新摆位，滚出可视区的直接隐藏。 */
-    private void layoutCategoryButtons() {
-        int top = CONTENT_TOP;
-        int bottom = this.height - BOTTOM_MARGIN;
-        for (int i = 0; i < categoryButtons.size(); i++) {
-            Button button = categoryButtons.get(i);
-            int y = top + i * (BTN_H + BTN_GAP) - categoryScroll;
-            button.setY(y);
-            button.visible = y >= top && y + BTN_H <= bottom;
-        }
-    }
-
     private int maxCategoryScroll() {
-        int content = categoryButtons.size() * (BTN_H + BTN_GAP) - BTN_GAP;
-        int visible = this.height - BOTTOM_MARGIN - CONTENT_TOP;
+        int content = categories.size() * (CAT_ROW_H + CAT_ROW_GAP) - CAT_ROW_GAP;
+        int visible = catBottom() - catTop();
         return Math.max(0, content - visible);
+    }
+
+    /** 分类行的屏幕矩形（i 为分类序号）；被滚出可视区时返回 null。 */
+    private int[] catRowRect(int index) {
+        int y = catTop() + index * (CAT_ROW_H + CAT_ROW_GAP) - categoryScroll;
+        if (y < catTop() || y + CAT_ROW_H > catBottom()) {
+            return null;
+        }
+        return new int[]{catX(), y, CAT_W, CAT_ROW_H};
     }
 
     // ==================== 绘制 ====================
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // 先糊背景：此时世界已经在主渲染目标里，模糊完再画半透明底色与控件
+    protected void renderWindowBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (this.minecraft.level == null) {
+            // 主菜单里没有可糊的世界，铺原版泥土底盖住上一屏
+            renderBackground(graphics);
+            return;
+        }
+        // 存档里只留模糊：不叠原版的半透明黑罩（深色面板本身已经够压住视线了）
         backdrop.blur(partialTick);
-        // ★ 1.20.1 的 Screen.render 只画 renderables，**背景要自己画**：
-        //   不画的话屏幕上留着的还是上一帧（例如 Mods 列表）——就是「配置和 Mods 页重叠」。
-        //   这里不用 super.renderBackground：那个在存档里用 0xC0 的黑罩、主菜单里把泥土压到 0.25，
-        //   都比我们要的暗，所以自己按同一套画法给一份更亮的。
-        renderBackdrop(graphics);
-        super.render(graphics, mouseX, mouseY, partialTick);
+    }
 
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, 6, 0xFFFFFF);
-        // 分类名贴在右侧内容区上方（左对齐，避免和居中的总标题撞在一起）
-        graphics.drawString(this.font, categories.get(selected).title,
-                panelX(), CONTENT_TOP - 12, 0xA0A0A0, false);
+    @Override
+    protected void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        panel.render(graphics);
+
+        // 标题 + 下方一道浅蓝分隔线
+        graphics.drawString(this.font, this.title,
+                guiLeft + (WIDTH - this.font.width(this.title)) / 2, guiTop + 9, TEXT, true);
+        graphics.fill(guiLeft + PADDING, guiTop + 21, guiLeft + WIDTH - PADDING, guiTop + 22, ACCENT_SOFT);
+        // 分类栏与内容区之间的竖分隔
+        graphics.fill(catX() + CAT_W + PADDING / 2, catTop(),
+                catX() + CAT_W + PADDING / 2 + 1, catBottom(), 0x30FFFFFF);
+
+        renderCategories(graphics, mouseX, mouseY);
+        renderContent(graphics, mouseX, mouseY);
 
         if (pageReadOnly()) {
-            renderReadOnlyHints(graphics);
-        } else {
-            renderStringLabels(graphics);
-            if (!categories.get(selected).serverAuthoritative) {
-                renderLocalConfigHint(graphics);
+            drawLockedBadge(graphics);
+        }
+    }
+
+    private void renderCategories(GuiGraphics graphics, int mouseX, int mouseY) {
+        for (int i = 0; i < categories.size(); i++) {
+            int[] rect = catRowRect(i);
+            if (rect == null) {
+                continue;
             }
+            boolean hovered = mouseX >= rect[0] && mouseX < rect[0] + rect[2]
+                    && mouseY >= rect[1] && mouseY < rect[1] + rect[3];
+            boolean isSelected = i == selected;
+
+            if (isSelected) {
+                graphics.fill(rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3], ROW_SELECTED);
+                graphics.fill(rect[0], rect[1], rect[0] + 2, rect[1] + rect[3], BRASS);
+            } else if (hovered) {
+                graphics.fill(rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3], ROW_HOVER);
+            }
+
+            Component title = categories.get(i).title;
+            graphics.drawString(this.font, title, rect[0] + 8, rect[1] + 6,
+                    isSelected ? ACCENT : TEXT_DIM, false);
+        }
+    }
+
+    private void renderContent(GuiGraphics graphics, int mouseX, int mouseY) {
+        ConfigCategorySpec category = categories.get(selected);
+
+        if (pageReadOnly()) {
+            int y = catTop() + 4;
+            for (String key : new String[]{
+                    "config.create_hand_made.multiplayer_hint",
+                    "config.create_hand_made.server_config_hint"}) {
+                y = drawWrapped(graphics, Component.translatable(key), contentX(),
+                        contentRight(), y, TEXT_DIM) + 4;
+            }
+            return;
         }
 
-        for (Map.Entry<AbstractWidget, ConfigOption> entry : tooltipTargets.entrySet()) {
+        // 「本地配置」页面（COMMON，如女仆 blocked_mods）在多人下也能改，点明一下。
+        // ★ 画在内容区**底部**（按钮上方），不要贴着标题——之前放 catTop()-14 会和标题/分隔线撞在一起。
+        if (!category.serverAuthoritative) {
+            graphics.drawString(this.font,
+                    Component.translatable("config.create_hand_made.local_config_hint"),
+                    contentX(), catBottom() - 10, TEXT_FAINT, false);
+        }
+
+        for (Placement placement : layout()) {
+            ConfigOption option = placement.option;
+            int labelY = placement.y + (option instanceof ConfigOption.Strings ? 2 : 7);
+            graphics.drawString(this.font, option.label, contentX(), labelY, TEXT, false);
+
+            if (option instanceof ConfigOption.Strings) {
+                // 输入框自己没边框，这里补一块深色底 + 顶部一条细线
+                int boxY = placement.y + 13;
+                graphics.fill(controlX() - 2, boxY - 2, controlX() + CONTROL_W + 2,
+                        boxY + CONTROL_H - 2, 0x90000000);
+                graphics.fill(controlX() - 2, boxY - 3, controlX() + CONTROL_W + 2, boxY - 2, 0x30FFFFFF);
+            } else if (option instanceof ConfigOption.Bool bool) {
+                // 「开 / 关」文字贴在按钮左侧
+                Component state = Component.translatable(bool.get() ? "options.on" : "options.off");
+                graphics.drawString(this.font, state,
+                        controlX() + CONTROL_W - 20 - this.font.width(state), labelY,
+                        bool.get() ? 0xFF88F788 : TEXT_FAINT, false);
+            }
+        }
+    }
+
+    /** Create 那个「锁」图标：只读页右上角的小徽记。 */
+    private void drawLockedBadge(GuiGraphics graphics) {
+        AllIcons.I_CONFIG_LOCKED.render(graphics, contentRight() - 16, guiTop + 8);
+    }
+
+    /** 按宽度折行绘制，返回下一行的 y。 */
+    private int drawWrapped(GuiGraphics graphics, Component text, int x, int right,
+                            int y, int color) {
+        List<FormattedCharSequence> lines = this.font.split(text, right - x);
+        for (FormattedCharSequence line : lines) {
+            graphics.drawString(this.font, line, x, y, color, false);
+            y += 10;
+        }
+        return y;
+    }
+
+    @Override
+    protected void renderWindowForeground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 控件（滑块 / 开关）的悬停说明
+        for (Map.Entry<AbstractWidget, ConfigOption> entry : hoverTargets.entrySet()) {
             AbstractWidget widget = entry.getKey();
             if (!widget.visible || !widget.isMouseOver(mouseX, mouseY)) {
                 continue;
@@ -309,70 +414,50 @@ public class HandMadeConfigScreen extends Screen {
             if (!tooltip.isEmpty()) {
                 graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
             }
-            break;
+            return;
         }
-    }
 
-    /**
-     * 自绘背景。两种环境要的东西不一样：
-     *
-     * <ul>
-     *   <li><b>存档里</b> —— <b>只留模糊</b>：不叠原版的半透明黑罩、也不加任何白，
-     *       世界就是玩家平时看到的亮度，只是糊了一层（用户的要求）。</li>
-     *   <li><b>主菜单里</b> —— 必须画不透明底，否则上一屏（Mods 列表）会从后面透出来；
-     *       用原版的泥土底（{@code renderBackground} 的 {@code level == null} 分支）。</li>
-     * </ul>
-     */
-    private void renderBackdrop(GuiGraphics graphics) {
-        if (this.minecraft.level == null) {
-            // 主菜单：没有世界可糊，只能自己铺底盖住上一屏
-            this.renderBackground(graphics);
-        }
-        // 存档里：什么都不画 —— 模糊已经由 ScreenBackdrop 在 render() 最前面做完了
-    }
-
-    /** 输入框类选项的标签画在框上方（按钮/滑块把标签塞在控件文字里，不需要）。 */
-    private void renderStringLabels(GuiGraphics graphics) {
-        int x = panelX();
-        for (Placement placement : layout()) {
-            if (placement.option instanceof ConfigOption.Strings) {
-                graphics.drawString(this.font, placement.option.label, x, placement.y, 0xE0E0E0, false);
+        // 右侧行的标签区域也算热区（不用非得压在控件上）
+        if (!pageReadOnly() && mouseX >= contentX() && mouseX < contentRight()) {
+            for (Placement placement : layout()) {
+                if (mouseY < placement.y || mouseY >= placement.y + placement.height) {
+                    continue;
+                }
+                List<Component> tooltip = placement.option.tooltip;
+                if (!tooltip.isEmpty()) {
+                    graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+                }
+                return;
             }
-        }
-    }
-
-    /** 「这一页是本地配置」的灰字提示（多人游戏里尤其需要，否则玩家会奇怪为什么这页能改）。 */
-    private void renderLocalConfigHint(GuiGraphics graphics) {
-        graphics.drawString(this.font,
-                Component.translatable("config.create_hand_made.local_config_hint"),
-                panelX(), this.height - BOTTOM_MARGIN - 12, 0x707070, false);
-    }
-
-    private void renderReadOnlyHints(GuiGraphics graphics) {
-        int x = panelX();
-        int width = panelWidth();
-        int y = CONTENT_TOP + 8;
-        for (String key : new String[]{
-                "config.create_hand_made.multiplayer_hint",
-                "config.create_hand_made.server_config_hint"}) {
-            List<FormattedCharSequence> lines =
-                    this.font.split(Component.translatable(key), width);
-            for (FormattedCharSequence line : lines) {
-                graphics.drawString(this.font, line, x, y, 0xFFA0A0A0, false);
-                y += 11;
-            }
-            y += 6;
         }
     }
 
     // ==================== 交互 ====================
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        for (int i = 0; i < categories.size(); i++) {
+            int[] rect = catRowRect(i);
+            if (rect == null) {
+                continue;
+            }
+            if (mouseX >= rect[0] && mouseX < rect[0] + rect[2]
+                    && mouseY >= rect[1] && mouseY < rect[1] + rect[3]) {
+                selectCategory(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseX < LEFT_X + LEFT_W && maxCategoryScroll() > 0) {
+        if (mouseX >= catX() && mouseX < catX() + CAT_W && maxCategoryScroll() > 0) {
             categoryScroll = (int) Math.max(0, Math.min(maxCategoryScroll(),
-                    categoryScroll - delta * (BTN_H + BTN_GAP)));
-            layoutCategoryButtons();
+                    categoryScroll - delta * (CAT_ROW_H + CAT_ROW_GAP)));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -382,15 +467,22 @@ public class HandMadeConfigScreen extends Screen {
         for (ConfigOption option : categories.get(selected).options) {
             option.resetToDefault();
         }
-        rebuildRows();
+        rebuildRowWidgets();
     }
 
-    /**
-     * 界面被换下时（完成 / Esc / 被别的界面顶掉）恢复 HUD 并释放模糊缓冲。
-     *
-     * <p>放在 {@code removed()} 而不是 {@code onClose()}：{@code /chm config} 之后玩家
-     * 有可能直接按 Esc 以外的路径离开（比如别的模组抢开界面），这里才是唯一可靠的收尾点。</p>
-     */
+    /** 关界面（完成 / Esc / 被顶掉）都走这里：保存 + 回上一级。 */
+    @Override
+    public void onClose() {
+        if (saveCallback != null) {
+            try {
+                saveCallback.run();
+            } catch (Throwable t) {
+                CreateHandMade.LOGGER.error("[HandMade] 保存配置失败", t);
+            }
+        }
+        this.minecraft.setScreen(this.parent);
+    }
+
     @Override
     public void removed() {
         this.minecraft.options.hideGui = hideGuiBefore;
@@ -399,64 +491,118 @@ public class HandMadeConfigScreen extends Screen {
         super.removed();
     }
 
-    /** 「完成」与 Esc 都走这里：先落盘 + 广播，再回上一级。 */
-    @Override
-    public void onClose() {
-        if (saveCallback != null) {
-            saveCallback.run();
-        }
-        this.minecraft.setScreen(this.parent);
+    // ==================== 给外部的提示文本用（保持与旧版一致的语义） ====================
+
+    /** 供调试/自检：当前页标题。 */
+    public Component currentCategoryTitle() {
+        return categories.get(selected).title;
     }
 
-    private static Component boolLabel(ConfigOption.Bool option) {
-        return Component.translatable("options.generic_value", option.label,
-                Component.translatable(option.get() ? "options.on" : "options.off"));
-    }
-
-    // ==================== 整数滑块 ====================
+    // ==================== 整数拖动条 ====================
 
     /**
-     * 整数滑块：值域来自配置声明（{@code defineInRange}），所以拖动过程中就把值写回去。
+     * 机械动力配色、<b>可以拖动</b>的整数条。
      *
-     * <p>拖动产生的 {@code value} 是连续 double，这里立刻量化到整数并把滑块位置吸附到
-     * 量化后的刻度上——否则松手后显示值与实际值会差一格。</p>
+     * <p>为什么不用 Create 的 {@code ScrollInput}：它只支持滚轮/点左右箭头，
+     * 而这批参数（起手、加工、冷却）玩家习惯「拖一格看一格」，所以自己画一条：
+     * 深色凹槽 + 底部浅蓝进度 + 右侧黄铜色旋钮，拖动、点击定位、滚轮微调三种都支持。</p>
+     *
+     * <p>值域来自 {@code defineInRange}，所以拖到底也出不了非法值。</p>
      */
-    private static final class IntSlider extends AbstractSliderButton {
+    private static final class IntSlider extends AbstractSimiWidget {
+
+        /**
+         * 旋钮宽度。
+         *
+         * <p>★ 必须是「可走距离 = 控件宽 - 旋钮宽 - 2」的关系，否则会出现两个经典毛病：
+         * 0% 时旋钮向左探出控件、100% 时到不了右端（之前那版就是）。</p>
+         */
+        private static final int KNOB_W = 6;
 
         private final ConfigOption.Int option;
 
         IntSlider(int x, int y, int width, int height, ConfigOption.Int option) {
-            super(x, y, width, height, Component.empty(), fraction(option.get(), option));
+            super(x, y, width, height);
             this.option = option;
-            updateMessage();
         }
 
-        private static double fraction(int value, ConfigOption.Int option) {
+        private double fraction() {
             int span = option.max() - option.min();
-            return span <= 0 ? 0.0 : (double) (value - option.min()) / span;
+            if (span <= 0) {
+                return 0;
+            }
+            return (option.get() - option.min()) / (double) span;
+        }
+
+        /** 旋钮能在轨道里滑动的距离（像素）。 */
+        private int travel() {
+            return Math.max(1, this.width - KNOB_W - 2);
+        }
+
+        /** 当前值对应的旋钮左缘（相对控件左上角）。 */
+        private int knobOffset() {
+            return 1 + (int) Math.round(travel() * fraction());
+        }
+
+        private void setFromMouse(double mouseX) {
+            // 以「旋钮中心」对齐鼠标，和绘制用同一套坐标系
+            double t = (mouseX - (this.getX() + 1) - KNOB_W / 2.0) / travel();
+            t = Math.max(0.0, Math.min(1.0, t));
+            int span = option.max() - option.min();
+            option.set(option.min() + (int) Math.round(t * span));
         }
 
         @Override
-        protected void updateMessage() {
-            // 父类构造阶段可能回调到这里，此时 option 还没赋值——给个空文本兜住
-            if (option == null) {
-                setMessage(Component.empty());
-                return;
-            }
-            setMessage(Component.translatable("options.generic_value", option.label,
-                    Component.literal(Integer.toString(option.get()))));
+        protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            int x = this.getX();
+            int y = this.getY();
+            int w = this.width;
+            int h = this.height;
+            boolean hovered = this.isHovered();
+
+            // 凹槽
+            graphics.fill(x, y, x + w, y + h, 0xFF17181B);
+            graphics.fill(x, y, x + w, y + 1, hovered ? 0x40FFFFFF : 0x28FFFFFF);
+            graphics.fill(x, y + h - 1, x + w, y + h, 0x40_000000);
+
+            // 旋钮位置：0% 贴左内缘、100% 贴右内缘
+            int knobX = x + knobOffset();
+
+            // 底部进度：从左内缘铺到旋钮中心
+            int center = knobX + KNOB_W / 2;
+            graphics.fill(x + 1, y + h - 4, center, y + h - 2, ACCENT);
+
+            // 旋钮（黄铜色竖条）
+            graphics.fill(knobX, y + 1, knobX + KNOB_W, y + h - 1, hovered ? 0xFFE0B47A : BRASS);
+            graphics.fill(knobX, y + 1, knobX + KNOB_W, y + 2, 0x60FFFFFF);
+
+            // 条里只显示「当前值」——标签由 renderContent 在行左边画一次就够了，
+            // 这里再画一次标签会变成两层字叠在一起。只调一次 drawString，用原版自带的阴影。
+            Font font = Minecraft.getInstance().font;
+            Component value = Component.literal(Integer.toString(option.get()));
+            graphics.drawString(font, value, x + (w - font.width(value)) / 2, y + (h - 8) / 2,
+                    TEXT, true);
         }
 
         @Override
-        protected void applyValue() {
-            if (option == null) {
-                return;
-            }
-            int span = option.max() - option.min();
-            int value = option.min() + (int) Math.round(this.value * span);
-            option.set(value);
-            // 吸附到刻度，避免显示值和实际值差一格
-            this.value = fraction(option.get(), option);
+        public void onClick(double mouseX, double mouseY) {
+            setFromMouse(mouseX);
+        }
+
+        @Override
+        protected void onDrag(double mouseX, double mouseY, double dragX, double dragY) {
+            setFromMouse(mouseX);
+        }
+
+        @Override
+        public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+            option.set(option.get() + (int) Math.signum(delta));
+            return true;
+        }
+
+        @Override
+        public void updateWidgetNarration(NarrationElementOutput output) {
+            this.defaultButtonNarrationText(output);
         }
     }
 }

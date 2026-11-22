@@ -22,8 +22,10 @@
 - **L3 配方可以直接作为原版序列组装的步骤**：L3 家族类现在实现了 Create 的 `IAssemblyRecipe`，
   整合包作者在 `create:sequenced_assembly` 的 `sequence` 里写 `create_hand_made:tool_recipe` 不再加载失败。
   （机器仍然执行不了这些步骤——它们只在手搓时被推进。）
-- **自绘配置界面（不再依赖 Cloth Config）**：模组列表里的「配置」按钮现在打开自己画的界面 ——
-  左侧分类栏 + 右侧选项列表，开关 / 整数滑块 / 列表输入框都是原版控件。
+- **自绘配置界面（不再依赖 Cloth Config）**：模组列表里的「配置」按钮现在打开自己画的界面，
+  走 **Create/Catnip 自己的 UI 件**（`AbstractSimiScreen` 窗口 + `BoxElement` 深色面板 +
+  `ScrollInput` 数值控件 + `IconButton` 与 `AllIcons.I_CONFIG_*` 图标），所以是机械动力那套观感，
+  且**不需要额外贴图**。
   顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面；女仆配置拆成 4 页
   （基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
   **只读是按页判定的**：只有 SERVER 类型的页在多人游戏里只读；女仆「屏蔽模组」是
