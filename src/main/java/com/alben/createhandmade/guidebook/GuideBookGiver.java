@@ -30,6 +30,16 @@ import java.lang.reflect.Method;
  * </ol>
  *
  * <p>没装 Patchouli 的玩家完全无感（{@link ModList#isLoaded} 直接挡掉，连注册表都不查）。</p>
+ *
+ * <h2>「每人一次」是怎么判定的</h2>
+ * <p>标记写在<b>玩家自己的持久数据</b>里（{@code create_hand_made:guidebook_given}），而且只有本模组会写。
+ * 所以：</p>
+ * <ul>
+ *   <li><b>老存档 / 新装模组的服务器</b>：玩家数据里没有这个标记 → 首次登录就送（这正是要的行为）；</li>
+ *   <li>已经送过的玩家：标记在 → 不再送；</li>
+ *   <li>换到另一个存档：那是另一份玩家数据 → 会再送一本（"每存档每人一次"，不是"整台机器一次"）。</li>
+ * </ul>
+ * <p>服务端已经有很多老玩家、想统一补发，用 {@code /chm book @a}。</p>
  */
 @Mod.EventBusSubscriber(modid = CreateHandMade.MODID)
 public final class GuideBookGiver {
@@ -48,6 +58,8 @@ public final class GuideBookGiver {
     private static boolean loggedSource;
     /** 只为日志：「没装 Patchouli 所以不送」只提醒一次，免得每次登录刷屏。 */
     private static boolean loggedMissingPatchouli;
+    /** 只为日志：「配置里关掉了赠送」只提醒一次。 */
+    private static boolean loggedDisabled;
 
     private GuideBookGiver() {}
 
@@ -97,6 +109,11 @@ public final class GuideBookGiver {
             return false;
         }
         if (!force && !Config.INSTANCE.giveGuideBookOnFirstJoin.get()) {
+            if (!loggedDisabled) {
+                loggedDisabled = true;
+                CreateHandMade.LOGGER.info(
+                        "[HandMade] 配置 guidebook.give_on_first_join = false，首登不再赠送手册");
+            }
             return false;
         }
 

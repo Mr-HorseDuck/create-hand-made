@@ -18,8 +18,9 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.config.ConfigTracker;
 import net.minecraftforge.fml.config.ModConfig;
 
-import javax.annotation.Nullable;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
 
 @Mod.EventBusSubscriber(modid = CreateHandMade.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class HandMadeCommands {
@@ -41,24 +42,38 @@ public class HandMadeCommands {
                                 .executes(ctx -> openConfig(ctx.getSource())))
                         .then(Commands.literal("book")
                                 .requires(src -> src.hasPermission(2))
-                                .executes(ctx -> giveBook(ctx.getSource(), ctx.getSource().getPlayer()))
-                                .then(Commands.argument("target", EntityArgument.player())
+                                // /chm book           → 给自己
+                                .executes(ctx -> giveBook(ctx.getSource(), self(ctx.getSource())))
+                                // /chm book reset [玩家们] → 清掉「已赠送」标记，下次登录重新送
+                                .then(Commands.literal("reset")
+                                        .executes(ctx -> resetBook(ctx.getSource(), self(ctx.getSource())))
+                                        .then(Commands.argument("targets", EntityArgument.players())
+                                                .executes(ctx -> resetBook(ctx.getSource(),
+                                                        EntityArgument.getPlayers(ctx, "targets")))))
+                                // /chm book <玩家们>  → 批量补发（老存档统一补书就用 @a）
+                                .then(Commands.argument("targets", EntityArgument.players())
                                         .executes(ctx -> giveBook(ctx.getSource(),
-                                                EntityArgument.getPlayer(ctx, "target")))))
+                                                EntityArgument.getPlayers(ctx, "targets")))))
                         .then(Commands.literal("reload")
                                 .requires(src -> src.hasPermission(2))
                                 .executes(ctx -> reload(ctx.getSource())))
         );
     }
 
+    /** 命令执行者自己（控制台没有玩家，返回空集合）。 */
+    private static Collection<ServerPlayer> self(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        return player == null ? List.of() : List.of(player);
+    }
+
     /**
-     * 手动发一本手册（调试 / 补发用）。
+     * 手动发手册（补发用）。
      *
-     * <p>无视「已赠送」标记，方便验证「动态取书」这条路通不通 ——
+     * <p>无视「已赠送」标记，所以：老存档 / 老服务器想统一补书，直接 {@code /chm book @a} 即可。
      * 日志里会打印书物品是从哪来的（PatchouliAPI / NBT 兜底 / 独立物品）。</p>
      */
-    private static int giveBook(CommandSourceStack source, @Nullable ServerPlayer target) {
-        if (target == null) {
+    private static int giveBook(CommandSourceStack source, Collection<ServerPlayer> targets) {
+        if (targets.isEmpty()) {
             source.sendFailure(Component.translatable("command.create_hand_made.config.player_only"));
             return 0;
         }
@@ -66,13 +81,41 @@ public class HandMadeCommands {
             source.sendFailure(Component.translatable("command.create_hand_made.book.no_patchouli"));
             return 0;
         }
-        if (!GuideBookGiver.tryGive(target, true)) {
+        int given = 0;
+        for (ServerPlayer target : targets) {
+            if (GuideBookGiver.tryGive(target, true)) {
+                given++;
+            }
+        }
+        if (given == 0) {
             source.sendFailure(Component.translatable("command.create_hand_made.book.failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.translatable("command.create_hand_made.book.success",
-                target.getDisplayName()), true);
-        return 1;
+        int count = given;
+        source.sendSuccess(() -> Component.translatable("command.create_hand_made.book.success", count), true);
+        return count;
+    }
+
+    /**
+     * 清掉「已赠送」标记：下次登录会重新送一本。
+     *
+     * <p>用于「玩家说没收到 / 数据被别的模组洗过」这类情况，也可以先 reset 再 book 一步到位。</p>
+     */
+    private static int resetBook(CommandSourceStack source, Collection<ServerPlayer> targets) {
+        if (targets.isEmpty()) {
+            source.sendFailure(Component.translatable("command.create_hand_made.config.player_only"));
+            return 0;
+        }
+        int cleared = 0;
+        for (ServerPlayer target : targets) {
+            if (GuideBookGiver.hasBeenGiven(target)) {
+                GuideBookGiver.resetGivenFlag(target);
+                cleared++;
+            }
+        }
+        int count = cleared;
+        source.sendSuccess(() -> Component.translatable("command.create_hand_made.book.reset", count), true);
+        return count;
     }
 
     /**
