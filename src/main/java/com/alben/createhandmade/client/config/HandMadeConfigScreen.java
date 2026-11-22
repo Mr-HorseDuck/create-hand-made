@@ -44,6 +44,9 @@ import java.util.Map;
  *       关界面（完成 / Esc）时统一落盘 + 广播 —— 与以前 Cloth 的 {@code setSaveConsumer} 一致。</li>
  *   <li><b>多人游戏整页只读</b>：SERVER 配置在多人里由服务端权威，
  *       与以前一样只显示两条提示文字，不给控件。</li>
+ *   <li><b>打开时糊背景、藏 HUD</b>：{@link ScreenBackdrop} 把世界做一次模糊，
+ *       同时临时把 {@code Options.hideGui} 打开 —— 物品栏、生命条、聊天、
+ *       以及尊重该开关的小地图全部让位，关掉界面后原样恢复（原本按着 F1 的话也不会被改坏）。</li>
  * </ul>
  */
 public class HandMadeConfigScreen extends Screen {
@@ -80,6 +83,12 @@ public class HandMadeConfigScreen extends Screen {
     private int categoryScroll;
     private Button resetButton;
 
+    /** 背景模糊；界面关闭时一并释放。 */
+    private final ScreenBackdrop backdrop = new ScreenBackdrop();
+    /** 打开界面前 HUD 是否已经被玩家自己藏起来了（F1）——关界面时要还原成这个值。 */
+    private boolean hideGuiBefore;
+    private boolean hideGuiCaptured;
+
     public HandMadeConfigScreen(Screen parent, List<ConfigCategorySpec> categories,
                                 Runnable saveCallback, boolean readOnly) {
         super(Component.translatable("config.create_hand_made.title"));
@@ -93,6 +102,14 @@ public class HandMadeConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        // 隐藏 HUD：物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都会让位。
+        // 只在第一次 init 时记录原值——窗口缩放会重跑 init()，那不该把「已隐藏」当成原值。
+        if (!hideGuiCaptured) {
+            hideGuiBefore = this.minecraft.options.hideGui;
+            hideGuiCaptured = true;
+        }
+        this.minecraft.options.hideGui = true;
+
         // 窗口尺寸变化会重跑 init()，Screen 已经把控件清空了，这里同步清掉自己的引用
         categoryButtons.clear();
         rowWidgets.clear();
@@ -246,6 +263,8 @@ public class HandMadeConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 先糊背景：此时世界已经在主渲染目标里，模糊完再画半透明底色与控件
+        backdrop.blur(partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 6, 0xFFFFFF);
@@ -317,6 +336,20 @@ public class HandMadeConfigScreen extends Screen {
             option.resetToDefault();
         }
         rebuildRows();
+    }
+
+    /**
+     * 界面被换下时（完成 / Esc / 被别的界面顶掉）恢复 HUD 并释放模糊缓冲。
+     *
+     * <p>放在 {@code removed()} 而不是 {@code onClose()}：{@code /chm config} 之后玩家
+     * 有可能直接按 Esc 以外的路径离开（比如别的模组抢开界面），这里才是唯一可靠的收尾点。</p>
+     */
+    @Override
+    public void removed() {
+        this.minecraft.options.hideGui = hideGuiBefore;
+        hideGuiCaptured = false;
+        backdrop.close();
+        super.removed();
     }
 
     /** 「完成」与 Esc 都走这里：先落盘 + 广播，再回上一级。 */
