@@ -69,16 +69,6 @@ public class HandMadeConfigScreen extends Screen {
 
     private static final int BOTTOM_MARGIN = 30;
 
-    /**
-     * 存档里的背景提亮层：白色 + 这个 alpha 盖在「原版半透明渐变 + 糊过的世界」之上。
-     *
-     * <p>想更亮就调大 alpha（0x50 ≈ 31%），想更暗就调小。原版那层是 {@code 0xC0} 的黑罩，
-     * 抬一档之后世界透得更明显，白字仍然看得清。</p>
-     *
-     * <p>★ 只作用于<b>存档里</b>；主菜单（{@code level == null}）保持原版泥土底，不做提亮。</p>
-     */
-    private static final int BACKDROP_LIGHTEN = 0x38FFFFFF;
-
     private final Screen parent;
     private final List<ConfigCategorySpec> categories;
     private final Runnable saveCallback;
@@ -324,23 +314,21 @@ public class HandMadeConfigScreen extends Screen {
     }
 
     /**
-     * 自绘背景：<b>比原版亮一档</b>。
+     * 自绘背景。两种环境要的东西不一样：
      *
      * <ul>
-     *   <li>存档里 —— 半透明黑渐变（{@code renderTransparentBackground}）盖在糊过的世界上；</li>
-     *   <li>主菜单里 —— 压暗的泥土底（{@code renderDirtBackground}）。</li>
+     *   <li><b>存档里</b> —— <b>只留模糊</b>：不叠原版的半透明黑罩、也不加任何白，
+     *       世界就是玩家平时看到的亮度，只是糊了一层（用户的要求）。</li>
+     *   <li><b>主菜单里</b> —— 必须画不透明底，否则上一屏（Mods 列表）会从后面透出来；
+     *       用原版的泥土底（{@code renderBackground} 的 {@code level == null} 分支）。</li>
      * </ul>
-     *
-     * <p>存档里再盖一层 {@link #BACKDROP_LIGHTEN}，也就是「原版画法 + 提亮一档」；
-     * <b>主菜单里不提亮</b>，保持原版泥土底。改亮度只改一个常量。</p>
      */
     private void renderBackdrop(GuiGraphics graphics) {
-        // 原版那套画法（存档里半透明渐变 / 主菜单里压暗的泥土底）
-        this.renderBackground(graphics);
-        // 只有存档里才提亮：主菜单的泥土底保持原版观感
-        if (this.minecraft.level != null) {
-            graphics.fill(0, 0, this.width, this.height, BACKDROP_LIGHTEN);
+        if (this.minecraft.level == null) {
+            // 主菜单：没有世界可糊，只能自己铺底盖住上一屏
+            this.renderBackground(graphics);
         }
+        // 存档里：什么都不画 —— 模糊已经由 ScreenBackdrop 在 render() 最前面做完了
     }
 
     /** 输入框类选项的标签画在框上方（按钮/滑块把标签塞在控件文字里，不需要）。 */
