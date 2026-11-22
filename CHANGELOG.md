@@ -22,10 +22,12 @@
 - **L3 配方可以直接作为原版序列组装的步骤**：L3 家族类现在实现了 Create 的 `IAssemblyRecipe`，
   整合包作者在 `create:sequenced_assembly` 的 `sequence` 里写 `create_hand_made:tool_recipe` 不再加载失败。
   （机器仍然执行不了这些步骤——它们只在手搓时被推进。）
-- **自绘配置界面（不再依赖 Cloth Config）**：模组列表里的「配置」按钮现在打开自己画的界面，
-  走 **Create/Catnip 自己的 UI 件**（`AbstractSimiScreen` 窗口 + `BoxElement` 深色面板 +
-  `ScrollInput` 数值控件 + `IconButton` 与 `AllIcons.I_CONFIG_*` 图标），所以是机械动力那套观感，
-  且**不需要额外贴图**。
+- **配置界面改成机械动力风（不再依赖 Cloth Config）**：模组列表里的「配置」按钮打开自己画的界面，
+  但外观与零件全部**借用 Create / Catnip 自己的那一套**：`AbstractSimiScreen` 窗口 +
+  `BoxElement` 深色面板（两层描边与内发光都是代码画）+ `IconButton` 与
+  `AllIcons.I_CONFIG_SAVE / I_CONFIG_RESET / I_CONFIG_LOCKED` 图标，文字取
+  `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
+  所以是机械动力那套观感，且**不需要额外贴图**。
   顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面；女仆配置拆成 4 页
   （基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
   **只读是按页判定的**：只有 SERVER 类型的页在多人游戏里只读；女仆「屏蔽模组」是
@@ -34,7 +36,13 @@
   `PostChain` 每帧处理主渲染目标，等价 1.21 的 `processBlurEffect`，不动全局后处理；
   光影模组跑不起来就自动停用），同时临时打开 `Options.hideGui` **隐藏 HUD**
   （物品栏 / 生命条 / 聊天 / 尊重该开关的小地图），关掉界面后还原成打开前的状态。
+- **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
+  （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
+  三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
 - **`/chm config` 命令**：玩家随时打开配置界面（多人游戏里是只读视图，SERVER 配置仍由服务端权威）。
+- **`/chm book` 命令**：补发手册。`/chm book` 给自己、`/chm book @a` 批量补发（无视「已赠送」标记，
+  老存档 / 老服务器统一补书就用它）、`/chm book reset [玩家们]` 清掉标记让下次登录重新送。
+  权限等级 2；失败时聊天栏会说清是「没装 Patchouli」还是「拿不到书物品」。
 - **JEI 新类别「手搓流水线」**：起始原料 → 每步的工具 + 额外原料/流体 → 产物。
   版式刻意与 Create 自己的序列组装对齐（背景 180×115、罗马数字标步、长箭头 + `xN` 圈数图标、
   随机产物的 `?` 底纹、单步 tooltip），差别只有产物是**权重池**：主槽画权重最大的那条，
@@ -67,11 +75,10 @@
   值由 `ProcessingRecipe` 预留的 `readAdditional` / `writeAdditional` 钩子读写，不需要动 serializer。
 - JEI 步骤列改走 Create 的 `SequencedAssemblySubCategory` 通道（一列一步、宽 25、
   附加物 / 流体槽落在列内 `x+4, y=15`），不再自己算槽位坐标。
-- 手册「首登赠送」改为**动态联动**取书：优先反射 `PatchouliAPI.get().getBookStack(...)`，
+- 手册「首登赠送」改为**动态联动**取书：优先反射 `PatchouliAPI.get().getBookStack(...)`
+  （方法声明在 `PatchouliAPI$IPatchouliAPI` 接口上、还要先查 `isStub()`，否则永远走兜底），
   拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
-  另加 `/chm book [玩家们]`（无视「已赠送」标记，老存档/老服务器用 `/chm book @a` 统一补发）
-  与 `/chm book reset [玩家们]`（清标记，下次登录重送）。
-  「每人一次」的判定写在玩家自己的持久数据里，所以**老存档里的老玩家首次装模组后登录就会收到**；
+  「每人一次」的标记写在玩家自己的持久数据里，所以**老存档里的老玩家首次装模组后登录就会收到**；
   换存档是另一份玩家数据，会再送一本（每存档每人一次）。
 - **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里根本没装
   Patchouli，「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
