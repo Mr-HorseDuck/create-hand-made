@@ -5,11 +5,69 @@
 
 ---
 
+## 0.7.1-beta — 2026-11-22
+
+基准：`0.7.0-beta`。这一版把**配置界面**从头重做（不再依赖 Cloth Config，改成机械动力风的机械动力界面），
+并把手册的**首登赠送**改成动态联动取书。玩法、配方、存档数据都没有破坏性改动；
+唯一需要注意的是**协议版本升到 3**（见「升级注意」）。
+
+### 新增
+
+- **配置界面：机械动力风、模组自带（不再依赖 Cloth Config）**：模组列表里的「配置」按钮打开的界面
+  外观与零件全部**借用 Create / Catnip 自己的那一套**——`AbstractSimiScreen` 窗口 +
+  `BoxElement` 深色面板（两层描边与内发光都是代码画）+ `IconButton` 与
+  `AllIcons.I_CONFIG_SAVE / I_CONFIG_RESET / I_CONFIG_LOCKED` 图标，文字取
+  `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
+  所以是机械动力那套观感，且**不需要额外贴图**。
+  - 顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面。
+  - 女仆配置拆成 4 页（基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
+- **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
+  （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
+  三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
+- **打开界面时糊背景 + 藏 HUD**：复用原版自带的 `minecraft:shaders/post/blur.json` 自己建 `PostChain`，
+  每帧处理主渲染目标（等价 1.21 的 `processBlurEffect`，不动全局后处理；光影模组跑不起来会自动停用）；
+  同时临时打开 `Options.hideGui`，物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都让位，
+  关掉界面后还原成打开前的状态。存档里**只留模糊**（不叠暗色、不提亮），主菜单里铺原版泥土底。
+- **`/chm config` 命令**：玩家随时打开配置界面（多人游戏里是只读视图，SERVER 配置仍由服务端权威）。
+- **`/chm book` 命令**（权限等级 2）：补发手册。`/chm book` 给自己、`/chm book @a` 批量补发
+  （无视「已赠送」标记，老存档 / 老服务器统一补书就用它）、`/chm book reset [玩家们]` 清掉标记让下次登录重送。
+  发不出去时聊天栏会说清是「没装 Patchouli」还是「拿不到书物品」。
+- **手册首登赠送改为动态联动取书**：优先反射 `PatchouliAPI.get().getBookStack(...)`
+  （方法声明在 `PatchouliAPI$IPatchouliAPI` 接口上、还要先查 `isStub()`），
+  拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
+  标记写在玩家自己的持久数据里 → **老存档里的老玩家首次装模组后登录就会收到**；换存档会再送一本。
+
+### 变更
+
+- **移除 Cloth Config 依赖**：`build.gradle` 的 compileOnly/runtimeOnly、`mods.toml` 的可选依赖段、
+  `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
+  `MaidClothConfigIntegration` 一并删除，改成 `client/config/` 下的一套自绘界面 +
+  `ConfigSectionProvider` 接口（女仆页由 tlmCompat 提供数据、主代码用反射接）。
+- **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读；女仆「屏蔽模组」是
+  `MaidStartupConfig`（COMMON，`config/create_hand_made-maid.toml`，本地文件），多人游戏里照样能改。
+  保存也随之分流：SERVER 类型的 SPEC 只在单人存档里存。
+- **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
+
+### 内部
+
+- 新增 `client/config/`：`ConfigOption`（布尔 / 整数 / 字符串列表的纯数据描述）、`ConfigCategorySpec`、
+  `ConfigSectionProvider`（可选模组提供配置页的接口）、`HandMadeConfigScreen`（机械动力风界面 + 自绘整数条）、
+  `ScreenBackdrop`（背景模糊）。
+- tlmCompat 侧新增 `client/MaidConfigSectionProvider`：只提供数据、不画界面，取代原来的 Cloth 集成。
+- **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里没有 Patchouli，
+  「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
+
+### 升级注意
+
+1. **协议版本由 2 升到 3**：`0.7.1` 与 `0.6.4` / `0.7.0` **不能互连**，客户端与服务端都要升到 `0.7.1`。
+2. **不再需要 Cloth Config**：装了也不冲突，只是模组不再用它；`mods.toml` 里的可选依赖也删掉了。
+3. 没有方块 / 物品 ID 变化，旧存档、旧工具、旧标记、旧配方全部继续有效。
+
 ## 0.7.0-beta — 2026-11-21
 
 基准：`0.6.4-beta`。这一版把 Create 的**序列组装**搬到手搓工具上（从 1.21.1 分支 `main` 的 0.7.0-beta 移植），
-把手册的获取方式从「合成」改成「砸」，并把配置界面换成**自己画的**（不再依赖 Cloth Config）。
-玩法没有破坏性改动，老存档直接升；两处例外见「升级注意」：手册的工作台配方被移除、协议版本变了。
+并把手册的获取方式从「合成」改成「砸」。玩法没有破坏性改动，老存档直接升；
+唯一的例外是**手册的工作台配方被移除了**（见「升级注意」）。
 
 ### 新增
 
@@ -22,27 +80,6 @@
 - **L3 配方可以直接作为原版序列组装的步骤**：L3 家族类现在实现了 Create 的 `IAssemblyRecipe`，
   整合包作者在 `create:sequenced_assembly` 的 `sequence` 里写 `create_hand_made:tool_recipe` 不再加载失败。
   （机器仍然执行不了这些步骤——它们只在手搓时被推进。）
-- **配置界面改成机械动力风（不再依赖 Cloth Config）**：模组列表里的「配置」按钮打开自己画的界面，
-  但外观与零件全部**借用 Create / Catnip 自己的那一套**：`AbstractSimiScreen` 窗口 +
-  `BoxElement` 深色面板（两层描边与内发光都是代码画）+ `IconButton` 与
-  `AllIcons.I_CONFIG_SAVE / I_CONFIG_RESET / I_CONFIG_LOCKED` 图标，文字取
-  `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
-  所以是机械动力那套观感，且**不需要额外贴图**。
-  顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面；女仆配置拆成 4 页
-  （基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
-  **只读是按页判定的**：只有 SERVER 类型的页在多人游戏里只读；女仆「屏蔽模组」是
-  `MaidStartupConfig`（COMMON，`config/create_hand_made-maid.toml`，本地文件），多人游戏里照样能改。
-  打开时把背景**做一次模糊**（复用原版的 `minecraft:shaders/post/blur.json`，自己建
-  `PostChain` 每帧处理主渲染目标，等价 1.21 的 `processBlurEffect`，不动全局后处理；
-  光影模组跑不起来就自动停用），同时临时打开 `Options.hideGui` **隐藏 HUD**
-  （物品栏 / 生命条 / 聊天 / 尊重该开关的小地图），关掉界面后还原成打开前的状态。
-- **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
-  （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
-  三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
-- **`/chm config` 命令**：玩家随时打开配置界面（多人游戏里是只读视图，SERVER 配置仍由服务端权威）。
-- **`/chm book` 命令**：补发手册。`/chm book` 给自己、`/chm book @a` 批量补发（无视「已赠送」标记，
-  老存档 / 老服务器统一补书就用它）、`/chm book reset [玩家们]` 清掉标记让下次登录重新送。
-  权限等级 2；失败时聊天栏会说清是「没装 Patchouli」还是「拿不到书物品」。
 - **JEI 新类别「手搓流水线」**：起始原料 → 每步的工具 + 额外原料/流体 → 产物。
   版式刻意与 Create 自己的序列组装对齐（背景 180×115、罗马数字标步、长箭头 + `xN` 圈数图标、
   随机产物的 `?` 底纹、单步 tooltip），差别只有产物是**权重池**：主槽画权重最大的那条，
@@ -59,11 +96,6 @@
 
 - **手册的工作台合成配方已移除**（`0.6.4` 的「书 ×1 + 冲压锤 ×1」无序合成）。现在获取途径是：
   首次进世界赠送、冲压锤砸书、`/give`。老玩家手里的手册不受影响。
-- **移除 Cloth Config 依赖**：`build.gradle` 的 compileOnly/runtimeOnly、`mods.toml` 的可选依赖段、
-  `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
-  `MaidClothConfigIntegration` 一并删除，改为 `client/config/` 下的一套自绘界面
-  + `ConfigSectionProvider` 接口（女仆页由 tlmCompat 提供数据、主代码用反射接）。
-- **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
 
 ### 内部
 
@@ -75,13 +107,6 @@
   值由 `ProcessingRecipe` 预留的 `readAdditional` / `writeAdditional` 钩子读写，不需要动 serializer。
 - JEI 步骤列改走 Create 的 `SequencedAssemblySubCategory` 通道（一列一步、宽 25、
   附加物 / 流体槽落在列内 `x+4, y=15`），不再自己算槽位坐标。
-- 手册「首登赠送」改为**动态联动**取书：优先反射 `PatchouliAPI.get().getBookStack(...)`
-  （方法声明在 `PatchouliAPI$IPatchouliAPI` 接口上、还要先查 `isStub()`，否则永远走兜底），
-  拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
-  「每人一次」的标记写在玩家自己的持久数据里，所以**老存档里的老玩家首次装模组后登录就会收到**；
-  换存档是另一份玩家数据，会再送一本（每存档每人一次）。
-- **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里根本没装
-  Patchouli，「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
 - 1.20.1 差异：`RecipeHolder` 不存在（直接用配方实例）、进度存 NBT 而非 DataComponent、
   `ProcessingRecipe` 单泛型参数、流体用 Create 的 `FluidIngredient`。
 
@@ -98,8 +123,7 @@
 
 1. **手册不能再合成**：`0.6.4` 的「书 ×1 + 冲压锤 ×1」配方已移除。已经拿到手册的玩家不受影响；要再来一本就砸书或用 `/give`。
 2. 没有方块 / 物品 ID 变化，旧存档、旧工具、旧标记、旧配方全部继续有效。
-3. **协议版本由 2 升到 3**（`/chm config` 新增了一个网络包）：`0.7.0` 与 `0.6.4` **不能互连**，
-   客户端与服务端都要升到 `0.7.0`。
+3. 客户端与服务端**协议版本未变**（仍为 2），可与 `0.6.4` 互通，但建议同步升级。
 4. 对外 `API_VERSION` 仍为 **3**：这一版只新增了配方类型与内部类，没动任何对外方法签名。
 
 ---
