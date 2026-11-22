@@ -148,8 +148,9 @@ public class Config {
 
         crusherMortarProcessingTicks = builder
                 .comment("加工时长：起手结束后，完成一次粉碎所需的 tick 数",
-                         "默认: 100")
-                .defineInRange("processing_ticks", 100, 1, 400);
+                         "默认: 50（是研钵的一半——碾钵是先粉碎、没配方才退回研磨，理应更快）",
+                         "注意：已有存档的 toml 里写死的值不会被改，只有新建存档才会拿到新默认")
+                .defineInRange("processing_ticks", 50, 1, 400);
 
         crusherMortarPoundCycleTicks = builder
                 .comment("捶捣周期：杵上下捶捣一次的 tick 数",

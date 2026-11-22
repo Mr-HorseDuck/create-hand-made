@@ -39,6 +39,9 @@
 
 ### 变更
 
+- **碾钵加工时长的默认值改成 50 tick**（原来是 100，和研钵一样）：碾钵是「先粉碎、没配方才退回研磨」，
+  本来就该比研钵快 —— 手册里一直这么写，但代码默认值没跟上。**已有存档不受影响**（toml 里写死的 100 会保留），
+  只有新建存档的默认值变成 50；想改回去把 `crusher_mortar.processing_ticks` 设为 100 即可。
 - **移除 Cloth Config 依赖**：`build.gradle` 的 compileOnly/runtimeOnly、`mods.toml` 的可选依赖段、
   `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
   `MaidClothConfigIntegration` 一并删除，改成 `client/config/` 下的一套自绘界面 +

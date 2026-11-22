@@ -68,7 +68,7 @@ public final class ConfigScreens {
 
         categories.add(new ConfigCategorySpec(tr("crusher_mortar"), List.of(
                 integer("crusher_mortar.windup_ticks", 0, 200, 20, c.crusherMortarWindupTicks),
-                integer("crusher_mortar.processing_ticks", 1, 400, 100, c.crusherMortarProcessingTicks),
+                integer("crusher_mortar.processing_ticks", 1, 400, 50, c.crusherMortarProcessingTicks),
                 integer("crusher_mortar.pound_cycle_ticks", 1, 100, 10, c.crusherMortarPoundCycleTicks)
         )));
 
