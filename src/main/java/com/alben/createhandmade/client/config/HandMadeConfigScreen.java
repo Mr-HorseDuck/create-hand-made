@@ -265,6 +265,10 @@ public class HandMadeConfigScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // 先糊背景：此时世界已经在主渲染目标里，模糊完再画半透明底色与控件
         backdrop.blur(partialTick);
+        // ★ 1.20.1 的 Screen.render 只画 renderables，**背景要自己调**：
+        //   存档里 = 半透明黑色渐变（盖在糊过的世界上），主菜单里 = 原版泥土底。
+        //   少了这一句，屏幕上留着的还是上一帧（例如 Mods 列表）——就是「配置和 Mods 页重叠」。
+        this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 6, 0xFFFFFF);
