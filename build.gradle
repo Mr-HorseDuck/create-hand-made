@@ -57,6 +57,13 @@ repositories {
             includeGroup "me.shedaniel.cloth"
         }
     }
+    // Patchouli：只给开发环境的 runClient/runServer 用，模组本身仍然零编译依赖
+    maven {
+        url = "https://maven.blamejared.com"
+        content {
+            includeGroup "vazkii.patchouli"
+        }
+    }
 
     maven {
         url = "https://api.modrinth.com/maven"
@@ -181,6 +188,12 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
+
+    // ★ Patchouli（**仅开发环境**）
+    //   - 模组代码里对 Patchouli 零编译依赖（全靠 ModList + 注册表 + 反射）
+    //   - 但开发环境如果不加载它，「首登送书 / 砸书出手册 / /chm book」根本无从测试，
+    //     以前的表现就是「开场没送书」且日志里什么都没有 —— 所以这里只挂 runtimeOnly，不进 jar
+    runtimeOnly fg.deobf("vazkii.patchouli:Patchouli:${patchouli_version}")
 
     // ★ 0.7.0 起**不再依赖 Cloth Config**：配置界面改为自绘
     //   （client/config/HandMadeConfigScreen），因此这里也不再有 cloth 的 compileOnly/runtimeOnly。

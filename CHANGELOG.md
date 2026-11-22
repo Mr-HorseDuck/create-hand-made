@@ -65,6 +65,11 @@
   值由 `ProcessingRecipe` 预留的 `readAdditional` / `writeAdditional` 钩子读写，不需要动 serializer。
 - JEI 步骤列改走 Create 的 `SequencedAssemblySubCategory` 通道（一列一步、宽 25、
   附加物 / 流体槽落在列内 `x+4, y=15`），不再自己算槽位坐标。
+- 手册「首登赠送」改为**动态联动**取书：优先反射 `PatchouliAPI.get().getBookStack(...)`，
+  拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
+  另加 `/chm book [玩家]`（无视「已赠送」标记）方便补发与验证。
+- **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里根本没装
+  Patchouli，「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
 - 1.20.1 差异：`RecipeHolder` 不存在（直接用配方实例）、进度存 NBT 而非 DataComponent、
   `ProcessingRecipe` 单泛型参数、流体用 Create 的 `FluidIngredient`。
 
