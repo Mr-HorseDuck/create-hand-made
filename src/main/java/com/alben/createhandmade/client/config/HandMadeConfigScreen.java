@@ -69,6 +69,14 @@ public class HandMadeConfigScreen extends Screen {
 
     private static final int BOTTOM_MARGIN = 30;
 
+    /**
+     * 背景提亮层：白色 + 这个 alpha 盖在 {@link #renderBackground}（或模糊后的世界）之上。
+     *
+     * <p>想更亮就调大 alpha（0x50 ≈ 31%），想更暗就调小。原版背景是「0xC0 黑罩 / 0.25 亮度泥土」，
+     * 这一层把它整体抬一档，白字仍然看得清。</p>
+     */
+    private static final int BACKDROP_LIGHTEN = 0x38FFFFFF;
+
     private final Screen parent;
     private final List<ConfigCategorySpec> categories;
     private final Runnable saveCallback;
@@ -279,10 +287,11 @@ public class HandMadeConfigScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // 先糊背景：此时世界已经在主渲染目标里，模糊完再画半透明底色与控件
         backdrop.blur(partialTick);
-        // ★ 1.20.1 的 Screen.render 只画 renderables，**背景要自己调**：
-        //   存档里 = 半透明黑色渐变（盖在糊过的世界上），主菜单里 = 原版泥土底。
-        //   少了这一句，屏幕上留着的还是上一帧（例如 Mods 列表）——就是「配置和 Mods 页重叠」。
-        this.renderBackground(graphics);
+        // ★ 1.20.1 的 Screen.render 只画 renderables，**背景要自己画**：
+        //   不画的话屏幕上留着的还是上一帧（例如 Mods 列表）——就是「配置和 Mods 页重叠」。
+        //   这里不用 super.renderBackground：那个在存档里用 0xC0 的黑罩、主菜单里把泥土压到 0.25，
+        //   都比我们要的暗，所以自己按同一套画法给一份更亮的。
+        renderBackdrop(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 6, 0xFFFFFF);
@@ -310,6 +319,24 @@ public class HandMadeConfigScreen extends Screen {
             }
             break;
         }
+    }
+
+    /**
+     * 自绘背景：<b>比原版亮一档</b>。
+     *
+     * <ul>
+     *   <li>存档里 —— 半透明黑渐变（{@code renderTransparentBackground}）盖在糊过的世界上；</li>
+     *   <li>主菜单里 —— 压暗的泥土底（{@code renderDirtBackground}）。</li>
+     * </ul>
+     *
+     * <p>然后统一盖一层 {@link #BACKDROP_LIGHTEN}，也就是「原版画法 + 提亮一档」——
+     * 不自己重画贴图，改亮度只改一个常量。控件上的白字仍然看得清。</p>
+     */
+    private void renderBackdrop(GuiGraphics graphics) {
+        // 原版那套画法（存档里半透明渐变 / 主菜单里压暗的泥土底）
+        this.renderBackground(graphics);
+        // 再盖一层低透明度白色，把整体亮度抬一档（不自己重画贴图，免得跟版本细节较劲）
+        graphics.fill(0, 0, this.width, this.height, BACKDROP_LIGHTEN);
     }
 
     /** 输入框类选项的标签画在框上方（按钮/滑块把标签塞在控件文字里，不需要）。 */
