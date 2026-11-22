@@ -31,13 +31,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * （手臂本来就不画），但如果那只手是空的，取消就会把手臂也藏掉。</p>
  *
  * <p>旧版对应的是 NeoForge 的 {@code RenderHandEvent}（{@code event.setCanceled(true)}）；
- * Fabric 没有等价事件，只能 mixin 到 {@code renderArmWithItem} 的 HEAD（该方法是 private）。</p>
+ * Fabric 没有等价事件，只能 mixin 到那只手的渲染入口（该方法是 private）。
+ * <b>26.2 起方法名从 {@code renderArmWithItem} 改为 {@code submitArmWithItem}</b>，
+ * 参数表完全一致（{@code AbstractClientPlayer;FFInteractionHand;FItemStack;FPoseStack;SubmitNodeCollector;I}）。</p>
  */
 @Mixin(ItemInHandRenderer.class)
 public abstract class ItemInHandRendererMixin {
 
     @Inject(
-            method = "renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FF"
+            method = "submitArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FF"
                     + "Lnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;F"
                     + "Lcom/mojang/blaze3d/vertex/PoseStack;"
                     + "Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V",

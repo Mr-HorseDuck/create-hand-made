@@ -31,6 +31,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
@@ -339,8 +340,8 @@ public class BellowsItem extends Item {
         } else if (type == AllFanProcessingTypes.SPLASHING) {
             // 洗涤：特定生物受伤 + 灭火
             if (entity instanceof EnderMan
-                    || entity.getType() == EntityType.SNOW_GOLEM
-                    || entity.getType() == EntityType.BLAZE) {
+                    || entity.getType() == EntityTypes.SNOW_GOLEM
+                    || entity.getType() == EntityTypes.BLAZE) {
                 entity.hurtServer(serverLevel, entity.damageSources().drown(), 2);
             }
             if (entity.isOnFire()) {

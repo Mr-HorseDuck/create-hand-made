@@ -1,7 +1,7 @@
-# Create: Hand Made — Fabric 26.1.2 移植版
+# Create: Hand Made — Fabric 26.2 移植版
 
 把 [Mr-HorseDuck/create-hand-made](https://github.com/Mr-HorseDuck/create-hand-made)（NeoForge 1.21.1）
-移植到 **Minecraft 26.1.2 + Fabric**，Create 前置由 **Create（Forge/NeoForge 版）** 换成
+移植到 **Minecraft 26.2 + Fabric**，Create 前置由 **Create（Forge/NeoForge 版）** 换成
 **Create Fly**（`com.zurrtum.create`，mod id 仍是 `create`）。
 
 ---
@@ -10,12 +10,12 @@
 
 | 项目 | 版本 |
 | --- | --- |
-| Minecraft | 26.1.2 |
+| Minecraft | 26.2 |
 | 模组加载器 | Fabric Loader 0.20.1 |
-| Fabric API | 0.155.3+26.1.2 |
-| Create 前置 | Create Fly 26.1.2-6.0.9-4（mod id `create`，版本 `6.0.9-4`） |
+| Fabric API | 0.161.0+26.2 |
+| Create 前置 | Create Fly 26.2-6.0.9-2（mod id `create`，版本 `6.0.9-2`） |
 | Java | 25 |
-| JEI（可选） | 29.47.0.111（`jei-26.1.2-fabric`，编译期 `compileOnly`，不打包、不设硬依赖） |
+| JEI（可选） | 30.48.0.244（`jei-26.2-fabric`，编译期 `compileOnly`，不打包、不设硬依赖） |
 | Gradle | 9.8.2（wrapper 已钉；Loom 1.19.x 要求 ≥ 9.8.0） |
 | Fabric Loom | 1.19.4（钉死 stable，不再用 `1.19-SNAPSHOT`） |
 | Gradle 守护进程 JVM | 25（`gradle/gradle-daemon-jvm.properties`；Loom 1.19.x 的插件字节码要求 JVM 25，用 JAVA_HOME 的 JDK 21 会在配置阶段失败） |
@@ -29,7 +29,7 @@
 
 ```powershell
 # 1) 把 Create Fly 的 jar 放到 fabric/libs/ 下
-#    create-fly-26.1.2-6.0.9-4.jar
+#    create-fly-26.2-6.0.9-2.jar
 # 2) 编译（用项目自带 wrapper，不要用系统 gradle）
 .\gradlew.bat build
 # 3) 产物
@@ -331,11 +331,31 @@ JEI 插件走 Fabric 的 `jei_mod_plugin` entrypoint（键名与 Create Fly 自�
 
 ---
 
+## 5.1 26.1.2 → 26.2 的差异（升级到 26.2 时改的四处）
+
+从 26.1.2 线升到 26.2 线，**业务代码只动了 3 行 + 1 处 mixin 方法名**，其余全是版本号：
+
+| 变化 | 26.1.2 | 26.2 | 处理 |
+| --- | --- | --- | --- |
+| 实体类型常量搬了家 | `EntityType.SNOW_GOLEM` / `.BLAZE` | **`EntityTypes`** 类的 `SNOW_GOLEM` / `BLAZE` | `BellowsItem` 改用 `EntityTypes.*`（多一行 import） |
+| 击退必须带伤害来源 | `knockback(power, x, z)` | `knockback(power, x, z, DamageSource, float[, boolean])` | `PressHammerItem` 传 `player.damageSources().playerAttack(player), 0.0f`；强度仍是 `2.4 × (1 - 击退抗性)`（方法内部只把 power 乘该系数，第 5 个 float 不参与） |
+| 手中渲染方法改名 | `ItemInHandRenderer.renderArmWithItem` | **`submitArmWithItem`**（参数表完全一致） | `mixin/client/ItemInHandRendererMixin` 的 `@Inject(method = ...)` 改方法名 |
+| Create Fly 版本号更「低」 | `6.0.9-4` | `6.0.9-2`（26.2 线的 build 号从 1 重排） | `fabric.mod.json` 的 `depends.create` 放宽到 `>=6.0.9-2`；**若沿用 `>=6.0.9-4`，loader 会直接拒绝加载** |
+
+**JEI 侧零改动**：JEI 从 29.x 跳到 **30.x**（`30.48.0.244`），但 `mezz.jei.common.Internal.getClientSyncedRecipes()`
+与 `IRecipeCategory` 的 6 个抽象方法、`IRecipeType.create(Identifier, Class)` 全部不变，
+14 个类别与 `JeiRecipeSource` 一行没改就通过编译。
+
+**Create Fly 26.2 的 JEI 兼容层签名与 26.1.2 逐字一致**（`CreateCategory`、`BasinCategory` 的静态 helper、
+`addChanceSlot` / `addFluidSlot` / `drawBackground` 等），所以类别代码不需要跟着改。
+
+---
+
 ## 6. 已知缺失 / 暂缓项
 
 | 项 | 原因 | 影响 |
 | --- | --- | --- |
-| **KubeJS 支持** | KubeJS 在 Fabric 26.1.2 上不存在 | 已彻底移除：`kubejs` 包、`kubejs.plugins.txt`、`recipe_schema` 全部删除。L3 配方改为纯数据包 JSON。 |
+| **KubeJS 支持** | KubeJS 在 Fabric 26.2 上不存在 | 已彻底移除：`kubejs` 包、`kubejs.plugins.txt`、`recipe_schema` 全部删除。L3 配方改为纯数据包 JSON。 |
 | **JEI 的两个自动类别** | 26.1 的 `BasinRecipe` 没有 `convertShaped` / `convertShapeless`（只有运行期 `BasinInput` 入口），做不出可显示的 `BasinRecipe` | `hand_press_basin_auto_square` / `stirring_staff_auto_shapeless` 不注册；其余 14 个类别正常（见 3.7）。 |
 | **灌注枪物品栏液体底图** | `GuiGraphicsMixin` 依赖已变更的 26.1 渲染 API（`RenderSystem.setShaderColor` 等） | 物品栏里的灌注枪图标不显示液面。 |
 | **`ServerConfigPayload` 客户端同步** | 需要自建 S2C 包 | 目前两端各自读本地 JSON。单人游戏完全一致；多人游戏里客户端与服务器的计时参数若被改过可能不同步（默认值下无影响）。 |
@@ -358,7 +378,7 @@ Create 的 `CustomRenderedItemModelRenderer` 那一套在 Create Fly 里已删�
 fabric/
 ├─ build.gradle / gradle.properties / settings.gradle
 ├─ gradle/gradle-daemon-jvm.properties  ← 钉 Gradle 守护进程用 JDK 25
-├─ libs/create-fly-26.1.2-6.0.9-4.jar     ← 需自行放入
+├─ libs/create-fly-26.2-6.0.9-2.jar     ← 需自行放入
 ├─ src/main/java/com/alben/createhandmade/
 │  ├─ CreateHandMade.java                 主入口 + 事件接线
 │  ├─ CreateHandMadeClient.java           客户端入口（粒子工厂 + 网络接收器）

@@ -210,7 +210,11 @@ public class PressHammerItem extends Item {
         }
 
         Vec3 away = target.position().subtract(player.position());
-        target.knockback(2.4, away.x, away.z);
+        // 26.2 起 knockback 必须带 DamageSource（旧的三参重载已移除）。
+        // 第 5 个 float 不参与蓄力强度计算（方法内部只把 power 乘 1 - KNOCKBACK_RESISTANCE），
+        // 传 0 等价于旧版三参语义：击退强度仍是 2.4 × (1 - 击退抗性)。
+        target.knockback(2.4, away.x, away.z,
+                player.damageSources().playerAttack(player), 0.0f);
     }
 
     @Nullable
