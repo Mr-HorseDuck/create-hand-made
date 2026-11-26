@@ -77,17 +77,13 @@ public class CreateHandMade {
                 java.lang.reflect.Method initMethod = maidNetworkClass.getMethod("init");
                 initMethod.invoke(null);
 
-                // ★ 女仆配置 SPEC 注册（两份）：
-                //   1) MaidConfig        = SERVER，运行时数值（与主配置同类型，存档 serverconfig 内）
-                //   2) MaidStartupConfig = COMMON，blocked_mods（mod 初始化阶段就要读）
-                for (String maidConfigClassName : new String[] {
-                        "com.colin101.maidfactory.MaidConfig",
-                        "com.colin101.maidfactory.MaidStartupConfig" }) {
-                    Class<?> maidConfigClass = Class.forName(maidConfigClassName);
-                    java.lang.reflect.Method registerSpecMethod =
-                            maidConfigClass.getMethod("registerSpec");
-                    registerSpecMethod.invoke(null);
-                }
+                // ★ 女仆配置 SPEC 注册（SERVER，运行时数值，存档 serverconfig 内）
+                //   blocked_mods 已改为代码里写死，不再有 COMMON 配置文件。
+                Class<?> maidConfigClass = Class.forName(
+                        "com.colin101.maidfactory.MaidConfig");
+                java.lang.reflect.Method registerSpecMethod =
+                        maidConfigClass.getMethod("registerSpec");
+                registerSpecMethod.invoke(null);
 
                 // ★ API 钩子：让对外 API 的 damageTool 对女仆也走好感度免耐久
                 //   （api 包在主 sourceSet，不能直接引用 EntityMaid，只能反射注册）

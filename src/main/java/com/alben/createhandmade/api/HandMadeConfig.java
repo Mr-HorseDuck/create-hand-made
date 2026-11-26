@@ -9,8 +9,8 @@ import com.alben.createhandmade.config.SyncedServerConfig;
  * 服务端同步下来的值（未收到同步时才回落到本地文件）。所以这些方法在两侧都能调，
  * 拿到的都是"这一局实际在用的参数"。</p>
  *
- * <p>女仆相关的冷却 / 距离 / blockedMods 不在这里 —— 它们属于可选的 TLM 兼容层
- * （{@code com.colin101.maidfactory.MaidConfig}），只有在装了车万女仆、
+ * <p>女仆相关的冷却 / 距离不在这里 —— 它们属于可选的 TLM 兼容层
+ * （{@code src/tlmCompat} sourceSet，包 {@code com.colin101.maidfactory}），只有在装了车万女仆、
  * 且接入方自己依赖 TLM 时才取得到，还没有稳定的对外门面。</p>
  */
 public final class HandMadeConfig {

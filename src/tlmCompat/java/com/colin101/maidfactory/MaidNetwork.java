@@ -154,28 +154,33 @@ public class MaidNetwork {
         context.enqueueWork(() -> {
             try {
                 ServerPlayer player = context.getSender();
+                MaidDebug.log("[HandMade][diag] ApplyToMaid packet received: entityId={} player={}",
+                        packet.entityId(), player == null ? "null" : player.getGameProfile().getName());
                 if (player == null) return;
                 if (!(player.level() instanceof ServerLevel serverLevel)) return;
 
                 // ★ 这个包会直接写女仆的标记数据，必须自己核：手持指杆 + 是自己的女仆 + 够得着。
                 //   之前只按 entityId 找实体，改过的客户端能给任意人的女仆写标记。
                 if (!(player.getMainHandItem().getItem() instanceof PointerItem)) {
-                    MaidDebug.log("ApplyToMaid: main hand not pointer, ignore");
+                    MaidDebug.log("[HandMade][diag] ApplyToMaid reject: main hand is {}",
+                            player.getMainHandItem().getItem());
                     return;
                 }
 
                 Entity target = serverLevel.getEntity(packet.entityId());
                 if (!(target instanceof EntityMaid maid)) {
-                    MaidDebug.log("ApplyToMaid: target not maid");
+                    MaidDebug.log("[HandMade][diag] ApplyToMaid reject: target {} is not EntityMaid",
+                            target == null ? "null" : target.getClass().getName());
                     return;
                 }
                 if (!maid.isAlive() || !maid.isOwnedBy(player)) {
-                    MaidDebug.log("ApplyToMaid: maid {} is not sender's", maid.getId());
+                    MaidDebug.log("[HandMade][diag] ApplyToMaid reject: maid {} alive={} ownedBySender={}",
+                            maid.getId(), maid.isAlive(), maid.isOwnedBy(player));
                     return;
                 }
                 if (player.distanceToSqr(maid) > MAID_APPLY_REACH_SQR) {
-                    MaidDebug.log("ApplyToMaid: maid {} out of reach from {}",
-                            maid.getId(), player.blockPosition());
+                    MaidDebug.log("[HandMade][diag] ApplyToMaid reject: maid {} out of reach ({})",
+                            maid.getId(), (int) Math.sqrt(player.distanceToSqr(maid)));
                     return;
                 }
 

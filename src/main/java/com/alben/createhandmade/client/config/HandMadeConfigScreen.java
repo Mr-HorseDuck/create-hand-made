@@ -12,7 +12,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -54,8 +53,6 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
     private static final int CAT_ROW_GAP = 2;
     /** 右侧每一行的高度。 */
     private static final int ROW_H = 24;
-    /** 带输入框的行要额外给标签留一行。 */
-    private static final int ROW_H_STRINGS = 34;
     private static final int ROW_GAP = 4;
     /** 滑块 / 输入框宽度。 */
     private static final int CONTROL_W = 118;
@@ -197,15 +194,6 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
             });
             boolButtons.put(toggle, bool);
             track(toggle, option);
-        } else if (option instanceof ConfigOption.Strings strings) {
-            EditBox box = new EditBox(this.font, controlX, placement.y + 13, CONTROL_W, CONTROL_H,
-                    option.label);
-            box.setBordered(false);
-            box.setMaxLength(1024);
-            box.setValue(strings.join());
-            box.setResponder(text -> strings.set(ConfigOption.Strings.parse(text)));
-            box.setTextColor(TEXT);
-            track(box, option);
         }
     }
 
@@ -251,7 +239,7 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
         ConfigCategorySpec category = categories.get(selected);
         int total = 0;
         for (ConfigOption option : category.options) {
-            total += rowHeight(option) + ROW_GAP;
+            total += ROW_H + ROW_GAP;
         }
         if (total > 0) {
             total -= ROW_GAP;
@@ -261,15 +249,11 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
 
         List<Placement> placements = new ArrayList<>(category.options.size());
         for (ConfigOption option : category.options) {
-            int height = rowHeight(option);
+            int height = ROW_H;
             placements.add(new Placement(option, y, height));
             y += height + ROW_GAP;
         }
         return placements;
-    }
-
-    private static int rowHeight(ConfigOption option) {
-        return option instanceof ConfigOption.Strings ? ROW_H_STRINGS : ROW_H;
     }
 
     private int maxCategoryScroll() {
@@ -357,7 +341,8 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
             return;
         }
 
-        // 「本地配置」页面（COMMON，如女仆 blocked_mods）在多人下也能改，点明一下。
+        // 「本地配置」页面（COMMON 类型的本地文件）在多人下也能改，点明一下。
+        // ★ 目前没有任何页走到这里（女仆 `blocked_mods` 已改为代码里写死），机制留着给将来的本地配置用。
         // ★ 画在内容区**底部**（按钮上方），不要贴着标题——之前放 catTop()-14 会和标题/分隔线撞在一起。
         if (!category.serverAuthoritative) {
             graphics.drawString(this.font,
@@ -367,16 +352,10 @@ public class HandMadeConfigScreen extends AbstractSimiScreen {
 
         for (Placement placement : layout()) {
             ConfigOption option = placement.option;
-            int labelY = placement.y + (option instanceof ConfigOption.Strings ? 2 : 7);
+            int labelY = placement.y + 7;
             graphics.drawString(this.font, option.label, contentX(), labelY, TEXT, false);
 
-            if (option instanceof ConfigOption.Strings) {
-                // 输入框自己没边框，这里补一块深色底 + 顶部一条细线
-                int boxY = placement.y + 13;
-                graphics.fill(controlX() - 2, boxY - 2, controlX() + CONTROL_W + 2,
-                        boxY + CONTROL_H - 2, 0x90000000);
-                graphics.fill(controlX() - 2, boxY - 3, controlX() + CONTROL_W + 2, boxY - 2, 0x30FFFFFF);
-            } else if (option instanceof ConfigOption.Bool bool) {
+            if (option instanceof ConfigOption.Bool bool) {
                 // 「开 / 关」文字贴在按钮左侧
                 Component state = Component.translatable(bool.get() ? "options.on" : "options.off");
                 graphics.drawString(this.font, state,

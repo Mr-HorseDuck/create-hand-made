@@ -6,8 +6,8 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "title": "Three files",
-      "text": "Main: $(c)saves/<world>/serverconfig/create_hand_made-server.toml$()$(br)Maid: $(c)…/serverconfig/create_hand_made-maid-server.toml$()$(br)Maid startup: $(c)config/create_hand_made-maid.toml$() (only $(c)blocked_mods$())"
+      "title": "Two files",
+      "text": "Main: $(c)saves/<world>/serverconfig/create_hand_made-server.toml$()$(br)Maid: $(c)…/serverconfig/create_hand_made-maid-server.toml$()"
     },
     {
       "type": "patchouli:text",
@@ -17,7 +17,7 @@
     {
       "type": "patchouli:text",
       "title": "Reloading",
-      "text": "$(c)/chm reload$() reloads both the main and maid configs (permission level 2).$(br2)$(italic)$(c)blocked_mods$() is not hot-reloadable — it's read during mod init, so restart after changing it. $()"
+      "text": "$(c)/chm reload$() reloads both the main and maid configs (permission level 2)."
     },
     {
       "type": "patchouli:text",

@@ -128,19 +128,13 @@
 "config.create_hand_made.maid.passive_infusion_gun.tooltip": "没用指杆指定液体目标时，女仆是否自己找附近的置物台/工作盆注液、存液；关闭后只按指杆指定的目标工作",
   "config.create_hand_made.maid.hand_saw_cooldown": "手锯冷却",
   "config.create_hand_made.maid.hand_saw_cooldown.tooltip": "女仆使用手锯后的冷却时间（tick）",
-  "config.create_hand_made.maid.blocked_mods": "屏蔽模组",
-  "config.create_hand_made.maid.blocked_mods.tooltip.0": "当以下任意模组被加载时，自动禁用女仆兼容",
-  "config.create_hand_made.maid.blocked_mods.tooltip.1": "§c⚠ 修改后必须重启游戏才会生效",
-  "config.create_hand_made.maid.blocked_mods.tooltip.2": "§7（女仆兼容的加载判定在启动阶段执行一次）",
   "config.create_hand_made.reset": "恢复本页默认",
-  "config.create_hand_made.list_hint": "用英文逗号分隔",
   "config.create_hand_made.category.guidebook": "手册",
   "config.create_hand_made.guidebook.give_on_first_join": "首次进世界赠送",
   "config.create_hand_made.guidebook.give_on_first_join.tooltip": "玩家第一次进入世界时自动赠送一本手册；需要安装 Patchouli，未安装时该项无效果（每人只送一次）",
   "config.create_hand_made.category.maid.basics": "女仆 · 基础",
   "config.create_hand_made.category.maid.cooldowns": "女仆 · 冷却（一）",
   "config.create_hand_made.category.maid.cooldowns_2": "女仆 · 冷却（二）",
-  "config.create_hand_made.category.maid.blocked_mods": "女仆 · 屏蔽模组",
   "command.create_hand_made.book.success": "已赠送手册给 %s 名玩家",
   "command.create_hand_made.book.reset": "已清除 %s 名玩家的赠送标记，他们下次登录会重新收到一本",
   "command.create_hand_made.book.no_patchouli": "没有安装 Patchouli，手册物品不存在",
@@ -194,7 +188,6 @@
 
   "command.create_hand_made.reload.success": "机械动力：手搓学 配置已重新加载",
   "command.create_hand_made.reload.failed": "配置加载失败，请查看日志",
-  "command.create_hand_made.reload.restart_hint": "§e注意：blocked_mods 的更改需要重启游戏才会生效",
 
   "hud.create_hand_made.hand_saw.more": "+%s",
   

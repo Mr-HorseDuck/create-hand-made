@@ -4,7 +4,6 @@ import com.alben.createhandmade.client.config.ConfigCategorySpec;
 import com.alben.createhandmade.client.config.ConfigOption;
 import com.alben.createhandmade.client.config.ConfigSectionProvider;
 import com.colin101.maidfactory.MaidConfig;
-import com.colin101.maidfactory.MaidStartupConfig;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -18,8 +17,8 @@ import java.util.List;
  * + {@link ConfigSectionProvider} 接口拿到它，所以主代码不需要引用女仆配置类，
  * 没装 TLM 时也不会 NoClassDefFoundError。</p>
  *
- * <p>为什么拆成 4 页：自绘界面右侧<b>不滚动</b>（见 {@code HandMadeConfigScreen}），
- * 一页按 4 项左右最稳（窗口矮的时候 7 行会顶到「完成」按钮上），而女仆配置有 12 项。</p>
+ * <p>为什么拆成 3 页：自绘界面右侧<b>不滚动</b>（见 {@code HandMadeConfigScreen}），
+ * 一页按 4 项左右最稳（窗口矮的时候 7 行会顶到「完成」按钮上）。</p>
  *
  * <p>0.7.0 起本类取代了原来的 {@code MaidClothConfigIntegration}——模组不再依赖 Cloth Config。</p>
  */
@@ -34,7 +33,6 @@ public class MaidConfigSectionProvider implements ConfigSectionProvider {
         categories.add(basics());
         categories.add(cooldownsOne());
         categories.add(cooldownsTwo());
-        categories.add(blockedMods());
         return categories;
     }
 
@@ -89,42 +87,17 @@ public class MaidConfigSectionProvider implements ConfigSectionProvider {
                 min, max, defaultValue, value::get, value::set);
     }
 
-    // ==================== 屏蔽模组 ====================
-
-    private ConfigCategorySpec blockedMods() {
-        ConfigOption.Strings blocked = new ConfigOption.Strings(
-                label("maid.blocked_mods"),
-                List.of(
-                        Component.translatable(P + "maid.blocked_mods.tooltip.0"),
-                        Component.translatable(P + "maid.blocked_mods.tooltip.1"),
-                        Component.translatable(P + "maid.blocked_mods.tooltip.2")),
-                List.of("maidassemblyline"),
-                () -> new ArrayList<>(MaidStartupConfig.INSTANCE.blockedMods.get()),
-                value -> MaidStartupConfig.INSTANCE.blockedMods.set(value));
-
-        // ★ 这一页不是服务端权威：blocked_mods 在 MaidStartupConfig（COMMON，
-        //   config/create_hand_made-maid.toml），改的是本地文件，多人游戏里也能改。
-        return new ConfigCategorySpec(Component.translatable(CAT + "maid.blocked_mods"),
-                List.of(blocked), false);
-    }
-
     // ==================== 落盘 ====================
 
     /**
-     * 两个 SPEC 分开处理：
-     * <ul>
-     *   <li>{@code MaidConfig} 是 SERVER（存档 {@code serverconfig/}）—— 只有单人存档里才加载过，
-     *       多人游戏里客户端不该去写它；</li>
-     *   <li>{@code MaidStartupConfig} 是 COMMON（{@code config/}，因为启动阶段就要读
-     *       {@code blocked_mods}）—— 本地文件，什么时候都能存。</li>
-     * </ul>
+     * 只有 {@code MaidConfig}（SERVER，存档 {@code serverconfig/}）—— 只有单人存档里才加载过，
+     * 多人游戏里客户端不该去写它。
      */
     @Override
     public void save(boolean serverConfigsLoaded) {
         if (serverConfigsLoaded) {
             MaidConfig.SPEC.save();
         }
-        MaidStartupConfig.SPEC.save();
     }
 
     // ==================== 辅助 ====================

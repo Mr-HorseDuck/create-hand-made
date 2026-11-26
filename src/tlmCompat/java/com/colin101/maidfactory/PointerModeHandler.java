@@ -112,6 +112,7 @@ public class PointerModeHandler {
         boolean currently = rightDown && player.isShiftKeyDown();
 
         if (currently && !lastShiftRightDown) {
+            MaidDebug.log("[HandMade][diag] shift+RMB edge detected");
             handleShiftRightClick(mc, player);
         }
 
@@ -123,21 +124,44 @@ public class PointerModeHandler {
         if (!(mainHand.getItem() instanceof PointerItem)) return;
 
         int mode = PointerDataHelper.Mode.getMode(mainHand);
-        if (mode != PointerDataHelper.Mode.MODE_MARK && mode != PointerDataHelper.Mode.MODE_LIQUID) return;
+        MaidDebug.log("[HandMade][diag] ShiftRight fired: mode={} mainHand={}",
+                mode, mainHand.getItem());
 
         HitResult hit = mc.hitResult;
-        if (hit == null) return;
+        if (hit == null) {
+            MaidDebug.log("[HandMade][diag] ShiftRight: hitResult == null");
+            return;
+        }
 
         // ---- 右键女仆：应用标记（两种模式通用） ----
         if (hit instanceof EntityHitResult entityHit) {
             Entity target = entityHit.getEntity();
+            MaidDebug.log("[HandMade][diag] ShiftRight hit entity: class={} isMaid={}",
+                    target.getClass().getName(), isMaid(target));
             if (isMaid(target)) {
-                CreateHandMade.LOGGER.info("[HandMade] Apply marks to maid id={}", target.getId());
-                MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.ApplyToMaidPacket(target.getId()));
+                // ★ 分工：液体模式走自定义包（TLM 事件那边对液体 return）；
+                //   标记(1) / 默认(0) 交给 TLM 的 InteractMaidEvent（PointerMaidIntegration）。
+                //   两边都发的话，同一次右键会应用两遍（重复提示音 + 重复聊天栏消息）。
+                if (mode == PointerDataHelper.Mode.MODE_LIQUID) {
+                    MaidDebug.log("[HandMade] Apply LIQUID marks to maid id={}", target.getId());
+                    MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.ApplyToMaidPacket(target.getId()));
+                } else {
+                    MaidDebug.log("[HandMade][diag] maid hit, mode={} -> 交给 TLM 事件路径", mode);
+                }
+            } else {
+                // 指到实体但不是女仆：以前完全静默，排查时分不清是「没瞄准」还是「逻辑没跑」
+                MaidDebug.log("ShiftRight: entity {} is not a maid", target.getClass().getName());
             }
             return;
         }
 
+        MaidDebug.log("[HandMade][diag] ShiftRight hit type={} (not a maid)",
+                hit.getType());
+        // 默认模式不标记方块（它只做 useOn 高亮），只有标记/液体模式才走下面的取点逻辑
+        if (mode != PointerDataHelper.Mode.MODE_MARK
+                && mode != PointerDataHelper.Mode.MODE_LIQUID) {
+            return;
+        }
         if (!(hit instanceof BlockHitResult blockHit)) return;
         if (hit.getType() != HitResult.Type.BLOCK) return;
 
@@ -250,9 +274,16 @@ public class PointerModeHandler {
         MaidNetwork.CHANNEL.sendToServer(new MaidNetwork.LiquidMarkerPacket(pos));
     }
 
+    /**
+     * 是不是女仆。
+     *
+     * <p>★ 以前用 {@code entity.getClass().getName().equals("...EntityMaid")} 精确比对，
+     * 一旦女仆是 {@code EntityMaid} 的子类（别的模组、TLM 自己的变体、调试生成器等），
+     * 这里会返回 false → 客户端**一个包都不发**，表现为「右键女仆没反应」。
+     * tlmCompat 本来就编译依赖 TLM，直接 {@code instanceof} 最稳。</p>
+     */
     private static boolean isMaid(Entity entity) {
-        return entity.getClass().getName()
-                .equals("com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid");
+        return entity instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
     }
 
     // ================= 兜底：阻止 use 包发出 =================
@@ -270,6 +301,13 @@ public class PointerModeHandler {
 
         int mode = PointerDataHelper.Mode.getMode(player.getMainHandItem());
         if (mode != PointerDataHelper.Mode.MODE_MARK && mode != PointerDataHelper.Mode.MODE_LIQUID) return;
+
+        // ★ 只在准星对着**方块**时取消：目的是压掉指杆 useOn 的高亮/取点行为。
+        //   对着实体（女仆）时绝对不能取消 —— 一取消，Minecraft 的 startUseItem 直接返回，
+        //   连 ServerboundInteractPacket 都不会发，服务端 EntityMaid.mobInteract 不执行，
+        //   TLM 的 InteractMaidEvent 也就永远不触发（症状正是「只有默认模式能应用标记」）。
+        HitResult hit = mc.hitResult;
+        if (hit instanceof EntityHitResult) return;
 
         event.setCanceled(true);
     }

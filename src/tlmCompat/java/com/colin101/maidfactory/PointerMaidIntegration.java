@@ -1,5 +1,6 @@
 package com.colin101.maidfactory;
 
+import com.alben.createhandmade.CreateHandMade;
 import com.alben.createhandmade.item.PointerItem;
 import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -33,6 +34,8 @@ public class PointerMaidIntegration {
     public static void onInteractMaid(InteractMaidEvent event) {
         Player player = event.getPlayer();
         EntityMaid maid = event.getMaid();
+        MaidDebug.log("[HandMade][diag] TLM InteractMaidEvent: shift={} mainHand={}",
+                player.isShiftKeyDown(), player.getMainHandItem().getItem());
 
         if (!player.isShiftKeyDown()) return;
         if (!(player.getMainHandItem().getItem() instanceof PointerItem)) return;

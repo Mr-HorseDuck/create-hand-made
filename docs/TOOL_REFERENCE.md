@@ -8,7 +8,7 @@
 - **L2 过滤对 L1 与 L3 一视同仁**，只作用于本工具自己的过滤表（L3 的归属看 JSON 的 `tool` 字段；碾钵读到的 `tool: mortar` 条目按 `crusher_mortar` 表过滤）。JEI 的分类页与工具用同一套口径。
 - "禁用连带"指：禁用这个 tool id 的某条配方，会不会影响同一个物品的**另一条**路径。
 - 所有时间参数在 `config/create_hand_made-server.toml` 的 `tools.*` 下，单位 tick（20 tick = 1 秒）。这些参数**服务端权威**：多人游戏里客户端拿到的是服务端同步下来的值。
-- 女仆兼容的运行时参数在存档的 `serverconfig/create_hand_made-maid-server.toml` 里（同样是**服务端权威**，单人可改、多人只读）；只有 `blocked_mods` 留在 `config/create_hand_made-maid.toml`（它在 mod 初始化阶段就要读，改了要重启）。
+- 女仆兼容的运行时参数在存档的 `serverconfig/create_hand_made-maid-server.toml` 里（同样是**服务端权威**，单人可改、多人只读）。女仆兼容的屏蔽名单（`blocked_mods`）已改为代码里写死，不再有对应的配置文件。
 
 ---
 

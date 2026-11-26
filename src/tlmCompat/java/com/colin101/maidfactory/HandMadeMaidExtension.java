@@ -59,19 +59,22 @@ public class HandMadeMaidExtension implements ILittleMaid {
                 return;
             }
 
-            MinecraftForge.EVENT_BUS.register(MaidNetwork.class);
-            MinecraftForge.EVENT_BUS.register(PointerMarker.class);
+            // ★ 逐个注册、各自兜异常：以前是一条 try 包住全部，任何一项抛异常（比如某个类
+            //   引用了 TLM 改过名的 API）会把**后面所有**注册一起跳过 —— 症状就是
+            //   「指杆右键女仆没反应 / HUD 不见 / 高亮不动」，而日志里只有一条泛泛的 error。
+            registerQuietly(MinecraftForge.EVENT_BUS, MaidNetwork.class);
+            registerQuietly(MinecraftForge.EVENT_BUS, PointerMarker.class);
             // ★ 液体模式的「换下手持物就清标记」在 PointerLiquidMarker 里；
             //   以前漏了这一行，导致 clearLiquid() 全库没有调用点（标记永不失效）。
-            MinecraftForge.EVENT_BUS.register(PointerLiquidMarker.class);
-            MinecraftForge.EVENT_BUS.register(PointerMaidIntegration.class);
-            MinecraftForge.EVENT_BUS.register(HandMadeMaidExtension.class);
+            registerQuietly(MinecraftForge.EVENT_BUS, PointerLiquidMarker.class);
+            registerQuietly(MinecraftForge.EVENT_BUS, PointerMaidIntegration.class);
+            registerQuietly(MinecraftForge.EVENT_BUS, HandMadeMaidExtension.class);
 
-            modEventBus.register(MaidNetwork.class);
+            registerQuietly(modEventBus, MaidNetwork.class);
 
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
-                MinecraftForge.EVENT_BUS.register(PointerModeHandler.class);
-                MinecraftForge.EVENT_BUS.register(PointerHudRenderer.class);
+                registerQuietly(MinecraftForge.EVENT_BUS, PointerModeHandler.class);
+                registerQuietly(MinecraftForge.EVENT_BUS, PointerHudRenderer.class);
             });
 
             CreateHandMade.LOGGER.info("[HandMade] Maid compatibility initialized");
@@ -83,16 +86,18 @@ public class HandMadeMaidExtension implements ILittleMaid {
         }
     }
 
+    /**
+     * 与女仆兼容冲突、需要自动禁用女仆兼容的模组。
+     *
+     * <p>★ 写死在代码里，不开放配置：这类兼容性判定属于模组自己的知识，
+     * 交给玩家改 config 只会造成「女仆兼容神神失灵」而又不知道为什么。</p>
+     */
+    private static final java.util.List<String> BLOCKED_MODS =
+            java.util.List.of("maidassemblyline");
+
     private static boolean isBlockedByMod() {
         try {
-            // ★ blocked_mods 在 MaidStartupConfig（COMMON）里：addMaidTask 阶段 SERVER 配置还没加载。
-            //   万一 COMMON 也还没加载（开发环境 get() 会抛），退回配置默认值，别让屏蔽失效。
-            var list = MaidStartupConfig.SPEC.isLoaded()
-                    ? MaidStartupConfig.INSTANCE.blockedMods.get()
-                    : MaidStartupConfig.INSTANCE.blockedMods.getDefault();
-            MaidDebug.log("blockedMods content = {} (size={})", list, list.size());
-
-            for (String modId : list) {
+            for (String modId : BLOCKED_MODS) {
                 if (modId == null || modId.isEmpty()) continue;
                 boolean loaded = ModList.get().isLoaded(modId);
                 MaidDebug.log("checking mod '{}': loaded={}", modId, loaded);
@@ -103,7 +108,7 @@ public class HandMadeMaidExtension implements ILittleMaid {
                 }
             }
         } catch (Throwable t) {
-            // 这里是异常路径，不受 debugEnabled 控制：配置读崩了必须留痕
+            // 异常路径不受 debugEnabled 控制：判定崩了必须留痕
             CreateHandMade.LOGGER.warn(
                     "[HandMade] isBlockedByMod failed, assuming not blocked", t);
         }
@@ -172,6 +177,22 @@ public class HandMadeMaidExtension implements ILittleMaid {
     public static void onMaidLeaveLevel(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof EntityMaid maid) {
             MaidBubbleHelper.clearContinuousState(((Entity) maid).getUUID());
+        }
+    }
+
+    /**
+     * 注册单个类到事件总线，失败只记日志、不影响其它类的注册。
+     *
+     * <p>为什么需要：这些类都直接引用 TLM 的 API，TLM 大版本改动时某一项可能加载失败；
+     * 以前用一条 try 包住全部注册，一处失败会让后面的 PointerModeHandler / PointerHudRenderer
+     * 一起丢失，表现为「指杆右键女仆没反应」这类很难定位的症状。</p>
+     */
+    private static void registerQuietly(IEventBus bus, Class<?> listener) {
+        try {
+            bus.register(listener);
+        } catch (Throwable t) {
+            CreateHandMade.LOGGER.error("[HandMade] 注册 {} 到事件总线失败（相关功能将不可用）",
+                    listener.getName(), t);
         }
     }
 }

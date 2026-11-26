@@ -6,8 +6,8 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "title": "三个文件",
-      "text": "主配置：$(c)saves/<存档>/serverconfig/create_hand_made-server.toml$()$(br)女仆配置：$(c)…/serverconfig/create_hand_made-maid-server.toml$()$(br)女仆启动项：$(c)config/create_hand_made-maid.toml$()（只有 $(c)blocked_mods$()）"
+      "title": "两个文件",
+      "text": "主配置：$(c)saves/<存档>/serverconfig/create_hand_made-server.toml$()$(br)女仆配置：$(c)…/serverconfig/create_hand_made-maid-server.toml$()"
     },
     {
       "type": "patchouli:text",
@@ -17,7 +17,7 @@
     {
       "type": "patchouli:text",
       "title": "热重载",
-      "text": "$(c)/chm reload$() 重载主配置与女仆配置（需要权限等级 2）。$(br2)$(italic)$(c)blocked_mods$() 不参与热重载——它要在模组初始化阶段读取，改完得重启游戏。$()"
+      "text": "$(c)/chm reload$() 重载主配置与女仆配置（需要权限等级 2）。"
     },
     {
       "type": "patchouli:text",

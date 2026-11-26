@@ -159,9 +159,6 @@ public class HandMadeCommands {
 
         source.sendSuccess(() -> Component.translatable(
                 "command.create_hand_made.reload.success"), true);
-        // ★ blocked_mods 需重启才生效的提示
-        source.sendSuccess(() -> Component.translatable(
-                "command.create_hand_made.reload.restart_hint"), false);
         return 1;
     }
 }

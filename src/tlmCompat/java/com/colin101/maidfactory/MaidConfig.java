@@ -14,8 +14,9 @@ import org.apache.commons.lang3.tuple.Pair;
  * 多人游戏里客户端只读，
  * 以服务端为准。文件位于存档的 {@code serverconfig/create_hand_made-maid-server.toml}。</p>
  *
- * <p>注意：{@code blocked_mods} 不在这里 —— 它在 mod 初始化阶段就要读，
- * 而 SERVER 配置那时还没加载，所以单独放在 {@link MaidStartupConfig}（COMMON）。</p>
+ * <p>注意：女仆兼容的屏蔽名单 {@code blocked_mods} 不在这里。它在 mod 初始化阶段（TLM
+ * 的 {@code addMaidTask}）就要判定，那时 SERVER 配置还没加载；现已直接写死在
+ * {@code HandMadeMaidExtension.BLOCKED_MODS}，不再开放配置。</p>
  */
 public class MaidConfig {
 

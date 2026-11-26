@@ -46,8 +46,12 @@
   `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
   `MaidClothConfigIntegration` 一并删除，改成 `client/config/` 下的一套自绘界面 +
   `ConfigSectionProvider` 接口（女仆页由 tlmCompat 提供数据、主代码用反射接）。
-- **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读；女仆「屏蔽模组」是
-  `MaidStartupConfig`（COMMON，`config/create_hand_made-maid.toml`，本地文件），多人游戏里照样能改。
+- **女仆兼容的「屏蔽模组」改为代码里写死，不再开放配置**：原来它是单独一份 COMMON 配置
+  （`MaidStartupConfig`，`config/create_hand_made-maid.toml`）+配置界面第四页，现在改成
+  `HandMadeMaidExtension.BLOCKED_MODS` 里的常量（默认只有 `maidassemblyline`）。这类兼容性判定属于模组自己的知识，
+  交给玩家改 config 只会造成「女仆兼容神神失灵」。配置界面女仆页 4 -> 3
+  （基础 / 冷却一 / 冷却二），`ConfigOption.Strings` 与 `list_hint` 一并删除；`/chm reload` 也不再提「改完要重启」。
+- **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读（目前所有页都是 SERVER）。
   保存也随之分流：SERVER 类型的 SPEC 只在单人存档里存。
 - **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
 
