@@ -24,7 +24,6 @@ public class MaidConfig {
     public static final ForgeConfigSpec SPEC;
 
     public final ForgeConfigSpec.DoubleValue maidSearchRadius;
-    public final ForgeConfigSpec.BooleanValue maidPassiveInfusionGun;
     public final ForgeConfigSpec.IntValue maidPressHammerCooldown;
     public final ForgeConfigSpec.IntValue maidInfusionGunCooldown;
     public final ForgeConfigSpec.IntValue maidHandSawCooldown;
@@ -45,16 +44,9 @@ public class MaidConfig {
 
         maidSearchRadius = builder
                 .comment("女仆与容器/工作方块的最大交互距离（格）",
-                         "作用于：灌注枪就近搜索 + 指杆标记（冲压锤/手锯/液体搬运/搅拌杖/风箱/指杆部署）",
+                         "作用于：指杆标记（冲压锤/手锯/灌注枪液体搬运/搅拌杖/风箱/指杆部署）",
                          "默认: 8.0")
                 .defineInRange("search_radius", 8.0, 1.0, 32.0);
-
-        maidPassiveInfusionGun = builder
-                .comment("女仆在没有指杆指定目标时，是否自己找附近的置物台/工作盆注液、存液",
-                         "关闭后，灌注枪只按指杆指定的抽/注/过剩目标工作",
-                         "关掉可避免女仆和玩家手搓抢同一个置物台",
-                         "默认: true")
-                .define("passive_infusion_gun", true);
 
         maidPressHammerCooldown = builder
                 .comment("女仆使用冲压锤后的冷却时间（tick）",
@@ -63,7 +55,7 @@ public class MaidConfig {
 
         maidInfusionGunCooldown = builder
                 .comment("女仆使用灌注枪后的冷却时间（tick）",
-                         "液体搬运行为共用此配置",
+                         "灌注枪只在指杆指定的抽/注/过剩目标之间搬运",
                          "默认: 16")
                 .defineInRange("infusion_gun_cooldown", 16, 1, 200);
 

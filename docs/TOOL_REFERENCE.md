@@ -112,7 +112,7 @@
 
 ## 女仆兼容（可选，需 TLM）
 
-女仆可用的工具（`TaskHandMade` 注册的行为表，数字为优先级）：冲压锤 5、液体转移 6、灌注枪就近注液 7、搅拌杖 8、手锯 9、研钵 10、碾钵 11、风箱 12、指杆部署 13。
+女仆可用的工具（`TaskHandMade` 注册的行为表，数字为优先级）：冲压锤 5、液体搬运 6（灌注枪只走这一条）、搅拌杖 7、手锯 8、研钵 9、碾钵 10、风箱 11、指杆部署 12。
 
 > 灌注枪有两条路径，**互斥**：玩家用指杆指定过抽/注/过剩目标 → 走 6 号行为（按指定目标抽、注）；没有指定 → 走 7 号行为，自己在 `search_radius` 内找附近的置物台注液 / 工作盆存液，冷却用 `infusion_gun_cooldown`，并且带节流（找不到目标时按冷却窗口重扫，不会每 tick 扫一遍范围）。指杆的潜行高亮属于客户端交互，与女仆无关。
 
@@ -150,7 +150,7 @@
 - 原因：这两套目标对应两套互不兼容的行为路径（部署/加工 vs 抽液/注液），同时生效会互相抢同一个容器。
 - 切换类型时聊天栏会提示当前应用的是哪一类；想换回来，切回对应模式重新标记并应用即可。
 
-- 配置文件与主配置分开，节名 `maid`：`search_radius`(8.0 格)、`passive_infusion_gun`(true，"没有指杆目标时是否就近自动注液/存液"——关掉可避免女仆与玩家手搓抢同一个置物台)、各工具冷却（`press_hammer_cooldown` 16 / `infusion_gun_cooldown` 16 / `hand_saw_cooldown` 20 / `bellows_cooldown` 16 / `pointer_deploy_cooldown` 16 / `stirring_staff_cooldown` 16 / `mortar_cooldown` 60，单位 tick）、`particle_level`(3, 1–5)、禁用兼容的模组名单。
+- 配置文件与主配置分开，节名 `maid`：`search_radius`(8.0 格，作用于指杆标记的交互距离)、各工具冷却（`press_hammer_cooldown` 16 / `infusion_gun_cooldown` 16 / `hand_saw_cooldown` 20 / `bellows_cooldown` 16 / `pointer_deploy_cooldown` 16 / `stirring_staff_cooldown` 16 / `mortar_cooldown` 60，单位 tick）、`particle_level`(3, 1–5)。屏蔽模组名单写死在 `HandMadeMaidExtension.BLOCKED_MODS`，不开配置。
 - 冷却会按女仆好感度缩短（每档 −7.5%，最多 −22.5%）。
 - 女仆用工具不消耗工具耐久（走女仆规则）。
 - 首次把某把工具装到女仆主手时会弹一次"气泡"，之后按 30 秒冷却 + 好感度分档 + 耐久/连续加工上下文说话。

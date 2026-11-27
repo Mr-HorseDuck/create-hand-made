@@ -52,14 +52,8 @@ public class MaidConfigSectionProvider implements ConfigSectionProvider {
                 MaidConfig.INSTANCE.maidParticleLevel::get,
                 MaidConfig.INSTANCE.maidParticleLevel::set);
 
-        ConfigOption.Bool passiveInfusionGun = new ConfigOption.Bool(
-                label("maid.passive_infusion_gun"), tooltip("maid.passive_infusion_gun"),
-                true,
-                MaidConfig.INSTANCE.maidPassiveInfusionGun::get,
-                MaidConfig.INSTANCE.maidPassiveInfusionGun::set);
-
         return new ConfigCategorySpec(Component.translatable(CAT + "maid.basics"),
-                List.of(searchRadius, passiveInfusionGun, particleLevel));
+                List.of(searchRadius, particleLevel));
     }
 
     // ==================== 冷却 ====================

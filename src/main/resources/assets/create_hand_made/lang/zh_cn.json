@@ -124,8 +124,6 @@
   "config.create_hand_made.maid.press_hammer_cooldown.tooltip": "女仆使用冲压锤后的冷却时间（tick）",
   "config.create_hand_made.maid.infusion_gun_cooldown": "灌注枪冷却",
   "config.create_hand_made.maid.infusion_gun_cooldown.tooltip": "女仆使用灌注枪后的冷却时间（tick）",
-"config.create_hand_made.maid.passive_infusion_gun": "灌注枪就近注液",
-"config.create_hand_made.maid.passive_infusion_gun.tooltip": "没用指杆指定液体目标时，女仆是否自己找附近的置物台/工作盆注液、存液；关闭后只按指杆指定的目标工作",
   "config.create_hand_made.maid.hand_saw_cooldown": "手锯冷却",
   "config.create_hand_made.maid.hand_saw_cooldown.tooltip": "女仆使用手锯后的冷却时间（tick）",
   "config.create_hand_made.reset": "恢复本页默认",

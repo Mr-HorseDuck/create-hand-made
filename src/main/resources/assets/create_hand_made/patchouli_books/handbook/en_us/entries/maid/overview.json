@@ -11,13 +11,13 @@
     },
     {
       "type": "patchouli:text",
-      "title": "Nine behaviours (by priority)",
-      "text": "$(li)$(l)5$() Press Hammer$(li)$(l)6$() Fluid transfer (uses pointer-marked targets)$(li)$(l)7$() Infusion Gun (finds a nearby depot/basin when no target marked)$(li)$(l)8$() Stirring Staff$(li)$(l)9$() Hand Saw$(li)$(l)10$() Mortar$(li)$(l)11$() Crusher Mortar$(li)$(l)12$() Bellows$(li)$(l)13$() Pointer deploy"
+      "title": "Eight behaviours (by priority)",
+      "text": "$(li)$(l)5$() Press Hammer$(li)$(l)6$() Fluid transfer / Infusion Gun (pointer-marked draw, fill and overflow targets only)$(li)$(l)7$() Stirring Staff$(li)$(l)8$() Hand Saw$(li)$(l)9$() Mortar$(li)$(l)10$() Crusher Mortar$(li)$(l)11$() Bellows$(li)$(l)12$() Pointer deploy"
     },
     {
       "type": "patchouli:text",
       "title": "Favorability bonuses",
-      "text": "Higher favour means faster, cheaper work:$(li)cooldown $(c)−7.5%$() / $(c)−15%$() / $(c)−22.5%$()$(li)$(c)5%$() / $(c)10%$() / $(c)15%$() chance to skip durability$(br)$(br)$(italic)#6 and #7 are exclusive: once you mark draw/fill targets with the pointer, #7 steps aside."
+      "text": "Higher favour means faster, cheaper work:$(li)cooldown $(c)−7.5%$() / $(c)−15%$() / $(c)−22.5%$()$(li)$(c)5%$() / $(c)10%$() / $(c)15%$() chance to skip durability$(br)$(br)$(italic)#6 is the only Infusion Gun path: without a pointer-marked input basin and output target she does nothing, and never hunts for a container on her own."
     }
   ]
 }

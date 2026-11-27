@@ -3,7 +3,6 @@ package com.colin101.maidfactory;
 import com.colin101.maidfactory.behavior.MaidUseBellowsBehavior;
 import com.colin101.maidfactory.behavior.MaidUseCrusherMortarBehavior;
 import com.colin101.maidfactory.behavior.MaidUseHandSawBehavior;
-import com.colin101.maidfactory.behavior.MaidUseInfusionGunBehavior;
 import com.colin101.maidfactory.behavior.MaidUseLiquidTransferBehavior;
 import com.colin101.maidfactory.behavior.MaidUseMortarBehavior;
 import com.colin101.maidfactory.behavior.MaidUsePointerDeployBehavior;
@@ -42,16 +41,15 @@ public class TaskHandMade implements IMaidTask {
         // ★ 必须返回可变列表：TLM 会在返回值上调用 .add(...) 追加自己的行为
         return Lists.newArrayList(
                 Pair.of(5, new MaidUsePressHammerBehavior()),
+                // 灌注枪只有这一条路径：必须先用指杆指定输入盆 + 输出目标，女仆才动手，
+                // 不会自己就近找置物台/工作盆（那样会和玩家手搓抢同一个容器）。
                 Pair.of(6, new MaidUseLiquidTransferBehavior()),
-                // 灌注枪的"自己找附近置物台/工作盆注液"兜底：6 号行为管玩家用指杆指定的目标，
-                // 这条管没指定时的就近加工；两者互斥（本行为在指定过目标时直接让位）。
-                Pair.of(7, new MaidUseInfusionGunBehavior()),
-                Pair.of(8, new MaidUseStirringStaffBehavior()),
-                Pair.of(9, new MaidUseHandSawBehavior()),
-                Pair.of(10, new MaidUseMortarBehavior()),
-                Pair.of(11, new MaidUseCrusherMortarBehavior()),
-                Pair.of(12, new MaidUseBellowsBehavior()),
-                Pair.of(13, new MaidUsePointerDeployBehavior())
+                Pair.of(7, new MaidUseStirringStaffBehavior()),
+                Pair.of(8, new MaidUseHandSawBehavior()),
+                Pair.of(9, new MaidUseMortarBehavior()),
+                Pair.of(10, new MaidUseCrusherMortarBehavior()),
+                Pair.of(11, new MaidUseBellowsBehavior()),
+                Pair.of(12, new MaidUsePointerDeployBehavior())
         );
     }
 

@@ -51,6 +51,11 @@
   `HandMadeMaidExtension.BLOCKED_MODS` 里的常量（默认只有 `maidassemblyline`）。这类兼容性判定属于模组自己的知识，
   交给玩家改 config 只会造成「女仆兼容神神失灵」。配置界面女仆页 4 -> 3
   （基础 / 冷却一 / 冷却二），`ConfigOption.Strings` 与 `list_hint` 一并删除；`/chm reload` 也不再提「改完要重启」。
+- **女仆的灌注枪只保留「指杆标记灌注」，「主动灌注」整个拿掉**：原来优先级 7 的 `MaidUseInfusionGunBehavior`
+  会在没标目标时自己扫附近的置物台 / 工作盆注液，容易和玩家手搓抢同一个容器。现在这个行为整个删除，
+  灌注枪只走优先级 6 的液体搬运——**必须用指杆标好输入盆 + 输出目标**才动手。行为表 9 条变 8 条，
+  后面的优先级顺延（搅拌杖 7 / 手锯 8 / 研钵 9 / 碾钵 10 / 风箱 11 / 指杆部署 12）。
+  配置项 `maid.passive_infusion_gun` 与配置界面「灌注枪就近注液」开关一并删除（旧 toml 里的残留键会被忽略）。
 - **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读（目前所有页都是 SERVER）。
   保存也随之分流：SERVER 类型的 SPEC 只在单人存档里存。
 - **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
@@ -61,6 +66,8 @@
   `ConfigSectionProvider`（可选模组提供配置页的接口）、`HandMadeConfigScreen`（机械动力风界面 + 自绘整数条）、
   `ScreenBackdrop`（背景模糊）。
 - tlmCompat 侧新增 `client/MaidConfigSectionProvider`：只提供数据、不画界面，取代原来的 Cloth 集成。
+- 删除 `behavior/MaidUseInfusionGunBehavior`（主动灌注）；灌注枪的行为只剩 `MaidUseLiquidTransferBehavior`，
+  `TaskHandMade` 的优先级改成连续 5–12。
 - **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里没有 Patchouli，
   「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
 
