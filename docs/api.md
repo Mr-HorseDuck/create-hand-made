@@ -18,8 +18,8 @@
 - 查询类方法**返回不可变列表**（`recipesFor` / `recipesForFiltered` / `handSawRecipes` / `bellowsMedia*`）。想就地排序请先自己拷贝一份，直接改会抛 `UnsupportedOperationException`。
 - 入参为 `null` 或空物品时，查询返回 `null` / 空列表 / `false`，不会抛 NPE。
 - **线程**：写操作必须在**服务端主线程**调用（会改方块实体、物品栏、触发上游配方与事件）；查询方法任意线程可读，内部缓存都是不可变快照，但取到的 `Recipe` / `ItemStack` 请只在对应 `Level` 的线程上用。
-- **弃用**：`HandMadeResult.canSucceed()` 与 `isSuccess()` 完全等价，0.7.1 起标为 `@Deprecated`（方法保留，不会删）。新代码用 `isSuccess()`。
-- 本 API 自 **0.6.1** 起提供；0.7.1 新增的方法与类在 Javadoc 里标了 `@since 0.7.1`。
+- **弃用**：`HandMadeResult.canSucceed()` 与 `isSuccess()` 完全等价，0.7.1.1 起标为 `@Deprecated`（方法保留，不会删）。新代码用 `isSuccess()`。
+- 本 API 自 **0.6.1** 起提供；0.7.1.1 新增的方法与类在 Javadoc 里标了 `@since 0.7.1.1`。
 
 ### 写操作：`HandMadeResult` + 预演
 
@@ -62,10 +62,10 @@ public static void onToolUsed(HandMadeToolUsedEvent event) {
 
 它是**通知性质、不可取消**——想拦截请在调用前用查询或预演判断。
 
-**0.7.1 起覆盖面变了**：以前只在「第三方通过 API 触发的加工」时发，玩家自己手搓、女仆用工具都不发；
+**0.7.1.1 起覆盖面变了**：以前只在「第三方通过 API 触发的加工」时发，玩家自己手搓、女仆用工具都不发；
 现在发射点下沉到各工具真正成功的那一步，**三种来源都会发**：
 
-| 来源 | 0.7.0 及以前 | 0.7.1 |
+| 来源 | 0.7.0 及以前 | 0.7.1.1 |
 |---|---|---|
 | 玩家手搓 | 不发 | 发 |
 | 女仆行为 | 不发 | 发 |
@@ -198,7 +198,7 @@ public static void onToolUsed(HandMadeToolUsedEvent event) {
 | `extractFluidTick(Level, BlockPos, LivingEntity, ItemStack, int rate)` | `void` | 灌注枪抽液；首次成功抽取扣耐久。逐 tick 增量动作，无预演（用 `fluidSourceAt` 预判） |
 | `applyBellows(Level, BlockPos, FanProcessingType)` | `HandMadeResult` | 对目标应用鼓风，跨模组触发上游效果，可能转化物品 |
 | `applyBellows(Level, BlockPos, FanProcessingType, boolean simulate)` | `HandMadeResult` | 同上，**预演** |
-| `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久，**对任何 `ItemStack` 都生效**（0.7.1 起不再写死灌注枪）；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致），其它实体走标准 `hurtAndBreak` |
+| `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久，**对任何 `ItemStack` 都生效**（0.7.1.1 起不再写死灌注枪）；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致），其它实体走标准 `hurtAndBreak` |
 
 > 需要 batchSize 版本的冲压或 `HandSawItem#executeCut` / `stripBlock` 这类更细的入口时，只能直接调工具类 public 方法，并自行承担"只在服务端调用""自行扣耐久""自行保证玩家行为约束"。
 >

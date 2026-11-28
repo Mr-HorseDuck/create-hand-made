@@ -50,7 +50,7 @@ import java.util.List;
  * {@link net.minecraft.world.item.crafting.Recipe} 与 {@code ItemStack} 仍请只在对应
  * {@code Level} 的线程上使用。</p>
  *
- * <p>本 API 自 0.6.1 起提供；0.7.1 新增的方法与类都标了 {@code @since 0.7.1}。</p>
+ * <p>本 API 自 0.6.1 起提供；0.7.1.1 新增的方法与类都标了 {@code @since 0.7.1.1}。</p>
  */
 public final class CreateHandMadeApi {
 
@@ -148,9 +148,9 @@ public final class CreateHandMadeApi {
      * <p>能回答"只看一件物品"的工具与 {@link #findRecipeFor} 完全一致，其余工具返回
      * {@code null}。</p>
      *
-     * <p>0.7.1 新增，向后兼容。</p>
+     * <p>0.7.1.1 新增，向后兼容。</p>
      *
-     * @since 0.7.1
+     * @since 0.7.1.1
      */
     @Nullable
     public static RecipeMatch findRecipeMatchFor(ToolType tool, Level level, ItemStack input) {
@@ -177,7 +177,7 @@ public final class CreateHandMadeApi {
      *
      * <p>想拿到"这件物品能走的所有类型"用 {@link #toolTypesOf}。</p>
      *
-     * @since 0.7.1
+     * @since 0.7.1.1
      */
     @Nullable
     public static ToolType toolTypeOf(ItemStack stack) {
@@ -203,7 +203,7 @@ public final class CreateHandMadeApi {
      * 两条路径的 L2 过滤（数据包 / KubeJS 禁用表）是分开的，所以做"这件物品被禁了没"
      * 这类判断时必须逐个类型查。</p>
      *
-     * @since 0.7.1
+     * @since 0.7.1.1
      */
     public static List<ToolType> toolTypesOf(ItemStack stack) {
         ToolType primary = toolTypeOf(stack);
@@ -218,7 +218,7 @@ public final class CreateHandMadeApi {
     /**
      * 便利判断：{@code toolTypeOf(stack) != null}。
      *
-     * @since 0.7.1
+     * @since 0.7.1.1
      */
     public static boolean isHandMadeTool(ItemStack stack) {
         return toolTypeOf(stack) != null;
@@ -617,7 +617,7 @@ public final class CreateHandMadeApi {
      * {@code hurtAndBreak}，和女仆自己加工的手感对不上）；其它实体走标准 {@code hurtAndBreak}
      * （玩家会正常播报物品损坏）。没装 TLM 时就是裸扣耐久。</p>
      *
-     * <p>0.7.1 起<b>对任何物品都生效</b>：以前这里写死转发 {@code InfusionGunItem.damageGun}，
+     * <p>0.7.1.1 起<b>对任何物品都生效</b>：以前这里写死转发 {@code InfusionGunItem.damageGun}，
      * 传自己的物品进来执行的其实是灌注枪那套逻辑，语义完全不清楚；现在统一走
      * {@link ToolDamage#breakTool}，灌注枪的行为不变（它同样转发到这里）。</p>
      */

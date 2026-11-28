@@ -1,30 +1,33 @@
 # Changelog
 
 本模组所有值得记录的变更都写在这里。
-版本号规则 `x.y.z-beta`；`beta` 期间对外 API 仍可能调整，但会尽量保持方法签名稳定。
+版本号规则 `x.y.z-beta`；需要单独出修补版时在后面追加一位（`x.y.z.w-beta`，如 `0.7.1.1-beta`）。`beta` 期间对外 API 仍可能调整，但会尽量保持方法签名稳定。
 
 ---
 
-## 0.7.1-beta — 2026-11-22
+## 0.7.1.1-beta — 2026-11-28
 
-基准：`0.7.0-beta`。这一版把**配置界面**从头重做（不再依赖 Cloth Config，改成机械动力风的机械动力界面），
-并把手册的**首登赠送**改成动态联动取书。玩法、配方、存档数据都没有破坏性改动；
-唯一需要注意的是**协议版本升到 3**（见「升级注意」）。
+基准：`0.7.1-beta`。这一版是 `0.7.1` 的修补与补齐：修好了**指杆 Shift + 右键女仆没反应**，把女仆的灌注枪
+收窄成只做「指杆标记灌注」，配置界面继续打磨（滚动条 / 只读灰值 / 撤销 / 键盘 / 音效），
+对外 API 补上工具识别与配方 ID、让 `HandMadeToolUsedEvent` 覆盖三种来源。
+**协议版本没变（仍为 3）**，与 `0.7.1` 可以互连；`0.7.0` 及更早仍需先升到 `0.7.1`。
 
 ### 新增
 
-- **配置界面：机械动力风、模组自带（不再依赖 Cloth Config）**：模组列表里的「配置」按钮打开的界面
-  外观与零件全部**借用 Create / Catnip 自己的那一套**——`AbstractSimiScreen` 窗口 +
-  `BoxElement` 深色面板（两层描边与内发光都是代码画）+ `IconButton` 与
-  `AllIcons.I_CONFIG_SAVE / I_CONFIG_RESET / I_CONFIG_LOCKED` 图标，文字取
-  `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
-  所以是机械动力那套观感，且**不需要额外贴图**。
-  - 顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面。
-  - 女仆配置拆成 3 页（基础 / 冷却一 / 冷却二）。装了女仆兼容时分类共 11 项、一屏放不下，
-    分类栏右侧会出现细滚动条并给上下边缘加渐隐（以前只有滚轮，看不出下面还有页）。
-- **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
-  （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
-  三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
+- **对外 API 补三处缺口**（`CreateHandMadeApi`，`docs/api.md` 同步）：
+  - `toolTypeOf(ItemStack)` / `toolTypesOf(ItemStack)` / `isHandMadeTool(ItemStack)`：以前接入方只能自己 `instanceof` 十连，
+    而且冲压锤的「工作盆 / 置物台」、手锯的「锯木 / 切石」在物品上是同一个东西，外部根本拆不出来；
+    现在能直接问到主类型与全部类型（`toolTypeOf` 给主类型、`toolTypesOf` 给全部，做「这件被 KJS 禁了没」要用后者）。
+  - `findRecipeMatchFor(ToolType, Level, ItemStack)` 与新类 `RecipeMatch`：1.20.1 的 `Recipe` 不是 `RecipeHolder`、
+    拿不到 `id()`，这个方法把配方 ID 一起返回（动态配方无稳定 ID 时 `id()` 为 `null`、`hasId()` 为 `false`）。
+- **对外 API 收尾三处**：
+  - `damageTool` 不再写死灌注枪：扣耐久抽成 `api/ToolDamage.breakTool`，API 与灌注枪内部的 6 处调用点共用
+    同一份实现。以前传自己的物品进来，实际执行的是灌注枪那套逻辑；现在**任何 `ItemStack` 都能用**，
+    灌注枪行为不变。
+  - `HandMadeResult.canSucceed()` 标为过时：与 `isSuccess()` 完全等价，只是 0.6.x 时期的第二种叫法，
+    同一个语义对外给两个名字只会让接入方猜。方法保留不删（删了会让已有调用方直接编译不过）。
+  - 补 `@since 0.7.1.1` 与线程说明：类注释与文档写明「写操作必须服务端主线程、查询可任意线程读」，
+    本版新增的方法与类都标了版本，接入方能一眼看出哪些是新加的。
 - **配置界面的细节补强**（读起来更省事、点错了也能退）：
   - **只读页不再是一片空白**：多人游戏里 SERVER 页照样把滑块 / 开关画出来，只是压暗、不能拖，
     玩家至少能看见服务端当前调成了多少；右上角仍有锁标记，底部一行「只读：本页配置由服务端决定」。
@@ -39,33 +42,6 @@
   - **键盘也能调**：方向键选行、左右改值（Shift 十步）、PageUp/PageDown 换分类、Enter 保存退出；
     动过键盘才画焦点框，鼠标玩家不会看到多余方框。底部左侧有一条灰字提示，不用猜。
   - **按钮有声音**：保存 / 恢复默认 / 撤销 / 换分类 / 拨开关都会响一声原版的 `UI_BUTTON_CLICK`。
-- **打开界面时糊背景 + 藏 HUD**：复用原版自带的 `minecraft:shaders/post/blur.json` 自己建 `PostChain`，
-  每帧处理主渲染目标（等价 1.21 的 `processBlurEffect`，不动全局后处理；光影模组跑不起来会自动停用）；
-  同时临时打开 `Options.hideGui`，物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都让位，
-  关掉界面后还原成打开前的状态。存档里**只留模糊**（不叠暗色、不提亮），主菜单里铺原版泥土底。
-- **`/chm config` 命令**：玩家随时打开配置界面（多人游戏里是只读视图，SERVER 配置仍由服务端权威）。
-- **`/chm book` 命令**（权限等级 2）：补发手册。`/chm book` 给自己、`/chm book @a` 批量补发
-  （无视「已赠送」标记，老存档 / 老服务器统一补书就用它）、`/chm book reset [玩家们]` 清掉标记让下次登录重送。
-  发不出去时聊天栏会说清是「没装 Patchouli」还是「拿不到书物品」。
-- **手册首登赠送改为动态联动取书**：优先反射 `PatchouliAPI.get().getBookStack(...)`
-  （方法声明在 `PatchouliAPI$IPatchouliAPI` 接口上、还要先查 `isStub()`），
-  拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
-  标记写在玩家自己的持久数据里 → **老存档里的老玩家首次装模组后登录就会收到**；换存档会再送一本。
-
-- **对外 API 补三处缺口**（`CreateHandMadeApi`，`docs/api.md` 同步）：
-  - `toolTypeOf(ItemStack)` / `toolTypesOf(ItemStack)` / `isHandMadeTool(ItemStack)`：以前接入方只能自己 `instanceof` 十连，
-    而且冲压锤的「工作盆 / 置物台」、手锯的「锯木 / 切石」在物品上是同一个东西，外部根本拆不出来；
-    现在能直接问到主类型与全部类型（`toolTypeOf` 给主类型、`toolTypesOf` 给全部，做「这件被 KJS 禁了没」要用后者）。
-  - `findRecipeMatchFor(ToolType, Level, ItemStack)` 与新类 `RecipeMatch`：1.20.1 的 `Recipe` 不是 `RecipeHolder`、
-    拿不到 `id()`，这个方法把配方 ID 一起返回（动态配方无稳定 ID 时 `id()` 为 `null`、`hasId()` 为 `false`）。
-- **对外 API 收尾三处**：
-  - `damageTool` 不再写死灌注枪：扣耐久抽成 `api/ToolDamage.breakTool`，API 与灌注枪内部的 6 处调用点共用
-    同一份实现。以前传自己的物品进来，实际执行的是灌注枪那套逻辑；现在**任何 `ItemStack` 都能用**，
-    灌注枪行为不变。
-  - `HandMadeResult.canSucceed()` 标为过时：与 `isSuccess()` 完全等价，只是 0.6.x 时期的第二种叫法，
-    同一个语义对外给两个名字只会让接入方猜。方法保留不删（删了会让已有调用方直接编译不过）。
-  - 补 `@since 0.7.1` 与线程说明：类注释与文档写明「写操作必须服务端主线程、查询可任意线程读」，
-    0.7.1 新增的方法与类都标了版本，接入方能一眼看出哪些是新加的。
 
 ### 变更
 
@@ -76,13 +52,6 @@
   三种来源各发**一次**（预演不发）。想静音用新的服务器配置 `[api] fire_tool_used_events`（默认 `true`，
   关掉只影响外部监听方，不影响任何加工逻辑）。**接入方注意**：以前收不到的原生加工现在也会进事件，
   按「每次事件记一笔」写的统计数值会跳一档。
-- **碾钵加工时长的默认值改成 50 tick**（原来是 100，和研钵一样）：碾钵是「先粉碎、没配方才退回研磨」，
-  本来就该比研钵快 —— 手册里一直这么写，但代码默认值没跟上。**已有存档不受影响**（toml 里写死的 100 会保留），
-  只有新建存档的默认值变成 50；想改回去把 `crusher_mortar.processing_ticks` 设为 100 即可。
-- **移除 Cloth Config 依赖**：`build.gradle` 的 compileOnly/runtimeOnly、`mods.toml` 的可选依赖段、
-  `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
-  `MaidClothConfigIntegration` 一并删除，改成 `client/config/` 下的一套自绘界面 +
-  `ConfigSectionProvider` 接口（女仆页由 tlmCompat 提供数据、主代码用反射接）。
 - **女仆兼容的「屏蔽模组」改为代码里写死，不再开放配置**：原来它是单独一份 COMMON 配置
   （`MaidStartupConfig`，`config/create_hand_made-maid.toml`）+配置界面第四页，现在改成
   `HandMadeMaidExtension.BLOCKED_MODS` 里的常量（默认只有 `maidassemblyline`）。这类兼容性判定属于模组自己的知识，
@@ -93,16 +62,19 @@
   灌注枪只走优先级 6 的液体搬运——**必须用指杆标好输入盆 + 输出目标**才动手。行为表 9 条变 8 条，
   后面的优先级顺延（搅拌杖 7 / 手锯 8 / 研钵 9 / 碾钵 10 / 风箱 11 / 指杆部署 12）。
   配置项 `maid.passive_infusion_gun` 与配置界面「灌注枪就近注液」开关一并删除（旧 toml 里的残留键会被忽略）。
-- **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读（目前所有页都是 SERVER）。
-  保存也随之分流：SERVER 类型的 SPEC 只在单人存档里存。
-- **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
+- **分类栏补滚动条与渐隐，窗口高度自适应**：装了女仆兼容时分类共 11 项、一屏放不下，以前只有滚轮、
+  看不出下面还有页；现在分类栏右侧有细滚动条，上下边缘按还有没有内容决定是否渐隐（不再无条件压暗首末行），
+  并且窗口高度改成跟着分类数量算（8 项 234 px、11 项 300 px，屏幕太矮时压到下限）。
+
+### 修复
+
+- **指杆 Shift + 右键女仆没反应**：客户端在 `InteractionKeyMappingTriggered` 上取消右键，本意是「别让指杆走原版
+  使用逻辑」，但同一个取消也一起吞掉了 `ServerboundInteractPacket` —— 服务端根本收不到交互，女仆侧的
+  `InteractMaidEvent` 自然不触发。现在只在**命中方块**时取消，命中实体时放行，让原版把交互包发出去；
+  同时液体模式不再额外发标记包（避免与女仆模组那条路径重复应用），女仆判定改成 `instanceof EntityMaid`。
 
 ### 内部
 
-- 新增 `client/config/`：`ConfigOption`（布尔 / 整数的纯数据描述）、`ConfigCategorySpec`、
-  `ConfigSectionProvider`（可选模组提供配置页的接口）、`HandMadeConfigScreen`（机械动力风界面 + 自绘整数条）、
-  `ScreenBackdrop`（背景模糊）。
-- tlmCompat 侧新增 `client/MaidConfigSectionProvider`：只提供数据、不画界面，取代原来的 Cloth 集成。
 - 新增 `api/ToolUseEvents`（事件唯一发射点，带配置门控）与 `api/RecipeMatch`；`CreateHandMadeApi` 里 6 处
   `fireToolUsed(...)` 全部删掉，改由工具侧在自己成功的那一步发射。
 - 女仆侧有 3 条路径是自己复写了一遍加工逻辑（不复用物品侧方法），事件在各自成功分支里补发：
@@ -122,14 +94,73 @@
 - 新增 `api/ToolDamage`：`breakTool(ItemStack, LivingEntity)` 是扣耐久的唯一实现；
   `InfusionGunItem.damageGun` 改为转发（方法名保留，内部 6 处调用点不动），`CreateHandMadeApi.damageTool`
   也走它，于是「API 只对灌注枪有效」这条耦合消失。`InfusionGunItem` 顺手删掉不再使用的 `EquipmentSlot` import。
-- `HandMadeResult.canSucceed()` 加 `@Deprecated(since = "0.7.1")` 与 `@deprecated` Javadoc（保留方法体，
+- `HandMadeResult.canSucceed()` 加 `@Deprecated(since = "0.7.1.1")` 与 `@deprecated` Javadoc（保留方法体，
   只换实现为 `return this == SUCCESS;` 不变）。
-- **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里没有 Patchouli，
-  「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
 - **`mods.toml` 补上女仆模组软依赖**：`touhou_little_maid`、`mandatory=false`、`ordering="AFTER"`、
   版本区间 `[1.5,1.6)`（`gradle.properties` 新增 `tlm_version_range`）。此前完全没有声明，
   女仆扩展能否被扫描到只取决于 modid 字典序（`create_hand_made` 恰好排在 `touhou_little_maid` 前面）；
   没装女仆模组的玩家不受影响，只是加载顺序被写死了。
+
+### 升级注意
+
+1. **协议版本仍是 3**：`0.7.1` 与 `0.7.1.1` **可以互连**；`0.6.4` / `0.7.0`（协议 2）不能，要先升到 `0.7.1` 或更高。
+2. 旧 toml 里如果还留着 `maid.passive_infusion_gun` 或 `blocked_mods`，**会被直接忽略**（不报错，也不必手删）。
+3. `HandMadeToolUsedEvent` 现在原生加工也发：按事件条数统计的数值会跳一档。
+4. 没有方块 / 物品 ID 变化，旧存档、旧工具、旧标记、旧配方全部继续有效。
+
+## 0.7.1-beta — 2026-11-22
+
+基准：`0.7.0-beta`。这一版把**配置界面**从头重做（不再依赖 Cloth Config，改成机械动力风的机械动力界面），
+并把手册的**首登赠送**改成动态联动取书。玩法、配方、存档数据都没有破坏性改动；
+唯一需要注意的是**协议版本升到 3**（见「升级注意」）。
+
+### 新增
+
+- **配置界面：机械动力风、模组自带（不再依赖 Cloth Config）**：模组列表里的「配置」按钮打开的界面
+  外观与零件全部**借用 Create / Catnip 自己的那一套**——`AbstractSimiScreen` 窗口 +
+  `BoxElement` 深色面板（两层描边与内发光都是代码画）+ `IconButton` 与
+  `AllIcons.I_CONFIG_SAVE / I_CONFIG_RESET / I_CONFIG_LOCKED` 图标，文字取
+  `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
+  所以是机械动力那套观感，且**不需要额外贴图**。
+  - 顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面。
+  - 女仆配置拆成 4 页（基础 / 冷却一 / 冷却二 / 屏蔽模组）。
+- **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
+  （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
+  三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
+- **打开界面时糊背景 + 藏 HUD**：复用原版自带的 `minecraft:shaders/post/blur.json` 自己建 `PostChain`，
+  每帧处理主渲染目标（等价 1.21 的 `processBlurEffect`，不动全局后处理；光影模组跑不起来会自动停用）；
+  同时临时打开 `Options.hideGui`，物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都让位，
+  关掉界面后还原成打开前的状态。存档里**只留模糊**（不叠暗色、不提亮），主菜单里铺原版泥土底。
+- **`/chm config` 命令**：玩家随时打开配置界面（多人游戏里是只读视图，SERVER 配置仍由服务端权威）。
+- **`/chm book` 命令**（权限等级 2）：补发手册。`/chm book` 给自己、`/chm book @a` 批量补发
+  （无视「已赠送」标记，老存档 / 老服务器统一补书就用它）、`/chm book reset [玩家们]` 清掉标记让下次登录重送。
+  发不出去时聊天栏会说清是「没装 Patchouli」还是「拿不到书物品」。
+- **手册首登赠送改为动态联动取书**：优先反射 `PatchouliAPI.get().getBookStack(...)`
+  （方法声明在 `PatchouliAPI$IPatchouliAPI` 接口上、还要先查 `isStub()`），
+  拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
+  标记写在玩家自己的持久数据里 → **老存档里的老玩家首次装模组后登录就会收到**；换存档会再送一本。
+
+### 变更
+
+- **碾钵加工时长的默认值改成 50 tick**（原来是 100，和研钵一样）：碾钵是「先粉碎、没配方才退回研磨」，
+  本来就该比研钵快 —— 手册里一直这么写，但代码默认值没跟上。**已有存档不受影响**（toml 里写死的 100 会保留），
+  只有新建存档的默认值变成 50；想改回去把 `crusher_mortar.processing_ticks` 设为 100 即可。
+- **移除 Cloth Config 依赖**：`build.gradle` 的 compileOnly/runtimeOnly、`mods.toml` 的可选依赖段、
+  `gradle.properties` 的版本号全部删掉；`HandMadeClothConfigIntegration` 与 tlmCompat 的
+  `MaidClothConfigIntegration` 一并删除，改成 `client/config/` 下的一套自绘界面 +
+  `ConfigSectionProvider` 接口（女仆页由 tlmCompat 提供数据、主代码用反射接）。
+- **只读判定改成按页**：只有 `ModConfig.Type.SERVER` 的页在多人游戏里只读（目前所有页都是 SERVER）。
+  保存也随之分流：SERVER 类型的 SPEC 只在单人存档里存。
+- **协议版本 `PROTOCOL_VERSION` 2 → 3**：新增 `/chm config` 用的空包 `OpenConfigScreenPacket`。
+
+### 内部
+
+- 新增 `client/config/`：`ConfigOption`（布尔 / 整数的纯数据描述）、`ConfigCategorySpec`、
+  `ConfigSectionProvider`（可选模组提供配置页的接口）、`HandMadeConfigScreen`（机械动力风界面 + 自绘整数条）、
+  `ScreenBackdrop`（背景模糊）。
+- tlmCompat 侧新增 `client/MaidConfigSectionProvider`：只提供数据、不画界面，取代原来的 Cloth 集成。
+- **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里没有 Patchouli，
+  「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
 
 ### 升级注意
 

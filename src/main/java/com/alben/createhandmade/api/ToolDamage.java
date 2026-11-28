@@ -15,7 +15,7 @@ import net.minecraft.world.item.ItemStack;
  *
  * <p><b>只在服务端调用</b>：{@code hurtAndBreak} 会改物品栈并可能触发损坏广播。</p>
  *
- * @since 0.7.1
+ * @since 0.7.1.1
  */
 public final class ToolDamage {
 

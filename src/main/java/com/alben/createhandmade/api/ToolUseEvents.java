@@ -13,7 +13,7 @@ import javax.annotation.Nullable;
  * {@link HandMadeToolUsedEvent} 的唯一发射点。
  *
  * <p>0.7.0 及以前，事件只在 {@link CreateHandMadeApi} 的写操作成功后发——也就是"只有第三方
- * 通过 API 触发的加工"能被监听到，玩家自己手搓、女仆用工具都不会发。0.7.1 起把发射点下沉到
+ * 通过 API 触发的加工"能被监听到，玩家自己手搓、女仆用工具都不会发。0.7.1.1 起把发射点下沉到
  * 各工具真正成功的那一步（{@code PressHammerItem.tryPressBasin} 之类），于是三种来源都会发：</p>
  *
  * <ul>
@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
  *
  * <p><b>只在服务端发射</b>：客户端调用直接 return，接入方不需要自己判 {@code isClientSide}。</p>
  *
- * @since 0.7.1
+ * @since 0.7.1.1
  */
 public final class ToolUseEvents {
 

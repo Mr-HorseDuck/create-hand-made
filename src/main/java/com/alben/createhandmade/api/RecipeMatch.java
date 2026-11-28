@@ -12,9 +12,9 @@ import javax.annotation.Nullable;
  * 所以 ID 需要单独反查一次。动态配方（{@code SequencedAssemblyRecipe} 之类）没有稳定
  * ID，这种情况 {@link #id()} 为 {@code null}，用 {@link #hasId()} 判断。</p>
  *
- * <p>0.7.1 新增，向后兼容：{@link CreateHandMadeApi#findRecipeFor} 保持原样。</p>
+ * <p>0.7.1.1 新增，向后兼容：{@link CreateHandMadeApi#findRecipeFor} 保持原样。</p>
  *
- * @since 0.7.1
+ * @since 0.7.1.1
  */
 public record RecipeMatch(Recipe<?> recipe, @Nullable ResourceLocation id) {
 

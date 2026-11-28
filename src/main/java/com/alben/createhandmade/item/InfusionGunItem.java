@@ -620,7 +620,7 @@ public class InfusionGunItem extends Item {
     /**
      * 扣 1 点耐久。
      *
-     * <p>0.7.1 起只做转发：实现搬到 {@link com.alben.createhandmade.api.ToolDamage#breakTool}，
+     * <p>0.7.1.1 起只做转发：实现搬到 {@link com.alben.createhandmade.api.ToolDamage#breakTool}，
      * 让「对外 API 的 damageTool」和「灌注枪自己的 6 处调用点」共用同一份逻辑。方法名保留，
      * 因为内部调用点多、且已有附属模组可能直接调用它。</p>
      */
