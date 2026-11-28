@@ -1,12 +1,14 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.api.HandMadeResult;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.bellows.BellowsMediaRegistry;
 import com.alben.createhandmade.item.renderer.BellowsItemRenderer;
 import com.alben.createhandmade.network.BellowsBlastPacket;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
+import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
@@ -714,6 +716,17 @@ private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemS
     
     // ================= 加工 =================
 
+    // funnel：玩家手搓 / 女仆行为 / 第三方 API 三条路径都走这个入口，所以工具使用事件在这里发一次；
+    // 预演（simulate）只判定不执行，不发。FanProcessingType 没有对应的事件字段，不塞进来。
+    public static HandMadeResult applyToTarget(Level level, BlockPos pos, FanProcessingType type,
+                                               boolean simulate) {
+        HandMadeResult result = applyToTargetImpl(level, pos, type, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.BELLOWS, level, pos, null, null);
+        }
+        return result;
+    }
+
     /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean applyToTarget(Level level, BlockPos pos, FanProcessingType type) {
         return applyToTarget(level, pos, type, false).isSuccess();
@@ -725,8 +738,8 @@ private static List<ItemStack> filterContainerShells(ItemStack input, List<ItemS
      * <p>★ 支持预演：{@code simulate} 为 true 时只扫描"有没有一件物品能被该类型处理且产物非空"，
      * 不改物品、不播粒子。</p>
      */
-    public static HandMadeResult applyToTarget(Level level, BlockPos pos, FanProcessingType type,
-                                               boolean simulate) {
+    private static HandMadeResult applyToTargetImpl(Level level, BlockPos pos, FanProcessingType type,
+                                                    boolean simulate) {
         if (level == null || pos == null || type == null) return HandMadeResult.INVALID_TARGET;
 
         TransportedItemStackHandlerBehaviour handler =

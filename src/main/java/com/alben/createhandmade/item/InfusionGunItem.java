@@ -8,6 +8,7 @@ import com.alben.createhandmade.item.renderer.InfusionGunRenderer;
 import com.alben.createhandmade.network.FluidParticlesPacket;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.api.HandMadeResult;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.ToolType;
 import com.alben.createhandmade.recipe.type.HandMadeRecipes;
@@ -34,7 +35,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -418,6 +418,18 @@ public class InfusionGunItem extends Item {
 
     // ================= 注入物品 =================
 
+    // funnel：玩家手搓 / 女仆行为 / 第三方 API 三条路径都走这个入口，所以工具使用事件在这里发一次；
+    // 预演（simulate）只判定不执行，不发。
+    public static HandMadeResult tryInjectItems(Level level, BlockPos pos, LivingEntity entity,
+                                                ItemStack gun, @Nullable FilterItemStack filter,
+                                                boolean simulate) {
+        HandMadeResult result = tryInjectItemsImpl(level, pos, entity, gun, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.INFUSION_GUN, level, pos, gun, null);
+        }
+        return result;
+    }
+
     /**
      * ★ 女仆兼容：
      *   - public static，供 TLM 行为类调用
@@ -435,9 +447,9 @@ public class InfusionGunItem extends Item {
      * <p>★ 支持预演：{@code simulate} 为 true 时只扫描"有没有一件物品能被当前枪内流体加工、
      * 且产物不被过滤器挡住"，不耗流体、不改物品、不扣耐久、不播粒子。</p>
      */
-    public static HandMadeResult tryInjectItems(Level level, BlockPos pos, LivingEntity entity,
-                                                ItemStack gun, @Nullable FilterItemStack filter,
-                                                boolean simulate) {
+    private static HandMadeResult tryInjectItemsImpl(Level level, BlockPos pos, LivingEntity entity,
+                                                     ItemStack gun, @Nullable FilterItemStack filter,
+                                                     boolean simulate) {
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
 
         TransportedItemStackHandlerBehaviour handler =
@@ -554,6 +566,17 @@ public class InfusionGunItem extends Item {
 
     // ================= 存入流体 =================
 
+    // funnel：玩家手搓 / 女仆行为 / 第三方 API 三条路径都走这个入口，所以工具使用事件在这里发一次；
+    // 预演（simulate）只判定不执行，不发。
+    public static HandMadeResult tryStoreFluid(Level level, BlockPos pos, LivingEntity entity,
+                                               ItemStack gun, boolean simulate) {
+        HandMadeResult result = tryStoreFluidImpl(level, pos, entity, gun, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.INFUSION_GUN, level, pos, gun, null);
+        }
+        return result;
+    }
+
     /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean tryStoreFluid(Level level, BlockPos pos, LivingEntity entity, ItemStack gun) {
         return tryStoreFluid(level, pos, entity, gun, false).isSuccess();
@@ -565,8 +588,8 @@ public class InfusionGunItem extends Item {
      * <p>★ 支持预演：{@code simulate} 为 true 时用 {@code FluidAction.SIMULATE} 问一次
      * "这里能接受多少"，能接受就返回 {@link HandMadeResult#SUCCESS}——不倒流体、不扣耐久、不播音效。</p>
      */
-    public static HandMadeResult tryStoreFluid(Level level, BlockPos pos, LivingEntity entity,
-                                               ItemStack gun, boolean simulate) {
+    private static HandMadeResult tryStoreFluidImpl(Level level, BlockPos pos, LivingEntity entity,
+                                                    ItemStack gun, boolean simulate) {
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
 
         IFluidHandler handler = getFluidHandler(level, pos);
@@ -594,14 +617,15 @@ public class InfusionGunItem extends Item {
 
     // ================= 耐久 =================
 
+    /**
+     * 扣 1 点耐久。
+     *
+     * <p>0.7.1 起只做转发：实现搬到 {@link com.alben.createhandmade.api.ToolDamage#breakTool}，
+     * 让「对外 API 的 damageTool」和「灌注枪自己的 6 处调用点」共用同一份逻辑。方法名保留，
+     * 因为内部调用点多、且已有附属模组可能直接调用它。</p>
+     */
     public static void damageGun(ItemStack gun, LivingEntity entity) {
-        if (entity instanceof Player player) {
-            EquipmentSlot slot = player.getUsedItemHand() == InteractionHand.MAIN_HAND
-                    ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
-            gun.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(slot));
-        } else {
-            gun.hurtAndBreak(1, entity, e -> {});
-        }
+        com.alben.createhandmade.api.ToolDamage.breakTool(gun, entity);
     }
 
     // ================= 判定 =================

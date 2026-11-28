@@ -1,6 +1,7 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.colin101.maidfactory.MaidConfig;
 import com.colin101.maidfactory.PointerDataHelper;
 import com.colin101.maidfactory.MaidBubbleHelper;
@@ -169,6 +170,10 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
                         }
                         depot.notifyUpdate();
                         depot.sendData();
+
+                        // 女仆指杆自己实现了一遍部署，事件在这里单独发一次；target 是置物台上被加工的那件
+                        ToolUseEvents.post(ToolType.POINTER, level, workPos, tool, held.copyWithCount(1));
+
                         returnOrConsumeInput(maid, inputInv, inputSlot, extracted, recipe);
                         MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
 
@@ -208,6 +213,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         if (handler == null) return false;
 
         boolean[] success = {false};
+        ItemStack[] appliedTarget = {ItemStack.EMPTY};
 
         handler.handleProcessingOnAllItems(item -> {
             if (success[0]) return TransportedResult.doNothing();
@@ -228,6 +234,7 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
             }
 
             success[0] = true;
+            appliedTarget[0] = stack.copy();
 
             List<TransportedItemStack> outputs = new ArrayList<>();
             for (ItemStack result : results) {
@@ -256,6 +263,9 @@ public class MaidUsePointerDeployBehavior implements BehaviorControl<EntityMaid>
         });
 
         if (success[0]) {
+            // 女仆指杆自己实现了一遍部署（不复用 PointerItem.executeDepotProcess），事件在这里单独发
+            ToolUseEvents.post(ToolType.POINTER, level, pos, tool, appliedTarget[0].copyWithCount(1));
+
             MaidFavorabilityHelper.damageToolWithLuck(tool, maid, 1);
         }
         return success[0];

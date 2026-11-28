@@ -85,6 +85,10 @@ public final class ConfigScreens {
                 bool("debug.enable_debug", false, c.debugEnabled)
         )));
 
+        categories.add(new ConfigCategorySpec(tr("api"), List.of(
+                bool("api.fire_tool_used_events", true, c.apiFireToolUsedEvents)
+        )));
+
         ConfigSectionProvider maid = maidProvider();
         if (maid != null) {
             categories.addAll(maid.categories());

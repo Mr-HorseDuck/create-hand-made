@@ -51,7 +51,15 @@ public enum HandMadeResult {
         return this == SUCCESS;
     }
 
-    /** 是否是"预演通过"（等价于 {@link #SUCCESS}，语义更清楚的别名）。 */
+    /**
+     * 是否是"预演通过"（等价于 {@link #SUCCESS}）。
+     *
+     * @deprecated 与 {@link #isSuccess()} 完全等价，只是 0.6.x 时期的第二种叫法，同一个语义
+     *             对外暴露两条方法名只会让接入方猜「到底该用哪个」。0.7.1 起标记过时，
+     *             方法本身会保留（删掉会让已有二进制 / 源码直接编译不过），新代码请用
+     *             {@link #isSuccess()}。
+     */
+    @Deprecated(since = "0.7.1")
     public boolean canSucceed() {
         return this == SUCCESS;
     }

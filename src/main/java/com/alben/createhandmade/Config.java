@@ -42,6 +42,9 @@ public class Config {
     // ==================== 调试 ====================
     public final ForgeConfigSpec.BooleanValue debugEnabled;
 
+    // ==================== API ====================
+    public final ForgeConfigSpec.BooleanValue apiFireToolUsedEvents;
+
     static {
         Pair<Config, ForgeConfigSpec> pair = new ForgeConfigSpec.Builder().configure(Config::new);
         INSTANCE = pair.getLeft();
@@ -200,6 +203,20 @@ public class Config {
                 .define("enable_debug", false);
 
         builder.pop(); // debug
+
+        // ==================== API ====================
+        builder.comment("对外 API 行为（给做兼容的模组看，普通玩家不用动）").push("api");
+
+        apiFireToolUsedEvents = builder
+                .comment("加工成功时是否发 HandMadeToolUsedEvent 事件",
+                         "true  = 玩家手搓 / 女仆行为 / 第三方通过 API 触发，三种来源都发",
+                         "false = 完全不发（第三方监听不到任何加工成功，包括通过 API 触发的）",
+                         "本模组自身玩法不依赖这个事件，关掉不影响任何加工逻辑，",
+                         "只影响外部监听方；想静音请关，别去删监听代码",
+                         "默认: true")
+                .define("fire_tool_used_events", true);
+
+        builder.pop(); // api
 
         builder.pop(); // create_hand_made
     }

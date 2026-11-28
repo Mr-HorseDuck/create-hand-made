@@ -7,6 +7,7 @@ import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.item.contents.MortarContents;
 import com.alben.createhandmade.item.renderer.MortarItemRenderer;
 import com.alben.createhandmade.api.HandMadeResult;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.recipe.HandMadeRecipePool;
 import com.alben.createhandmade.recipe.HandMadeRecipeTypes;
 import com.alben.createhandmade.recipe.HandMadeToolRecipeLike;
@@ -254,6 +255,19 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
 
     // ================= 女仆一次性研磨辅助 =================
 
+    // funnel：玩家手搓 / 女仆行为 / 第三方 API 三条路径都走这个入口，所以工具使用事件在这里发一次；
+    // 预演（simulate）只判定不执行，不发。研磨没有方块坐标，pos 用使用者的位置。
+    public static HandMadeResult tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
+                                              @Nullable IItemHandler inputInv,
+                                              @Nullable IItemHandler outputInv,
+                                              @Nullable FilterItemStack filter, boolean simulate) {
+        HandMadeResult result = tryGrindOnceImpl(level, entity, mortar, inputInv, outputInv, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.MORTAR, level, entity.blockPosition(), mortar, null);
+        }
+        return result;
+    }
+
     /** 旧签名（boolean）。内部调用方继续用它。 */
     public static boolean tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
                                         @Nullable IItemHandler inputInv,
@@ -272,10 +286,10 @@ public class MortarItem extends Item implements CustomUseEffectsItem {
      * 而且 rollback 自身的分支（副手已空 / 容器已满）容易出漏洞。改成先判定后取料后，
      * rollbackMaterial 不再需要，已连带删除。</p>
      */
-    public static HandMadeResult tryGrindOnce(Level level, LivingEntity entity, ItemStack mortar,
-                                              @Nullable IItemHandler inputInv,
-                                              @Nullable IItemHandler outputInv,
-                                              @Nullable FilterItemStack filter, boolean simulate) {
+    private static HandMadeResult tryGrindOnceImpl(Level level, LivingEntity entity, ItemStack mortar,
+                                                   @Nullable IItemHandler inputInv,
+                                                   @Nullable IItemHandler outputInv,
+                                                   @Nullable FilterItemStack filter, boolean simulate) {
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         if (!(level instanceof ServerLevel serverLevel)) return HandMadeResult.INVALID_TARGET;
 

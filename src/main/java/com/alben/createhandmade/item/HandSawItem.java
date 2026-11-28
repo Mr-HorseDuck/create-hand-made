@@ -1,6 +1,7 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.Config;
 import com.alben.createhandmade.config.SyncedServerConfig;
@@ -540,7 +541,8 @@ public class HandSawItem extends Item {
             }
         }
 
-        // ★ 一次消耗 actual 份原料
+        // ★ 一次消耗 actual 份原料（消耗前留一份被切物的快照，事件里的 target 用它）
+        ItemStack cutTarget = off.copyWithCount(actual);
         off.shrink(actual);
 
         // ★ 产物 × actual，按 maxStackSize 拆分发放
@@ -562,6 +564,11 @@ public class HandSawItem extends Item {
                 total -= give;
             }
         }
+
+        // funnel：切削真的成了（原料已扣、产物已发）——玩家手搓、女仆手锯行为都走这里，
+        // 工具使用事件在这一步发一次。手锯切的是副手物品，没有方块坐标，用使用者位置代表加工处；
+        // target 传刚被切掉的原料（不是产物）。
+        ToolUseEvents.post(ToolType.HAND_SAW, level, entity.blockPosition(), saw, cutTarget);
 
         // ★ 耐久：批量只扣 1 点
         if (entity instanceof Player player) {

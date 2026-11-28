@@ -53,3 +53,15 @@ mandatory=false
 versionRange="[1.20.1-84,)"
 ordering="NONE"
 side="BOTH"
+
+# 女仆兼容（tlmCompat）编译期依赖 Touhou Little Maid，运行期没有它照样能玩：
+# 相关类只在 ModList.get().isLoaded("touhou_little_maid") 为真时才会被 Class.forName 触达。
+# mandatory=false 不影响没装女仆模组的玩家，但 ordering="AFTER" 会把加载顺序写死——
+# 否则只能靠 modid 字典序（create_hand_made < touhou_little_maid）碰巧排在前面，
+# 一旦女仆模组先于本模组注册扩展扫描，TaskHandMade 就不会被注册。
+[[dependencies.${mod_id}]]
+modId="touhou_little_maid"
+mandatory=false
+versionRange="${tlm_version_range}"
+ordering="AFTER"
+side="BOTH"

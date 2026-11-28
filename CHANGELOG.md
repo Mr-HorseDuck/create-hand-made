@@ -20,10 +20,25 @@
   `UIRenderHelper.COLOR_TEXT*` 的同一组色值（`#eeeeee` / `#a3a3a3` / `#8ab6d6`），
   所以是机械动力那套观感，且**不需要额外贴图**。
   - 顺带把以前 Cloth 版漏掉的手册项 `guidebook.give_on_first_join` 也放进了界面。
-  - 女仆配置拆成 4 页（基础 / 冷却一 / 冷却二 / 屏蔽模组），因为右侧列表不滚动。
+  - 女仆配置拆成 3 页（基础 / 冷却一 / 冷却二）。装了女仆兼容时分类共 11 项、一屏放不下，
+    分类栏右侧会出现细滚动条并给上下边缘加渐隐（以前只有滚轮，看不出下面还有页）。
 - **数值改成可拖动条**：起手 / 加工 / 冷却这些 tick 参数不再用 Create 的 `ScrollInput`
   （它只能滚轮、点不动），换成自绘的整数条 —— **拖动旋钮、点击条上任意位置定位、滚轮 ±1 微调**
   三种都支持，两端严格贴住内缘；条内只显示当前值，标签在行左边只画一次。
+- **配置界面的细节补强**（读起来更省事、点错了也能退）：
+  - **只读页不再是一片空白**：多人游戏里 SERVER 页照样把滑块 / 开关画出来，只是压暗、不能拖，
+    玩家至少能看见服务端当前调成了多少；右上角仍有锁标记，底部一行「只读：本页配置由服务端决定」。
+  - **改动过的项有痕迹**：偏离默认值的行，标签右边点一颗黄铜色小点；
+    「恢复本页默认」按下之后按钮变成「撤销」（回退箭头图标），可以把刚才那一页的值原样放回去。
+  - **滑块左侧显示值域**（如 `1-200`），悬停说明里再补「默认：X / 范围：A-B」兜底。
+  - **Shift 精调**：按住 Shift 拖动按位移走 ±1，Shift + 滚轮一次 ±10 —— 跨度大的项（1-1200）也能落到整数上。
+  - **悬停说明延迟 250 ms**：不再一扫过整页就弹一片提示。
+  - **窗口高度跟着分类数量走**：分类多的（装了女仆兼容共 11 项）窗口自动加高到一屏放得下，
+    装不下才出现滚动条；屏幕太矮时压到 200 px 下限，不会让窗口底边伸出屏幕外。
+  - **标签超宽截断加省略号**：以前长翻译会直接压到滑块和值域上，现在按渲染宽度截断（值域占的宽度先扣掉）。
+  - **键盘也能调**：方向键选行、左右改值（Shift 十步）、PageUp/PageDown 换分类、Enter 保存退出；
+    动过键盘才画焦点框，鼠标玩家不会看到多余方框。底部左侧有一条灰字提示，不用猜。
+  - **按钮有声音**：保存 / 恢复默认 / 撤销 / 换分类 / 拨开关都会响一声原版的 `UI_BUTTON_CLICK`。
 - **打开界面时糊背景 + 藏 HUD**：复用原版自带的 `minecraft:shaders/post/blur.json` 自己建 `PostChain`，
   每帧处理主渲染目标（等价 1.21 的 `processBlurEffect`，不动全局后处理；光影模组跑不起来会自动停用）；
   同时临时打开 `Options.hideGui`，物品栏 / 生命条 / 聊天 / 尊重该开关的小地图都让位，
@@ -37,8 +52,30 @@
   拿不到再退回 `patchouli:guide_book` + NBT、最后才是独立物品；取到哪条路会打一条 INFO 日志。
   标记写在玩家自己的持久数据里 → **老存档里的老玩家首次装模组后登录就会收到**；换存档会再送一本。
 
+- **对外 API 补三处缺口**（`CreateHandMadeApi`，`docs/api.md` 同步）：
+  - `toolTypeOf(ItemStack)` / `toolTypesOf(ItemStack)` / `isHandMadeTool(ItemStack)`：以前接入方只能自己 `instanceof` 十连，
+    而且冲压锤的「工作盆 / 置物台」、手锯的「锯木 / 切石」在物品上是同一个东西，外部根本拆不出来；
+    现在能直接问到主类型与全部类型（`toolTypeOf` 给主类型、`toolTypesOf` 给全部，做「这件被 KJS 禁了没」要用后者）。
+  - `findRecipeMatchFor(ToolType, Level, ItemStack)` 与新类 `RecipeMatch`：1.20.1 的 `Recipe` 不是 `RecipeHolder`、
+    拿不到 `id()`，这个方法把配方 ID 一起返回（动态配方无稳定 ID 时 `id()` 为 `null`、`hasId()` 为 `false`）。
+- **对外 API 收尾三处**：
+  - `damageTool` 不再写死灌注枪：扣耐久抽成 `api/ToolDamage.breakTool`，API 与灌注枪内部的 6 处调用点共用
+    同一份实现。以前传自己的物品进来，实际执行的是灌注枪那套逻辑；现在**任何 `ItemStack` 都能用**，
+    灌注枪行为不变。
+  - `HandMadeResult.canSucceed()` 标为过时：与 `isSuccess()` 完全等价，只是 0.6.x 时期的第二种叫法，
+    同一个语义对外给两个名字只会让接入方猜。方法保留不删（删了会让已有调用方直接编译不过）。
+  - 补 `@since 0.7.1` 与线程说明：类注释与文档写明「写操作必须服务端主线程、查询可任意线程读」，
+    0.7.1 新增的方法与类都标了版本，接入方能一眼看出哪些是新加的。
+
 ### 变更
 
+- **`HandMadeToolUsedEvent` 覆盖到玩家手搓与女仆**：以前这个事件只在「第三方通过 API 写操作」时发，
+  玩家自己手搓、女仆用工具都不发 —— 想统计工具使用次数的话，正常玩法一条都收不到。现在发射点下沉到各工具
+  真正成功的那一步（`PressHammerItem.tryPressBasin` / `tryPressTransported`、`MortarItem` / `CrusherMortarItem.tryGrindOnce`、
+  灌注枪 `tryInjectItems` / `tryStoreFluid`、`BellowsItem.applyToTarget`、手锯切削、搅拌、指杆应用），
+  三种来源各发**一次**（预演不发）。想静音用新的服务器配置 `[api] fire_tool_used_events`（默认 `true`，
+  关掉只影响外部监听方，不影响任何加工逻辑）。**接入方注意**：以前收不到的原生加工现在也会进事件，
+  按「每次事件记一笔」写的统计数值会跳一档。
 - **碾钵加工时长的默认值改成 50 tick**（原来是 100，和研钵一样）：碾钵是「先粉碎、没配方才退回研磨」，
   本来就该比研钵快 —— 手册里一直这么写，但代码默认值没跟上。**已有存档不受影响**（toml 里写死的 100 会保留），
   只有新建存档的默认值变成 50；想改回去把 `crusher_mortar.processing_ticks` 设为 100 即可。
@@ -62,14 +99,37 @@
 
 ### 内部
 
-- 新增 `client/config/`：`ConfigOption`（布尔 / 整数 / 字符串列表的纯数据描述）、`ConfigCategorySpec`、
+- 新增 `client/config/`：`ConfigOption`（布尔 / 整数的纯数据描述）、`ConfigCategorySpec`、
   `ConfigSectionProvider`（可选模组提供配置页的接口）、`HandMadeConfigScreen`（机械动力风界面 + 自绘整数条）、
   `ScreenBackdrop`（背景模糊）。
 - tlmCompat 侧新增 `client/MaidConfigSectionProvider`：只提供数据、不画界面，取代原来的 Cloth 集成。
+- 新增 `api/ToolUseEvents`（事件唯一发射点，带配置门控）与 `api/RecipeMatch`；`CreateHandMadeApi` 里 6 处
+  `fireToolUsed(...)` 全部删掉，改由工具侧在自己成功的那一步发射。
+- 女仆侧有 3 条路径是自己复写了一遍加工逻辑（不复用物品侧方法），事件在各自成功分支里补发：
+  `MaidUseHandSawBehavior`（传送带 / 置物台两处）、`MaidUsePointerDeployBehavior`（传送带 / 置物台两处）、
+  `MaidUseStirringStaffBehavior`；其余女仆行为本来就走 `CreateHandMadeApi`，自动经过工具侧的发射点。
+- 新增 `Config.apiFireToolUsedEvents`（`[api] fire_tool_used_events`）与配置界面「API」页（第 9 页，只有这一个开关）。
 - 删除 `behavior/MaidUseInfusionGunBehavior`（主动灌注）；灌注枪的行为只剩 `MaidUseLiquidTransferBehavior`，
   `TaskHandMade` 的优先级改成连续 5–12。
+- **性能：配方 / 介质查询不再每次重建列表**。
+  `HandMadeRecipePool.getBaseRecipes` 按「RecipeManager 实例 + cacheEpoch + 切石门控」缓存一份不可变列表
+  （原来每次调用都新建 ArrayList 并把对应 RecipeType 整表遍历一遍，有独占配方的工具还要再遍历一遍）；
+  `BellowsMediaRegistry.resolveAll` 按「注册表快照 + Item」缓存解析结果 —— 风箱渲染器每帧都会问一次
+  「手上 / 副手是不是介质」，原来每问一次就建一个 LinkedHashSet。两处缓存的失效都靠「表实例换没换」判断，
+  不需要任何人记得手动清。介质缓存只对无 NBT、未掉耐久的物品生效（`Ingredient` 可能按 NBT 匹配）。
+- **性能：切石查找不再造中间列表**。`findRecipeFor(HAND_SAW_STONECUTTING)` 以前先 `recipesForFiltered`
+  造一份完整列表、只为取第一条命中，现在边扫边用 `isAvailable` 跳过被禁配方（判定口径与 `applyFilter` 一致）。
+- 新增 `api/ToolDamage`：`breakTool(ItemStack, LivingEntity)` 是扣耐久的唯一实现；
+  `InfusionGunItem.damageGun` 改为转发（方法名保留，内部 6 处调用点不动），`CreateHandMadeApi.damageTool`
+  也走它，于是「API 只对灌注枪有效」这条耦合消失。`InfusionGunItem` 顺手删掉不再使用的 `EquipmentSlot` import。
+- `HandMadeResult.canSucceed()` 加 `@Deprecated(since = "0.7.1")` 与 `@deprecated` Javadoc（保留方法体，
+  只换实现为 `return this == SUCCESS;` 不变）。
 - **开发环境补上 Patchouli 运行时依赖**（`runtimeOnly`，不进 jar）：以前 `runClient` 里没有 Patchouli，
   「首登送书 / 砸书出手册」无从测试，表现就是"开场没送书"且日志里什么都没有。
+- **`mods.toml` 补上女仆模组软依赖**：`touhou_little_maid`、`mandatory=false`、`ordering="AFTER"`、
+  版本区间 `[1.5,1.6)`（`gradle.properties` 新增 `tlm_version_range`）。此前完全没有声明，
+  女仆扩展能否被扫描到只取决于 modid 字典序（`create_hand_made` 恰好排在 `touhou_little_maid` 前面）；
+  没装女仆模组的玩家不受影响，只是加载顺序被写死了。
 
 ### 升级注意
 

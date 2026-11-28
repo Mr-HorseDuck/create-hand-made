@@ -1,6 +1,7 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.colin101.maidfactory.MaidBubbleHelper;
 import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.MaidConfig;
@@ -99,6 +100,9 @@ public class MaidUseStirringStaffBehavior implements BehaviorControl<EntityMaid>
         }
 
         basin.notifyChangeOfContents();
+
+        // 女仆搅拌自己实现了一遍（不复用 StirringStaffItem），工具使用事件在这里单独发一次
+        ToolUseEvents.post(ToolType.STIRRING_STAFF, level, basin.getBlockPos(), tool, null);
 
         // 反馈
         MaidFeedback.stirSound(level, outputPos);

@@ -64,6 +64,62 @@ public class BellowsMediaRegistry {
     private static volatile Map<ResourceLocation, Integer> PRIORITY_OVERRIDES = Map.of();
     private static volatile Map<Item, List<ResourceLocation>> AUTO_MAP = Map.of();
 
+    // ================= 解析结果缓存 =================
+    // resolveAll 每次调用都要新建一个 LinkedHashSet + 再 List.copyOf 一份，
+    // 而它挂在两条真正的热路径上：风箱渲染器每帧问一次「手上/副手是不是介质」，
+    // 女仆风箱行为每个冷却窗口问一次。结果只取决于「注册表快照」和物品本身，
+    // 所以这里按 Item 记一份，key = 三个 volatile 表的实例身份。
+    //
+    // 失效是天然的：reloadData / 配置改禁用类型都整体换表（List.copyOf / Map.copyOf /
+    // Set.copyOf），实例一换，下面的快照比对立刻对不上 → 整表作废重建。不需要任何人
+    // 记得手动调 clear。
+    //
+    // ★ 只缓存「无 NBT、未掉耐久」的栈：Ingredient 可能按 NBT 匹配，那种栈的结果
+    //   不能只看 Item。风箱介质（桶、染料、打火石…）都是无 NBT 的，热路径全都命中。
+
+    private static final int RESOLVE_CACHE_LIMIT = 256;
+
+    private static volatile Map<Item, List<ResourceLocation>> resolveCache = Map.of();
+    private static volatile List<Binding> resolveCacheEntries;
+    private static volatile Map<Item, List<ResourceLocation>> resolveCacheAuto;
+    private static volatile Set<ResourceLocation> resolveCacheDisabled;
+
+    private static boolean cacheable(ItemStack stack) {
+        return !stack.hasTag() && stack.getDamageValue() == 0;
+    }
+
+    /** 命中返回缓存的列表；未命中返回 null（注册表换了表也会顺手把缓存清空）。 */
+    @Nullable
+    private static List<ResourceLocation> cachedResolve(ItemStack stack) {
+        if (!cacheable(stack)) return null;
+
+        List<Binding> entries = DATA_ENTRIES;
+        Map<Item, List<ResourceLocation>> auto = AUTO_MAP;
+        Set<ResourceLocation> disabled = DISABLED_TYPES;
+
+        if (entries != resolveCacheEntries || auto != resolveCacheAuto || disabled != resolveCacheDisabled) {
+            resolveCacheEntries = entries;
+            resolveCacheAuto = auto;
+            resolveCacheDisabled = disabled;
+            resolveCache = Map.of();
+            return null;
+        }
+        return resolveCache.get(stack.getItem());
+    }
+
+    private static void putResolve(ItemStack stack, List<ResourceLocation> ids) {
+        // 带 NBT / 掉过耐久的栈结果不可按 Item 复用，压根不记
+        if (!cacheable(stack)) return;
+
+        Map<Item, List<ResourceLocation>> cache = resolveCache;
+        // 上限只是防止第三方模组的物品把表撑爆；到顶后只是不再记新的，结果依旧正确。
+        if (cache.size() >= RESOLVE_CACHE_LIMIT) return;
+
+        Map<Item, List<ResourceLocation>> next = new HashMap<>(cache);
+        next.put(stack.getItem(), ids);
+        resolveCache = next;
+    }
+
     // ================= 内置写死规则 =================
 
     private static final ResourceLocation DP_FREEZING =
@@ -360,12 +416,26 @@ public class BellowsMediaRegistry {
     public static List<ResourceLocation> resolveAll(ItemStack stack) {
         if (stack.isEmpty()) return List.of();
 
+        // 自动发现的表是懒加载的，先确保它就位：否则这一轮算出的快照 key
+        // 和下一轮对不上，缓存永远不命中。
+        ensureAutoDiscovered();
+
+        List<ResourceLocation> cached = cachedResolve(stack);
+        if (cached != null) return cached;
+
+        // collectTypes 已经返回不可变列表，这里直接拿来当缓存值，不再多拷一份
+        List<ResourceLocation> resolved = collectTypes(stack);
+        putResolve(stack, resolved);
+        return resolved;
+    }
+
+    /** 真正干活的那一层：不做缓存判断。 */
+    private static List<ResourceLocation> collectTypes(ItemStack stack) {
         Set<ResourceLocation> ids = new LinkedHashSet<>();
         for (Binding b : DATA_ENTRIES) {
             if (b.matches(stack)) ids.add(b.typeId());
         }
 
-        ensureAutoDiscovered();
         List<ResourceLocation> auto = AUTO_MAP.get(stack.getItem());
         if (auto != null) ids.addAll(auto);
 

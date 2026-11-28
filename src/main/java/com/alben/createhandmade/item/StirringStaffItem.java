@@ -1,6 +1,7 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.CreateHandMade;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.config.SyncedServerConfig;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.item.renderer.StirringStaffRenderer;
@@ -218,6 +219,9 @@ public class StirringStaffItem extends Item implements CustomUseEffectsItem {
 
             basin.notifyChangeOfContents();
 
+            // funnel：搅拌真的成了（配方已应用、盆内容已变）——玩家手搓 / 第三方 API 都走这里，
+            // 工具使用事件在成功这一步发一次。pos 就是工作盆坐标。
+            ToolUseEvents.post(ToolType.STIRRING_STAFF, level, pos, stack, null);
             EquipmentSlot slot = entity.getUsedItemHand() == InteractionHand.MAIN_HAND
                     ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
             stack.hurtAndBreak(1, entity, e -> e.broadcastBreakEvent(slot));

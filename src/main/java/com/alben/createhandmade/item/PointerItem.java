@@ -1,6 +1,7 @@
 package com.alben.createhandmade.item;
 
 import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.HighlightBlockPacket;
@@ -176,6 +177,11 @@ public class PointerItem extends Item {
         });
 
         if (success[0]) {
+            // funnel：置物台加工真的成了（配方已应用），工具使用事件在这里发一次。
+            // toolStack 是指杆本体；target 是置物台上被加工的那件（消耗前的 copy）。
+            ToolUseEvents.post(ToolType.POINTER, level, pos, player.getMainHandItem(),
+                    particleItem.copyWithCount(1));
+
             depot.notifyUpdate();
             depot.sendData();
             consumeTool(player, tool, recipe);
@@ -278,9 +284,13 @@ public class PointerItem extends Item {
         });
 
         if (success[0]) {
+            // funnel：传送带加工真的成了（配方已应用、副手工具已消耗），工具使用事件在这里发一次。
+            // toolStack 是指杆本体；target 是传送带上被加工的那件（lambda 里消费前已 copy）。
+            ItemStack pointer = player.getMainHandItem();
+            ToolUseEvents.post(ToolType.POINTER, level, pos, pointer, particleItem[0].copyWithCount(1));
+
             playProcessEffects(level, pos, particleItem[0]);
 
-            ItemStack pointer = player.getMainHandItem();
             if (pointer.getItem() instanceof PointerItem) {
                 pointer.hurtAndBreak(1, player, e -> e.broadcastBreakEvent(EquipmentSlot.MAINHAND));
             }

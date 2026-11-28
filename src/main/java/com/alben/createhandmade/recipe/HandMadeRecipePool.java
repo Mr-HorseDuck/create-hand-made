@@ -106,6 +106,9 @@ public class HandMadeRecipePool {
     public static void invalidateIdCache() {
         cachedIdMap = null;
         cachedIdManager = null;
+        // 顺带丢掉基础配方缓存：配方对象本身也会被整批换掉，留着只是白占内存。
+        // （正确性不依赖这一行 —— epoch 已经变了，下次查询同样会重建。）
+        BASE_CACHE.clear();
         bumpEpoch();
     }
 
@@ -209,7 +212,18 @@ public class HandMadeRecipePool {
             return true;
         }
     }
-    // ================= L2: 应用过滤 =================
+    // ================= L1 + 缓存：基础配方 =================
+    // ★ getBaseRecipes 原来每次都新建 ArrayList、把对应 RecipeType 整表遍历一遍，
+    //   有独占配方的工具还要再遍历一遍 tool_recipe。它挂在 API（recipesFor /
+    //   recipesForFiltered / findRecipeFor）和 JEI 类别构建上，一次界面刷新会问十几次。
+    //   结果只取决于三件事：配方集（RecipeManager 实例 + cacheEpoch）、工具类型、
+    //   以及切石那个配置门控 —— 所以按 tool 存一份，任一变化就重建。
+    //   返回的列表是不可变的，调用方拿到的是同一个实例，不要再外面包 List.copyOf。
+
+    private record BaseCache(RecipeManager manager, int epoch, boolean stonecutting, List<Recipe<?>> recipes) {}
+
+    private static final Map<ToolType, BaseCache> BASE_CACHE = new ConcurrentHashMap<>();
+
     /**
      * 某工具类型下所有基础配方。
      *
@@ -219,10 +233,34 @@ public class HandMadeRecipePool {
      * <p>1.20.1 的 {@link ToolType} 没有 AUTO_SQUARE / AUTO_SHAPELESS / AUTO_BREWING，
      * 这三个自动类别走 {@code PRESS_HAMMER_BASIN} / {@code STIRRING_STAFF} 的 L2 过滤，
      * 由 JEI 各自类别单独收集，不在本方法的返回范围内。</p>
+     *
+     * <p>★ 返回的是缓存下来的<b>不可变</b>列表（同一 tool 多次调用拿到同一实例），
+     * 要改动请自己拷贝一份。</p>
      */
     public static List<Recipe<?>> getBaseRecipes(ToolType tool, Level level) {
         if (level == null) return List.of();
 
+        RecipeManager manager = level.getRecipeManager();
+        int epoch = cacheEpoch;
+        // 切石那条是唯一受外部配置（Create 的 allowStonecuttingOnSaw）影响的，
+        // 其余工具恒为 false，保证 key 稳定。
+        boolean stonecutting = tool == ToolType.HAND_SAW_STONECUTTING && allowsStonecutting();
+
+        BaseCache cached = BASE_CACHE.get(tool);
+        if (cached != null
+                && cached.manager() == manager
+                && cached.epoch() == epoch
+                && cached.stonecutting() == stonecutting) {
+            return cached.recipes();
+        }
+
+        // ★ 先算后写：并发时最多多算一次，不会让别的线程读到半成品
+        List<Recipe<?>> built = List.copyOf(collectBaseRecipes(tool, level, stonecutting));
+        BASE_CACHE.put(tool, new BaseCache(manager, epoch, stonecutting, built));
+        return built;
+    }
+
+    private static List<Recipe<?>> collectBaseRecipes(ToolType tool, Level level, boolean stonecutting) {
         List<Recipe<?>> result = new ArrayList<>();
         switch (tool) {
             case HAND_SAW -> {
@@ -231,8 +269,8 @@ public class HandMadeRecipePool {
                 }
             }
             case HAND_SAW_STONECUTTING -> {
-                // 门控：跟随 Create 的 allowStonecuttingOnSaw
-                if (allowsStonecutting()) {
+                // 门控：跟随 Create 的 allowStonecuttingOnSaw（已在入口处取好）
+                if (stonecutting) {
                     for (Recipe<?> r : recipesOfType(level, RecipeType.STONECUTTING)) {
                         if (r instanceof StonecutterRecipe) result.add(r);
                     }
@@ -289,7 +327,6 @@ public class HandMadeRecipePool {
 
         // 通用 L3：switch 之后统一收
         collectExclusiveRecipes(tool, level, result);
-
         return result;
     }
 
@@ -332,6 +369,8 @@ public class HandMadeRecipePool {
         if (id == null) return true;   // 动态配方没有 ID，禁不掉
         return !isRecipeDisabled(tool, id);
     }
+
+    // ================= L2: 应用过滤 =================
 
     /**
      * 对 L1 结果应用 L2 过滤（数据包 + KubeJS 双来源）

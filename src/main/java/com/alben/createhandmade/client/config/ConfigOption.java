@@ -39,6 +39,23 @@ public abstract class ConfigOption {
     /** 恢复默认值（「恢复本页默认」按钮用）。 */
     public abstract void resetToDefault();
 
+    /** 默认值的可读形式——悬停说明里显示「默认：X」。 */
+    public abstract Component defaultText();
+
+    /** 当前值是否已经等于默认值（不等的项会在界面上打一个点）。 */
+    public abstract boolean isDefault();
+
+    /**
+     * 当前值的快照，配合 {@link #restore(Object)} 实现「恢复本页默认」之后的<b>撤销</b>。
+     *
+     * <p>用 {@code Object} 而不是泛型，是因为一页里混着布尔和整数，
+     * 界面侧只把它们原样存进 {@code Map<ConfigOption, Object>} 再原样放回去。</p>
+     */
+    public abstract Object snapshot();
+
+    /** 把 {@link #snapshot()} 拿到的值写回去；类型不符时静默忽略。 */
+    public abstract void restore(Object value);
+
     // ==================== 布尔开关 ====================
 
     /** 画成一个「开 / 关」按钮。 */
@@ -62,6 +79,32 @@ public abstract class ConfigOption {
 
         public void set(boolean value) {
             setter.accept(value);
+        }
+
+        public boolean defaultValue() {
+            return defaultValue;
+        }
+
+        @Override
+        public Component defaultText() {
+            return Component.translatable(defaultValue ? "options.on" : "options.off");
+        }
+
+        @Override
+        public boolean isDefault() {
+            return get() == defaultValue;
+        }
+
+        @Override
+        public Object snapshot() {
+            return get();
+        }
+
+        @Override
+        public void restore(Object value) {
+            if (value instanceof Boolean bool) {
+                set(bool);
+            }
         }
 
         @Override
@@ -112,6 +155,32 @@ public abstract class ConfigOption {
 
         public void set(int value) {
             setter.accept(Math.max(min, Math.min(max, value)));
+        }
+
+        public int defaultValue() {
+            return defaultValue;
+        }
+
+        @Override
+        public Component defaultText() {
+            return Component.literal(Integer.toString(defaultValue));
+        }
+
+        @Override
+        public boolean isDefault() {
+            return get() == defaultValue;
+        }
+
+        @Override
+        public Object snapshot() {
+            return get();
+        }
+
+        @Override
+        public void restore(Object value) {
+            if (value instanceof Integer number) {
+                set(number);
+            }
         }
 
         @Override

@@ -43,6 +43,14 @@ import java.util.List;
  * <p>本类提供<b>查询 / 读写组件</b>级别能力，以及<b>受控的写操作入口</b>
  * （执行加工、注入/存储流体、应用鼓风等）。写操作的副作用见各方法 Javadoc，
  * 调用方必须保证在服务端调用。</p>
+ *
+ * <p><b>线程与调用环境</b>：写操作必须在<b>服务端主线程</b>调用 —— 它们会改方块实体、物品栏、
+ * 触发上游配方与事件；在客户端调用一律返回 {@link HandMadeResult#CLIENT_SIDE}，不产生副作用。
+ * 查询方法可以在任意线程调用（内部缓存都是并发安全的不可变快照 / volatile 换表），但取到的
+ * {@link net.minecraft.world.item.crafting.Recipe} 与 {@code ItemStack} 仍请只在对应
+ * {@code Level} 的线程上使用。</p>
+ *
+ * <p>本 API 自 0.6.1 起提供；0.7.1 新增的方法与类都标了 {@code @since 0.7.1}。</p>
  */
 public final class CreateHandMadeApi {
 
@@ -122,12 +130,98 @@ public final class CreateHandMadeApi {
                 List<Recipe<?>> cutting = HandSawItem.getCuttingRecipes(level, input);
                 yield cutting.isEmpty() ? null : cutting.get(0);
             }
-            case HAND_SAW_STONECUTTING -> firstMatch(recipesForFiltered(tool, level), input, level);
+            case HAND_SAW_STONECUTTING -> firstMatch(tool, recipesFor(tool, level), input, level);
             case PRESS_HAMMER_DEPOT -> PressHammerItem.findPressingRecipe(level, input);
             case MORTAR -> MortarItem.findRecipe(level, input);
             case CRUSHER_MORTAR -> CrusherMortarItem.findRecipe(level, input);
             default -> null;
         };
+    }
+
+    /**
+     * 和 {@link #findRecipeFor} 一样按输入物品查配方，但连**配方 ID 一起返回**。
+     *
+     * <p>1.20.1 的 {@link Recipe} 不是 {@code RecipeHolder}，光拿配方本体没法知道它叫什么，
+     * 于是调用方想「记下我匹配到了哪条」「按 ID 做黑名单/统计」时都要自己再反查一次。
+     * 这个方法把反查做掉了；动态配方没有稳定 ID，此时 {@link RecipeMatch#id()} 为 null。</p>
+     *
+     * <p>能回答"只看一件物品"的工具与 {@link #findRecipeFor} 完全一致，其余工具返回
+     * {@code null}。</p>
+     *
+     * <p>0.7.1 新增，向后兼容。</p>
+     *
+     * @since 0.7.1
+     */
+    @Nullable
+    public static RecipeMatch findRecipeMatchFor(ToolType tool, Level level, ItemStack input) {
+        Recipe<?> recipe = findRecipeFor(tool, level, input);
+        if (recipe == null) return null;
+        return new RecipeMatch(recipe, HandMadeRecipePool.recipeIdOf(level, recipe));
+    }
+
+    // ==================== 工具类型 ====================
+
+    /**
+     * 这件物品是不是手搓工具；是的话返回它的**主**工具类型，否则 {@code null}。
+     *
+     * <p>以前接入方只能自己写 {@code instanceof PressHammerItem …} 十连，而且冲压锤的
+     * 「工作盆 / 置物台」两条路径（{@code PRESS_HAMMER_BASIN} / {@code PRESS_HAMMER_DEPOT}）
+     * 在物品上是同一个东西，外部根本拆不出来。这个入口统一处理：</p>
+     *
+     * <ul>
+     *   <li>冲压锤 → {@code PRESS_HAMMER_DEPOT}（"手里拿着它，对着一格"的默认语义）；</li>
+     *   <li>手锯 → {@code HAND_SAW}（切石那条留给 {@link #toolTypesOf} / 显式传
+     *       {@code HAND_SAW_STONECUTTING}）；</li>
+     *   <li>其余工具一一对应。</li>
+     * </ul>
+     *
+     * <p>想拿到"这件物品能走的所有类型"用 {@link #toolTypesOf}。</p>
+     *
+     * @since 0.7.1
+     */
+    @Nullable
+    public static ToolType toolTypeOf(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+        // 注意：Java 17 不支持 switch 的类型模式，这里只能 instanceof 链
+        var item = stack.getItem();
+        if (item instanceof HandSawItem) return ToolType.HAND_SAW;
+        if (item instanceof PressHammerItem) return ToolType.PRESS_HAMMER_DEPOT;
+        if (item instanceof MortarItem) return ToolType.MORTAR;
+        if (item instanceof CrusherMortarItem) return ToolType.CRUSHER_MORTAR;
+        if (item instanceof StirringStaffItem) return ToolType.STIRRING_STAFF;
+        if (item instanceof InfusionGunItem) return ToolType.INFUSION_GUN;
+        if (item instanceof PointerItem) return ToolType.POINTER;
+        if (item instanceof BellowsItem) return ToolType.BELLOWS;
+        return null;
+    }
+
+    /**
+     * 这件物品能走的所有工具类型（只有手锯和冲压锤是多个，其余与
+     * {@link #toolTypeOf} 相同）；非手搓工具返回空列表。
+     *
+     * <p>手锯同时是 {@code HAND_SAW} 与 {@code HAND_SAW_STONECUTTING}，
+     * 两条路径的 L2 过滤（数据包 / KubeJS 禁用表）是分开的，所以做"这件物品被禁了没"
+     * 这类判断时必须逐个类型查。</p>
+     *
+     * @since 0.7.1
+     */
+    public static List<ToolType> toolTypesOf(ItemStack stack) {
+        ToolType primary = toolTypeOf(stack);
+        if (primary == null) return List.of();
+        return switch (primary) {
+            case HAND_SAW -> List.of(ToolType.HAND_SAW, ToolType.HAND_SAW_STONECUTTING);
+            case PRESS_HAMMER_DEPOT -> List.of(ToolType.PRESS_HAMMER_BASIN, ToolType.PRESS_HAMMER_DEPOT);
+            default -> List.of(primary);
+        };
+    }
+
+    /**
+     * 便利判断：{@code toolTypeOf(stack) != null}。
+     *
+     * @since 0.7.1
+     */
+    public static boolean isHandMadeTool(ItemStack stack) {
+        return toolTypeOf(stack) != null;
     }
 
     /**
@@ -139,7 +233,7 @@ public final class CreateHandMadeApi {
      */
     @Nullable
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static Recipe<?> firstMatch(List<Recipe<?>> recipes, ItemStack input, Level level) {
+    private static Recipe<?> firstMatch(ToolType tool, List<Recipe<?>> recipes, ItemStack input, Level level) {
         if (recipes.isEmpty()) return null;
 
         ItemStackHandler handler = new ItemStackHandler(1);
@@ -147,6 +241,10 @@ public final class CreateHandMadeApi {
         RecipeWrapper wrapper = new RecipeWrapper(handler);
 
         for (Recipe<?> recipe : recipes) {
+            // ★ 就地过滤：以前先 recipesForFiltered 造一份完整列表，只为了取第一条命中。
+            //   isAvailable 与 applyFilter 判定口径一致（动态配方无 ID → 不禁），
+            //   顺序也一致，所以结果等价，但不再分配两个 List。
+            if (!HandMadeRecipePool.isAvailable(tool, level, recipe)) continue;
             if (((Recipe) recipe).matches(wrapper, level)) return recipe;
         }
         return null;
@@ -301,9 +399,6 @@ public final class CreateHandMadeApi {
         if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         HandMadeResult result = PressHammerItem.tryPressBasin(level, pos, filter, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(ToolType.PRESS_HAMMER_BASIN, level, pos, null, null);
-        }
         return result;
     }
 
@@ -329,9 +424,6 @@ public final class CreateHandMadeApi {
         if (level == null || pos == null) return HandMadeResult.INVALID_TARGET;
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         HandMadeResult result = PressHammerItem.tryPressTransported(level, pos, filter, batchSize, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(ToolType.PRESS_HAMMER_DEPOT, level, pos, null, null);
-        }
         return result;
     }
 
@@ -369,10 +461,6 @@ public final class CreateHandMadeApi {
         HandMadeResult result = crusherMortar
                 ? CrusherMortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter, simulate)
                 : MortarItem.tryGrindOnce(level, entity, mortar, inputInv, outputInv, filter, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(crusherMortar ? ToolType.CRUSHER_MORTAR : ToolType.MORTAR,
-                    level, entity.blockPosition(), mortar, entity.getOffhandItem());
-        }
         return result;
     }
 
@@ -410,9 +498,6 @@ public final class CreateHandMadeApi {
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         if (entity == null || gun == null || gun.isEmpty()) return HandMadeResult.INVALID_TARGET;
         HandMadeResult result = InfusionGunItem.tryInjectItems(level, pos, entity, gun, filter, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(ToolType.INFUSION_GUN, level, pos, gun, null);
-        }
         return result;
     }
 
@@ -436,9 +521,6 @@ public final class CreateHandMadeApi {
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         if (entity == null || gun == null || gun.isEmpty()) return HandMadeResult.INVALID_TARGET;
         HandMadeResult result = InfusionGunItem.tryStoreFluid(level, pos, entity, gun, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(ToolType.INFUSION_GUN, level, pos, gun, null);
-        }
         return result;
     }
 
@@ -523,41 +605,27 @@ public final class CreateHandMadeApi {
         if (level == null || pos == null || type == null) return HandMadeResult.INVALID_TARGET;
         if (level.isClientSide) return HandMadeResult.CLIENT_SIDE;
         HandMadeResult result = BellowsItem.applyToTarget(level, pos, type, simulate);
-        if (!simulate && result.isSuccess()) {
-            fireToolUsed(ToolType.BELLOWS, level, pos, null, null);
-        }
         return result;
-    }
-
-    // ==================== 事件 ====================
-
-    /**
-     * 加工成功后发 {@link HandMadeToolUsedEvent}。
-     *
-     * <p>只在真正执行（非预演）且成功时调用；事件是通知性质，不可取消。</p>
-     */
-    private static void fireToolUsed(ToolType tool, Level level, BlockPos pos,
-                                     @Nullable ItemStack toolStack, @Nullable ItemStack target) {
-        if (level == null || level.isClientSide) return;
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
-                new HandMadeToolUsedEvent(tool, level, pos,
-                        toolStack != null ? toolStack : ItemStack.EMPTY, target));
     }
 
     // ==================== 通用 ====================
 
     /**
-     * 扣工具耐久。只在服务端调用。
+     * 扣 1 点工具耐久。只在服务端调用。
      *
      * <p>实体是车万女仆时按好感度走"概率免耐久"，和女仆行为内部完全一致（以前这里是无条件
-     * {@code hurtAndBreak}，和女仆自己加工的手感对不上）；其它实体直接 {@code hurtAndBreak}。
-     * 没装 TLM 时就是裸扣耐久。</p>
+     * {@code hurtAndBreak}，和女仆自己加工的手感对不上）；其它实体走标准 {@code hurtAndBreak}
+     * （玩家会正常播报物品损坏）。没装 TLM 时就是裸扣耐久。</p>
+     *
+     * <p>0.7.1 起<b>对任何物品都生效</b>：以前这里写死转发 {@code InfusionGunItem.damageGun}，
+     * 传自己的物品进来执行的其实是灌注枪那套逻辑，语义完全不清楚；现在统一走
+     * {@link ToolDamage#breakTool}，灌注枪的行为不变（它同样转发到这里）。</p>
      */
     public static void damageTool(ItemStack stack, LivingEntity entity) {
         // ★ 写操作只认服务端：客户端调用会改动本地状态（幻影物品 / 耐久不同步），直接拒绝
         if (stack == null || stack.isEmpty() || entity == null) return;
         if (entity.level().isClientSide) return;
         if (MaidApiHooks.damageToolWithMaidRules(stack, entity, 1)) return;
-        InfusionGunItem.damageGun(stack, entity);
+        ToolDamage.breakTool(stack, entity);
     }
 }

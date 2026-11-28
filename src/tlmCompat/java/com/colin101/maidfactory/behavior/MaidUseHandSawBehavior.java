@@ -1,6 +1,7 @@
 package com.colin101.maidfactory.behavior;
 
 import com.alben.createhandmade.api.CreateHandMadeApi;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.colin101.maidfactory.MaidBubbleHelper;
 import com.colin101.maidfactory.MaidFavorabilityHelper;
 import com.colin101.maidfactory.MaidConfig;
@@ -204,6 +205,9 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
         });
 
         if (success[0]) {
+            // 女仆手锯自己实现了一遍切削（不复用 HandSawItem.executeCut），所以工具使用事件要在这里单独发一次
+            ToolUseEvents.post(ToolType.HAND_SAW, level, pos, saw, particleItem[0].copyWithCount(1));
+
             MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
             MaidFeedback.cutSound(level, pos);
             MaidFeedback.itemParticles(level, pos, particleItem[0], 8);
@@ -296,6 +300,9 @@ public class MaidUseHandSawBehavior implements BehaviorControl<EntityMaid> {
 
         depot.notifyUpdate();
         depot.sendData();
+
+        // 女仆手锯自己实现了一遍切削，工具使用事件要在这里单独发一次；target 是被切掉的那一份
+        ToolUseEvents.post(ToolType.HAND_SAW, level, depot.getBlockPos(), saw, held.copyWithCount(1));
 
         MaidFavorabilityHelper.damageToolWithLuck(saw, maid, 1);
 

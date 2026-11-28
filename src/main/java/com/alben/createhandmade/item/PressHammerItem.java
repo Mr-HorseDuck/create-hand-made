@@ -3,6 +3,7 @@ package com.alben.createhandmade.item;
 import com.alben.createhandmade.recipe.HandMadeSequencedAssemblyRecipe;
 import com.alben.createhandmade.recipe.HandMadeAssembly;
 import com.alben.createhandmade.api.HandMadeResult;
+import com.alben.createhandmade.api.ToolUseEvents;
 import com.alben.createhandmade.enchantment.BatchCrafting;
 import com.alben.createhandmade.network.ModNetwork;
 import com.alben.createhandmade.network.PressParticlesPacket;
@@ -402,8 +403,8 @@ public class PressHammerItem extends Item {
      * @param simulate true = 只判定不执行：走到"该 apply 了"就返回 {@link HandMadeResult#SUCCESS}，
      *                 不改工作盆内容、不播特效
      */
-    public static HandMadeResult tryPressBasin(Level level, BlockPos pos,
-                                              @Nullable FilterItemStack filter, boolean simulate) {
+    private static HandMadeResult tryPressBasinImpl(Level level, BlockPos pos,
+                                                    @Nullable FilterItemStack filter, boolean simulate) {
         if (!(level.getBlockEntity(pos) instanceof BasinBlockEntity basin)) {
             return HandMadeResult.INVALID_TARGET;
         }
@@ -462,6 +463,17 @@ public class PressHammerItem extends Item {
         }
 
         return sawFilteredOut ? HandMadeResult.FILTERED_OUT : HandMadeResult.NO_RECIPE;
+    }
+
+    // funnel：玩家手搓 / 女仆行为 / 第三方 API 三条路径都走这个入口，所以工具使用事件在这里发一次；
+    // 预演（simulate）只判定不执行，不发。
+    public static HandMadeResult tryPressBasin(Level level, BlockPos pos,
+                                              @Nullable FilterItemStack filter, boolean simulate) {
+        HandMadeResult result = tryPressBasinImpl(level, pos, filter, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.PRESS_HAMMER_BASIN, level, pos, null, null);
+        }
+        return result;
     }
 
     /** 旧签名（boolean）。内部调用方继续用它。 */
@@ -564,9 +576,9 @@ public class PressHammerItem extends Item {
      * @param batchSize 本次最多处理多少份。由调用方从工具栈上的 Batch Crafting 附魔读出。
      *                  处理 N 份 = 从物品堆叠里拆 N 个，逐个应用配方，产物累加。
      */
-    public static HandMadeResult tryPressTransported(Level level, BlockPos pos,
-                                                     @Nullable FilterItemStack filter,
-                                                     int batchSize, boolean simulate) {
+    private static HandMadeResult tryPressTransportedImpl(Level level, BlockPos pos,
+                                                          @Nullable FilterItemStack filter,
+                                                          int batchSize, boolean simulate) {
         TransportedItemStackHandlerBehaviour handler =
                 BlockEntityBehaviour.get(level, pos, TransportedItemStackHandlerBehaviour.TYPE);
         if (handler == null) return HandMadeResult.INVALID_TARGET;
@@ -661,6 +673,18 @@ public class PressHammerItem extends Item {
             return sawItem[0] ? HandMadeResult.NO_RECIPE : HandMadeResult.NO_INPUT;
         }
         return processed[0] > 0 ? HandMadeResult.SUCCESS : HandMadeResult.NO_RECIPE;
+    }
+
+    // funnel：玩家 / 女仆 / 第三方 API 都从这里进来（只有带 simulate 的这个重载真的干活），
+    // 所以工具使用事件在这里发一次；预演（simulate）不发。
+    public static HandMadeResult tryPressTransported(Level level, BlockPos pos,
+                                                     @Nullable FilterItemStack filter,
+                                                     int batchSize, boolean simulate) {
+        HandMadeResult result = tryPressTransportedImpl(level, pos, filter, batchSize, simulate);
+        if (!simulate && result.isSuccess()) {
+            ToolUseEvents.post(ToolType.PRESS_HAMMER_DEPOT, level, pos, null, null);
+        }
+        return result;
     }
 
     /** 旧签名（boolean）。内部调用方继续用它。 */

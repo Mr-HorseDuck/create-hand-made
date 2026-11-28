@@ -12,11 +12,14 @@
 
 - `API_VERSION` 只在**破坏性变更**时递增；新增方法不算破坏性变更。
 - 本 API 提供两类能力：
-  - **查询 / 读写组件**（26 个方法）—— 只读，不改世界、不消耗材料；
+  - **查询 / 读写组件**（30 个方法）—— 只读，不改世界、不消耗材料；
   - **写操作**（12 个方法，6 类操作 × 普通/预演重载）—— 会消耗输入、产出、扣耐久、播放特效，**只在服务端生效**。
 - 写操作在**客户端调用会被静默拒绝**（返回 `HandMadeResult.CLIENT_SIDE`），不会再改动本地状态。
 - 查询类方法**返回不可变列表**（`recipesFor` / `recipesForFiltered` / `handSawRecipes` / `bellowsMedia*`）。想就地排序请先自己拷贝一份，直接改会抛 `UnsupportedOperationException`。
 - 入参为 `null` 或空物品时，查询返回 `null` / 空列表 / `false`，不会抛 NPE。
+- **线程**：写操作必须在**服务端主线程**调用（会改方块实体、物品栏、触发上游配方与事件）；查询方法任意线程可读，内部缓存都是不可变快照，但取到的 `Recipe` / `ItemStack` 请只在对应 `Level` 的线程上用。
+- **弃用**：`HandMadeResult.canSucceed()` 与 `isSuccess()` 完全等价，0.7.1 起标为 `@Deprecated`（方法保留，不会删）。新代码用 `isSuccess()`。
+- 本 API 自 **0.6.1** 起提供；0.7.1 新增的方法与类在 Javadoc 里标了 `@since 0.7.1`。
 
 ### 写操作：`HandMadeResult` + 预演
 
@@ -46,20 +49,42 @@ if (CreateHandMadeApi.pressBasin(level, pos, null, true).isSuccess()) {
 
 ### 事件
 
-写操作**成功执行**后（预演不发）会发出 `HandMadeToolUsedEvent`（Forge 事件总线，服务端）：
+**加工成功执行**后（预演不发）会发出 `HandMadeToolUsedEvent`（Forge 事件总线，服务端）：
 
 ```java
 @SubscribeEvent
 public static void onToolUsed(HandMadeToolUsedEvent event) {
     ToolType tool = event.tool();      // 哪个工具
     BlockPos pos = event.pos();        // 在哪加工
-    ItemStack target = event.target(); // 被加工物（可能为 null）
+    ItemStack target = event.target(); // 被加工物（可能是空栈）
 }
 ```
 
 它是**通知性质、不可取消**——想拦截请在调用前用查询或预演判断。
 
-> ⚠ 本模组自己的工具逻辑（玩家手搓、女仆行为）**不经过** API，所以不会发这个事件；它只覆盖第三方通过 API 触发的加工。
+**0.7.1 起覆盖面变了**：以前只在「第三方通过 API 触发的加工」时发，玩家自己手搓、女仆用工具都不发；
+现在发射点下沉到各工具真正成功的那一步，**三种来源都会发**：
+
+| 来源 | 0.7.0 及以前 | 0.7.1 |
+|---|---|---|
+| 玩家手搓 | 不发 | 发 |
+| 女仆行为 | 不发 | 发 |
+| 第三方 API 写操作 | 发 | 发 |
+
+不想收可以把自己服务器的 `[api] fire_tool_used_events` 设为 `false`（默认 `true`），
+关掉只影响监听方，不影响任何加工逻辑。**监听方要能接受"事件变多了"**：以前收不到的原生加工
+现在也会进来，按「每次事件就记一笔」写统计的话数值会跳一档。
+
+`toolStack` / `target` 传什么，按工具区分（`target` 取不到单一物品时是 `null`）：
+
+| 工具 | `toolStack` | `target` |
+|---|---|---|
+| 冲压锤、风箱 | 空栈 | `null` |
+| 研钵、碾钵 | 研钵本体 | `null`（原料在容器里，不是单个栈） |
+| 灌注枪 | 枪 | `null` |
+| 搅拌杖 | 搅拌杖 | `null` |
+| 手锯 | 手锯 | 刚被切掉的几份原料 |
+| 指杆（应用配方） | 指杆 | 置物台 / 传送带上被加工的那一件 |
 
 ### 3.0 的破坏性变更
 
@@ -81,7 +106,7 @@ public static void onToolUsed(HandMadeToolUsedEvent event) {
 
 ---
 
-## 方法总览（38 个：查询 26 + 写操作 12）
+## 方法总览（42 个：查询 30 + 写操作 12）
 
 ### 配方查询
 
@@ -119,6 +144,30 @@ public static void onToolUsed(HandMadeToolUsedEvent event) {
 | `setMortarContents(ItemStack stack, @Nullable MortarContents contents)` | `void` | 写内容物；`null` 表示清空。 |
 | `mortarProcessingTicks(boolean crusherMortar)` | `int` | 按配置算加工 tick（不含起手）。`true` 读碾钵段、`false` 读研钵段。取值走 `SyncedServerConfig`，客户端拿到的是服务端同步值。 |
 
+### 工具类型识别
+
+接入方最常需要「这件物品是不是手搓工具、是哪一种」。以前只能自己 `instanceof` 十连，而且冲压锤
+有「工作盆 / 置物台」两条独立路径、手锯有「锯木 / 切石」两条独立路径，在物品层面是同一个东西，
+外部拆不出来。
+
+| 方法 | 返回 | 说明 |
+|---|---|---|
+| `toolTypeOf(ItemStack stack)` | `@Nullable ToolType` | 主类型；非手搓工具返回 `null`。冲压锤返回 `PRESS_HAMMER_DEPOT`、手锯返回 `HAND_SAW`。 |
+| `toolTypesOf(ItemStack stack)` | `List<ToolType>` | 这件物品**所有**可走的类型：手锯 → `[HAND_SAW, HAND_SAW_STONECUTTING]`、冲压锤 → `[PRESS_HAMMER_BASIN, PRESS_HAMMER_DEPOT]`，其余与主类型相同；非手搓工具返回空列表。 |
+| `isHandMadeTool(ItemStack stack)` | `boolean` | 便利方法，等价于 `toolTypeOf(stack) != null`。 |
+
+两条路径的 L2 过滤（数据包 / KubeJS 的禁用表）是分开记的，所以做「这件物品被禁了没」这类判断
+必须用 `toolTypesOf` 逐个类型查，只查主类型会漏。
+
+### 配方 ID
+
+1.20.1 的 `Recipe` 不是 `RecipeHolder`，拿不到 `id()`。`findRecipeFor` 只返回配方本体，
+想记「匹配到了哪条」得自己反查；`findRecipeMatchFor` 把这步做掉了：
+
+| 方法 | 返回 | 说明 |
+|---|---|---|
+| `findRecipeMatchFor(ToolType, Level, ItemStack)` | `@Nullable RecipeMatch` | 同 `findRecipeFor`，但连配方 ID 一起返回。`RecipeMatch.recipe()` / `.id()` / `.hasId()`；动态配方（`SequencedAssemblyRecipe` 等）没有稳定 ID，此时 `id()` 为 `null`、`hasId()` 为 `false`。 |
+
 ### 各工具查询
 
 | 方法 | 返回 | 说明 |
@@ -149,7 +198,7 @@ public static void onToolUsed(HandMadeToolUsedEvent event) {
 | `extractFluidTick(Level, BlockPos, LivingEntity, ItemStack, int rate)` | `void` | 灌注枪抽液；首次成功抽取扣耐久。逐 tick 增量动作，无预演（用 `fluidSourceAt` 预判） |
 | `applyBellows(Level, BlockPos, FanProcessingType)` | `HandMadeResult` | 对目标应用鼓风，跨模组触发上游效果，可能转化物品 |
 | `applyBellows(Level, BlockPos, FanProcessingType, boolean simulate)` | `HandMadeResult` | 同上，**预演** |
-| `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致） |
+| `damageTool(ItemStack, LivingEntity)` | `void` | 扣 1 点耐久，**对任何 `ItemStack` 都生效**（0.7.1 起不再写死灌注枪）；实体是车万女仆时按好感度走免耐久（与女仆行为内部一致），其它实体走标准 `hurtAndBreak` |
 
 > 需要 batchSize 版本的冲压或 `HandSawItem#executeCut` / `stripBlock` 这类更细的入口时，只能直接调工具类 public 方法，并自行承担"只在服务端调用""自行扣耐久""自行保证玩家行为约束"。
 >
@@ -246,6 +295,8 @@ if (!contents.isEmpty()) {                     // 永不返回 null，和灌注�
 | `mortarProcessingTicks(boolean)` | 只有两态：`true` 读碾钵段 `[tools.crusher_mortar]`、`false` 读研钵段 `[tools.mortar]`，没有「自动」档 |
 | 碾钵读 L3 | `CRUSHER_MORTAR` 会同时收 `tool: mortar` 的独占配方（碾钵是研钵的升级版），设计如此 |
 | `recipesFor` / `recipesForFiltered` | 前者不含 L2 过滤，后者含。游戏内工具查询与 JEI 分类页都按 L2 过滤 |
+| `damageTool` | 逻辑只有一份（`api/ToolDamage.breakTool`），灌注枪内部 6 处扣耐久也走它；女仆的免耐久在 API 层先判定，所以传女仆进来不会掉耐久也不会报错 |
+| 返回的列表 | 全部是**不可变列表**；`recipesFor` / `bellowsMediaTypes` 还可能直接返回缓存的同一个实例（配方表 / 注册表没变时重复调用不重建）。要改请自己拷一份，不要就地 `sort` / `remove` |
 
 ---
 
